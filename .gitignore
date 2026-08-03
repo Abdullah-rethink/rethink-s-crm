@@ -1,0 +1,8 @@
+.env
+launchgood_donations.db
+__pycache__/
+*.parquet
+data_cache/
+*.xlsx
+*.csv
+scratch/
