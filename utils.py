@@ -1158,13 +1158,89 @@ def apply_custom_css():
         <style>
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
         
+        :root {
+            /* Light mode theme (default) */
+            --bg-color: #F8FAFC;
+            --text-color: #0F172A;
+            --secondary-text-color: #64748B;
+            --card-bg: linear-gradient(145deg, rgba(255, 255, 255, 0.95), rgba(241, 245, 249, 0.98));
+            --card-border: rgba(15, 23, 42, 0.08);
+            --card-shadow: 0 8px 32px 0 rgba(148, 163, 184, 0.12);
+            --header-gradient-start: #0F172A;
+            --header-gradient-end: #2563EB;
+            --sidebar-bg: linear-gradient(180deg, #F1F5F9 0%, #E2E8F0 100%);
+            --sidebar-border: rgba(15, 23, 42, 0.07);
+            --input-bg: rgba(255, 255, 255, 0.9);
+            --input-border: rgba(15, 23, 42, 0.08);
+            --input-text: #0F172A;
+            --button-secondary-bg: rgba(15, 23, 42, 0.03);
+            --button-secondary-border: rgba(15, 23, 42, 0.08);
+            --button-secondary-hover-bg: rgba(15, 23, 42, 0.06);
+            --divider-color: rgba(15, 23, 42, 0.08);
+            --metric-card-hover-shadow: 0 14px 40px 0 rgba(37, 99, 235, 0.15);
+            --metric-border-hover: rgba(37, 99, 235, 0.4);
+            --metric-card-glow: rgba(37, 99, 235, 0.05);
+            --tab-bg: rgba(15, 23, 42, 0.04);
+            --tab-border: rgba(15, 23, 42, 0.06);
+            --tab-checked-bg: linear-gradient(135deg, #0EA5E9 0%, #6366F1 100%);
+            --tab-checked-color: #FFFFFF;
+            --tab-checked-border: rgba(56, 189, 248, 0.5);
+            --tab-checked-shadow: 0 4px 14px rgba(14, 165, 233, 0.2);
+            --metric-card-glow-left: linear-gradient(90deg, #2563EB, #7C3AED, #059669);
+            --expander-bg: rgba(255, 255, 255, 0.6);
+            --expander-border: rgba(15, 23, 42, 0.08);
+            --tier-card-bg: rgba(255, 255, 255, 0.7);
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                /* Dark mode theme */
+                --bg-color: #0F172A;
+                --text-color: #F8FAFC;
+                --secondary-text-color: #94A3B8;
+                --card-bg: linear-gradient(145deg, rgba(30, 41, 59, 0.75), rgba(15, 23, 42, 0.95));
+                --card-border: rgba(255, 255, 255, 0.1);
+                --card-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+                --header-gradient-start: #F8FAFC;
+                --header-gradient-end: #3B82F6;
+                --sidebar-bg: linear-gradient(180deg, #0F172A 0%, #090D16 100%);
+                --sidebar-border: rgba(255, 255, 255, 0.07);
+                --input-bg: rgba(30, 41, 59, 0.6);
+                --input-border: rgba(255, 255, 255, 0.08);
+                --input-text: #F8FAFC;
+                --button-secondary-bg: rgba(255, 255, 255, 0.03);
+                --button-secondary-border: rgba(255, 255, 255, 0.1);
+                --button-secondary-hover-bg: rgba(255, 255, 255, 0.08);
+                --divider-color: rgba(255, 255, 255, 0.12);
+                --metric-card-hover-shadow: 0 14px 40px 0 rgba(59, 130, 246, 0.25);
+                --metric-border-hover: rgba(59, 130, 246, 0.6);
+                --metric-card-glow: rgba(16, 185, 129, 0.15);
+                --tab-bg: rgba(15, 23, 42, 0.7);
+                --tab-border: rgba(255, 255, 255, 0.08);
+                --tab-checked-bg: linear-gradient(135deg, #0EA5E9 0%, #6366F1 100%);
+                --tab-checked-color: #FFFFFF;
+                --tab-checked-border: rgba(56, 189, 248, 0.8);
+                --tab-checked-shadow: 0 4px 14px rgba(14, 165, 233, 0.4);
+                --metric-card-glow-left: linear-gradient(90deg, #3B82F6, #8B5CF6, #10B981);
+                --expander-bg: rgba(30, 41, 59, 0.4);
+                --expander-border: rgba(255, 255, 255, 0.08);
+                --tier-card-bg: rgba(30, 41, 59, 0.6);
+            }
+        }
+        
+        /* Base page background override */
+        .stApp {
+            background-color: var(--bg-color) !important;
+            color: var(--text-color) !important;
+        }
+
         html, body, [class*="css"] {
             font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif !important;
         }
         
         /* Premium Gradient Headers */
         h1, h2, h3 {
-            background: linear-gradient(135deg, #F8FAFC 0%, #E2E8F0 50%, #3B82F6 100%);
+            background: linear-gradient(135deg, var(--header-gradient-start) 0%, var(--secondary-text-color) 50%, var(--header-gradient-end) 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             font-weight: 800 !important;
@@ -1176,45 +1252,45 @@ def apply_custom_css():
             display: flex;
             flex-wrap: wrap;
             gap: 8px;
-            background: rgba(15, 23, 42, 0.7);
+            background: var(--tab-bg);
             padding: 8px 12px;
             border-radius: 14px;
-            border: 1px solid rgba(255, 255, 255, 0.08);
+            border: 1px solid var(--tab-border);
             margin-bottom: 20px;
         }
         div[data-testid="stRadio"] > div[role="radiogroup"] > label {
-            background: rgba(255, 255, 255, 0.03) !important;
-            border: 1px solid rgba(255, 255, 255, 0.06) !important;
+            background: var(--button-secondary-bg) !important;
+            border: 1px solid var(--button-secondary-border) !important;
             border-radius: 10px !important;
             padding: 8px 16px !important;
-            color: #94A3B8 !important;
+            color: var(--secondary-text-color) !important;
             font-weight: 600 !important;
             cursor: pointer;
             transition: all 0.2s ease-in-out !important;
             margin: 0 !important;
         }
         div[data-testid="stRadio"] > div[role="radiogroup"] > label:hover {
-            background: rgba(255, 255, 255, 0.08) !important;
-            color: #F8FAFC !important;
+            background: var(--button-secondary-hover-bg) !important;
+            color: var(--text-color) !important;
             border-color: rgba(56, 189, 248, 0.4) !important;
         }
         div[data-testid="stRadio"] > div[role="radiogroup"] > label[data-checked="true"] {
-            background: linear-gradient(135deg, #0EA5E9 0%, #6366F1 100%) !important;
-            color: #FFFFFF !important;
+            background: var(--tab-checked-bg) !important;
+            color: var(--tab-checked-color) !important;
             font-weight: 700 !important;
-            border-color: rgba(56, 189, 248, 0.8) !important;
-            box-shadow: 0 4px 14px rgba(14, 165, 233, 0.4) !important;
+            border-color: var(--tab-checked-border) !important;
+            box-shadow: var(--tab-checked-shadow) !important;
         }
 
         /* Glassmorphic Metric Cards with Neon Glow */
         .metric-card {
-            background: linear-gradient(145deg, rgba(30, 41, 59, 0.75), rgba(15, 23, 42, 0.95));
+            background: var(--card-bg);
             backdrop-filter: blur(16px);
             -webkit-backdrop-filter: blur(16px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            border: 1px solid var(--card-border) !important;
             border-radius: 16px;
             padding: 20px 22px;
-            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+            box-shadow: var(--card-shadow);
             text-align: left;
             margin-bottom: 16px;
             transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
@@ -1227,21 +1303,21 @@ def apply_custom_css():
             position: absolute;
             top: 0; left: 0; right: 0;
             height: 2px;
-            background: linear-gradient(90deg, #3B82F6, #8B5CF6, #10B981);
+            background: var(--metric-card-glow-left);
             opacity: 0.8;
         }
 
         .metric-card:hover {
             transform: translateY(-4px);
-            border-color: rgba(59, 130, 246, 0.6);
-            box-shadow: 0 14px 40px 0 rgba(59, 130, 246, 0.25), 0 0 20px 0 rgba(16, 185, 129, 0.15);
+            border-color: var(--metric-border-hover) !important;
+            box-shadow: var(--metric-card-hover-shadow), 0 0 20px 0 var(--metric-card-glow) !important;
         }
         
         .metric-label {
             font-size: 0.78rem;
             text-transform: uppercase;
             letter-spacing: 0.08em;
-            color: #94A3B8;
+            color: var(--secondary-text-color);
             margin-bottom: 6px;
             font-weight: 700;
             display: flex;
@@ -1252,30 +1328,30 @@ def apply_custom_css():
         .metric-value {
             font-size: 1.85rem;
             font-weight: 800;
-            color: #F8FAFC;
+            color: var(--text-color);
             margin-bottom: 4px;
             letter-spacing: -0.03em;
         }
 
         .metric-sub {
             font-size: 0.82rem;
-            color: #64748B;
+            color: var(--secondary-text-color);
             font-weight: 500;
         }
 
         /* Glass Content Containers */
         .glass-panel {
-            background: linear-gradient(145deg, rgba(30, 41, 59, 0.5), rgba(15, 23, 42, 0.7));
+            background: var(--card-bg);
             backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 255, 255, 0.08);
+            border: 1px solid var(--card-border) !important;
             border-radius: 16px;
             padding: 24px;
             margin-bottom: 20px;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
+            box-shadow: var(--card-shadow);
         }
         
         .header-badge {
-            background: linear-gradient(90deg, #3B82F6 0%, #8B5CF6 100%);
+            background: var(--badge-bg);
             color: white;
             padding: 5px 14px;
             border-radius: 30px;
@@ -1294,41 +1370,41 @@ def apply_custom_css():
             padding: 10px 20px !important;
             font-weight: 700 !important;
             font-size: 0.9rem !important;
-            color: #94A3B8 !important;
+            color: var(--secondary-text-color) !important;
             background-color: transparent !important;
             border: 1px solid transparent !important;
             transition: all 0.2s ease-in-out !important;
         }
         
         button[data-baseweb="tab"]:hover {
-            color: #F8FAFC !important;
-            background-color: rgba(255, 255, 255, 0.05) !important;
+            color: var(--text-color) !important;
+            background-color: var(--button-secondary-hover-bg) !important;
         }
         
         button[aria-selected="true"] {
             background: linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(139, 92, 246, 0.25)) !important;
             border: 1px solid rgba(139, 92, 246, 0.4) !important;
-            color: #F8FAFC !important;
+            color: var(--text-color) !important;
             box-shadow: 0 4px 20px rgba(59, 130, 246, 0.25) !important;
         }
         
         /* Divider */
         .custom-divider {
             height: 1px;
-            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.12), transparent);
+            background: linear-gradient(90deg, transparent, var(--divider-color), transparent);
             margin: 1.5rem 0;
             border: none;
         }
         
         /* Sidebar Styling */
         [data-testid="stSidebar"] {
-            background: linear-gradient(180deg, #0F172A 0%, #090D16 100%) !important;
-            border-right: 1px solid rgba(255, 255, 255, 0.07);
+            background: var(--sidebar-bg) !important;
+            border-right: 1px solid var(--sidebar-border);
         }
         
         /* Custom Tier Cards for LTV Tab */
         .tier-card {
-            background: rgba(30, 41, 59, 0.6);
+            background: var(--tier-card-bg);
             border-radius: 14px;
             padding: 16px;
             border-left: 4px solid #3B82F6;
@@ -1345,10 +1421,56 @@ def apply_custom_css():
         .tier-card.tier-super { border-left-color: #EC4899; }
         
         /* Streamlit Input Enhancements */
-        div[data-baseweb="select"] > div {
-            background-color: rgba(30, 41, 59, 0.8) !important;
-            border-color: rgba(255, 255, 255, 0.1) !important;
+        div[data-baseweb="select"] > div, div[data-baseweb="input"] > div {
+            background-color: var(--input-bg) !important;
+            border: 1px solid var(--input-border) !important;
             border-radius: 10px !important;
+            color: var(--input-text) !important;
+        }
+        div[data-testid="stTextInput"] input, div[data-testid="stNumberInput"] input {
+            color: var(--input-text) !important;
+            background-color: transparent !important;
+        }
+        
+        /* Streamlit Button Enhancements */
+        button[kind="primary"] {
+            background: linear-gradient(135deg, #0EA5E9 0%, #6366F1 100%) !important;
+            color: white !important;
+            border: none !important;
+            border-radius: 10px !important;
+            font-weight: 700 !important;
+            box-shadow: 0 4px 14px rgba(14, 165, 233, 0.3) !important;
+            transition: all 0.2s ease !important;
+            padding: 8px 16px !important;
+        }
+        button[kind="primary"]:hover {
+            transform: translateY(-1px) !important;
+            box-shadow: 0 6px 20px rgba(14, 165, 233, 0.5) !important;
+        }
+        button[kind="secondary"] {
+            background-color: var(--button-secondary-bg) !important;
+            color: var(--text-color) !important;
+            border: 1px solid var(--button-secondary-border) !important;
+            border-radius: 10px !important;
+            font-weight: 600 !important;
+            transition: all 0.2s ease !important;
+        }
+        button[kind="secondary"]:hover {
+            background-color: var(--button-secondary-hover-bg) !important;
+            border-color: rgba(56, 189, 248, 0.4) !important;
+        }
+        
+        /* Streamlit Expander Enhancements */
+        div[data-testid="stExpander"] {
+            background: var(--expander-bg) !important;
+            border: 1px solid var(--expander-border) !important;
+            border-radius: 14px !important;
+            overflow: hidden !important;
+            box-shadow: var(--card-shadow) !important;
+        }
+        div[data-testid="stExpander"] summary {
+            font-weight: 700 !important;
+            color: var(--text-color) !important;
         }
 
         #MainMenu {visibility: hidden;}

@@ -32,9 +32,14 @@ pio.templates["custom_dark"] = pio.templates["plotly_dark"]
 pio.templates["custom_dark"].layout.update(
     paper_bgcolor="rgba(0,0,0,0)",
     plot_bgcolor="rgba(0,0,0,0)",
-    font=dict(family="Plus Jakarta Sans", color="#94A3B8"),
+    font=dict(family="Plus Jakarta Sans", color="#64748B"),
     xaxis=dict(showgrid=False, zeroline=False),
-    yaxis=dict(showgrid=True, gridcolor="rgba(255,255,255,0.05)", zeroline=False),
+    yaxis=dict(showgrid=True, gridcolor="rgba(148, 163, 184, 0.15)", zeroline=False),
+    hoverlabel=dict(
+        bgcolor="#1E293B",
+        font=dict(color="#F8FAFC", family="Plus Jakarta Sans"),
+        bordercolor="rgba(255, 255, 255, 0.1)"
+    )
 )
 pio.templates.default = "custom_dark"
 
@@ -442,6 +447,33 @@ def render_classification_tab():
             st.session_state.pop(state_key, None)
             st.rerun()
 
+    # Auto-apply inline edits to matrix_df before page/tab change
+    editor_key = f"data_editor_{matrix_platform}_filtered"
+    if editor_key in st.session_state and st.session_state[editor_key].get("edited_rows"):
+        edits = st.session_state[editor_key]["edited_rows"]
+        deleted = st.session_state[editor_key].get("deleted_rows", [])
+        prev_indices = st.session_state.get(f"{editor_key}_indices", [])
+        
+        if state_key not in st.session_state:
+            st.session_state[state_key] = matrix_df.copy()
+            
+        for pos_str, row_edits in edits.items():
+            pos = int(pos_str)
+            if pos < len(prev_indices):
+                orig_idx = prev_indices[pos]
+                for col, val in row_edits.items():
+                    st.session_state[state_key].at[orig_idx, col] = val
+                    
+        for pos_str in deleted:
+            pos = int(pos_str)
+            if pos < len(prev_indices):
+                orig_idx = prev_indices[pos]
+                st.session_state[state_key] = st.session_state[state_key].drop(index=orig_idx)
+                
+        st.session_state[editor_key]["edited_rows"] = {}
+        st.session_state[editor_key]["deleted_rows"] = []
+        matrix_df = st.session_state[state_key]
+
     unassigned_count = (matrix_df["Heading"] == "Unassigned").sum() if "Heading" in matrix_df.columns else 0
 
     
@@ -551,23 +583,52 @@ def render_classification_tab():
     st.subheader(f"📝 Edit {matrix_platform} Rules Inline")
     st.caption("Double-click any cell below to edit Heading, Sub-Heading, Country, Code, or Zakat Eligibility.")
     
+    # Pagination for classifications
+    classif_page_key = f"classif_page_{matrix_platform}"
+    if classif_page_key not in st.session_state:
+        st.session_state[classif_page_key] = 1
+        
+    classif_page_size = 100
+    classif_total_pages = max(1, (filtered_count - 1) // classif_page_size + 1)
+    
+    st.session_state[classif_page_key] = min(st.session_state[classif_page_key], classif_total_pages)
+    st.session_state[classif_page_key] = max(1, st.session_state[classif_page_key])
+    
+    classif_start_idx = (st.session_state[classif_page_key] - 1) * classif_page_size
+    classif_end_idx = classif_start_idx + classif_page_size
+    
+    matrix_df_page = matrix_df[mask].iloc[classif_start_idx:classif_end_idx]
+    
+    # Store indices for next run's edit matching
+    st.session_state[f"{editor_key}_indices"] = list(matrix_df_page.index)
+
+    # Render pagination controls
+    p_col1, p_col2, p_col3 = st.columns([2, 6, 2])
+    with p_col1:
+        if st.button("⬅️ Previous Page", key=f"prev_classif_{matrix_platform}", disabled=(st.session_state[classif_page_key] == 1)):
+            st.session_state[classif_page_key] -= 1
+            st.rerun()
+    with p_col2:
+        st.markdown(f"<div style='text-align: center; padding-top: 6px;'>Page <b>{st.session_state[classif_page_key]}</b> of <b>{classif_total_pages}</b> (Showing {classif_start_idx+1}-{min(classif_end_idx, filtered_count)} of {filtered_count:,} matching rules)</div>", unsafe_allow_html=True)
+    with p_col3:
+        if st.button("Next Page ➡️", key=f"next_classif_{matrix_platform}", disabled=(st.session_state[classif_page_key] == classif_total_pages)):
+            st.session_state[classif_page_key] += 1
+            st.rerun()
+
     edited_filtered_df = st.data_editor(
-        matrix_df[mask],
+        matrix_df_page,
         use_container_width=True,
         num_rows="dynamic",
-        key=f"data_editor_{matrix_platform}_filtered"
+        key=editor_key
     )
     
-    # Recombine unfiltered rows with edited filtered rows
-    other_rows = matrix_df[~mask]
-    full_updated_df = pd.concat([other_rows, edited_filtered_df], ignore_index=True)
-    
     if st.button(f"💾 Save & Apply {matrix_platform} Rules Now", type="primary", use_container_width=True):
+        save_target_df = st.session_state.get(state_key, matrix_df)
         with st.spinner("Saving classification matrix & updating database..."):
             if matrix_platform == "⚡ LaunchGood Matrix":
-                n_saved = save_classification_matrix(full_updated_df)
+                n_saved = save_classification_matrix(save_target_df)
             else:
-                n_saved = save_givebright_classification_matrix(full_updated_df)
+                n_saved = save_givebright_classification_matrix(save_target_df)
             st.session_state.pop(state_key, None)
             st.session_state.pop("df_raw", None)
             st.success(f"✅ Saved {n_saved:,} campaign rules! Dashboard metrics re-calculated.")
@@ -1017,6 +1078,53 @@ elif selected_tab == "🌍 Geography & Payment Insights":
                 st.plotly_chart(fig_pm, use_container_width=True)
 
 elif selected_tab == "📋 Data Explorer & Export":
+    # Auto-apply inline edits to df_raw and df before page change
+    editor_key = "data_editor_donors_filtered"
+    if editor_key in st.session_state and st.session_state[editor_key].get("edited_rows"):
+        edits = st.session_state[editor_key]["edited_rows"]
+        deleted = st.session_state[editor_key].get("deleted_rows", [])
+        prev_ids = st.session_state.get(f"{editor_key}_donation_ids", [])
+        
+        df_raw_indexed = df_raw.set_index("Donation ID")
+        df_indexed = df.set_index("Donation ID")
+        
+        for pos_str, row_edits in edits.items():
+            pos = int(pos_str)
+            if pos < len(prev_ids):
+                don_id = prev_ids[pos]
+                if df_raw_indexed.index.dtype == 'int64':
+                    try: don_id = int(don_id)
+                    except ValueError: pass
+                elif df_raw_indexed.index.dtype == 'float64':
+                    try: don_id = float(don_id)
+                    except ValueError: pass
+                    
+                if don_id in df_raw_indexed.index:
+                    for col, val in row_edits.items():
+                        df_raw_indexed.at[don_id, col] = val
+                if don_id in df_indexed.index:
+                    for col, val in row_edits.items():
+                        df_indexed.at[don_id, col] = val
+                        
+        for pos_str in deleted:
+            pos = int(pos_str)
+            if pos < len(prev_ids):
+                don_id = prev_ids[pos]
+                if df_raw_indexed.index.dtype == 'int64':
+                    try: don_id = int(don_id)
+                    except ValueError: pass
+                if don_id in df_raw_indexed.index:
+                    df_raw_indexed = df_raw_indexed.drop(index=don_id)
+                if don_id in df_indexed.index:
+                    df_indexed = df_indexed.drop(index=don_id)
+                    
+        df_raw = df_raw_indexed.reset_index()
+        st.session_state["df_raw"] = df_raw
+        df = df_indexed.reset_index()
+        
+        st.session_state[editor_key]["edited_rows"] = {}
+        st.session_state[editor_key]["deleted_rows"] = []
+
     st.subheader("📋 Donor Records Table")
     st.markdown("Full donor-level data with classification, payment frequency, category, email, and more.")
 
@@ -1103,11 +1211,20 @@ elif selected_tab == "📋 Data Explorer & Export":
 
     total_matching = len(display_df)
 
-    # Apply row limit
-    if max_rows != "All":
-        display_df_show = display_df.head(int(max_rows))
-    else:
-        display_df_show = display_df
+    # Initialize donors_page
+    if "donors_page" not in st.session_state:
+        st.session_state["donors_page"] = 1
+        
+    page_size = int(max_rows) if max_rows != "All" else len(display_df)
+    total_pages = max(1, (len(display_df) - 1) // page_size + 1) if page_size > 0 else 1
+    
+    st.session_state["donors_page"] = min(st.session_state["donors_page"], total_pages)
+    st.session_state["donors_page"] = max(1, st.session_state["donors_page"])
+    
+    start_idx = (st.session_state["donors_page"] - 1) * page_size
+    end_idx = start_idx + page_size
+    
+    display_df_show = display_df.iloc[start_idx:end_idx]
 
     # ── Summary stats bar ───────────────────────────────────────────────────
     s1, s2, s3, s4, s5 = st.columns(5)
@@ -1221,8 +1338,26 @@ elif selected_tab == "📋 Data Explorer & Export":
 
 
 
+    # Store Donation IDs of the currently displayed page for edit matching on the next run
+    if "Donation ID" in display_df_show.columns:
+        st.session_state[f"{editor_key}_donation_ids"] = list(display_df_show["Donation ID"])
+    else:
+        st.session_state[f"{editor_key}_donation_ids"] = list(display_df_show.index)
+
+    # Render pagination controls
+    p_col1, p_col2, p_col3 = st.columns([2, 6, 2])
+    with p_col1:
+        if st.button("⬅️ Previous Page", key="donors_prev_btn", disabled=(st.session_state["donors_page"] == 1)):
+            st.session_state["donors_page"] -= 1
+            st.rerun()
+    with p_col2:
+        st.markdown(f"<div style='text-align: center; padding-top: 6px;'>Page <b>{st.session_state['donors_page']}</b> of <b>{total_pages}</b> (Showing {start_idx+1}-{min(end_idx, len(display_df))} of {len(display_df):,} matching records)</div>", unsafe_allow_html=True)
+    with p_col3:
+        if st.button("Next Page ➡️", key="donors_next_btn", disabled=(st.session_state["donors_page"] == total_pages)):
+            st.session_state["donors_page"] += 1
+            st.rerun()
+
     # ── The Main Data Table ─────────────────────────────────────────────────
-    st.markdown(f"**Showing {len(display_df_show):,} of {total_matching:,} matching records**")
     st.caption("Double-click any cell below to edit donor information. The Donation ID index column is read-only for alignment safety.")
 
     # Set index to Donation ID for the editor
@@ -1233,25 +1368,10 @@ elif selected_tab == "📋 Data Explorer & Export":
         use_container_width=True,
         height=520,
         num_rows="dynamic",
-        key="data_editor_donors_filtered"
+        key=editor_key
     )
 
-    # Align edits back
-    if "Donation ID" in display_df_show.columns:
-        original_ids = set(display_df_show_editor.index)
-        current_ids = set(edited_filtered_df.index)
-        deleted_ids = original_ids - current_ids
-        
-        # Build raw updated df from edits
-        df_raw_indexed = df_raw.set_index("Donation ID")
-        df_raw_indexed.update(edited_filtered_df)
-        
-        if deleted_ids:
-            df_raw_indexed = df_raw_indexed.drop(index=list(deleted_ids))
-            
-        df_raw_updated = df_raw_indexed.reset_index()
-    else:
-        df_raw_updated = df_raw
+    df_raw_updated = st.session_state.get("df_raw", df_raw)
         
     st.markdown("<br>", unsafe_allow_html=True)
     if st.button("💾 Save Donor Changes Now", type="primary", use_container_width=True, key="save_donors_btn"):
