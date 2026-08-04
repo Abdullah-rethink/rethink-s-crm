@@ -277,13 +277,16 @@ def sync_donor_classifications_to_matrix(df_raw):
         # 1. Sync LaunchGood / Default rows
         lg_mask = df_raw.get("Platform", pd.Series("", index=df_raw.index)) != "GiveBright"
         if lg_mask.any():
-            lg_df = df_raw[lg_mask]
-            comm_col = "Community Name" if "Community Name" in lg_df.columns else None
-            group_cols = ["Campaign Name"] + ([comm_col] if comm_col else [])
+            lg_df = df_raw[lg_mask].copy()
+            lg_df["Campaign Name"] = lg_df["Campaign Name"].astype(str).fillna("N/A").replace({'nan': 'N/A', '': 'N/A', 'None': 'N/A'})
+            if "Community Name" in lg_df.columns:
+                lg_df["Community Name"] = lg_df["Community Name"].astype(str).fillna("N/A").replace({'nan': 'N/A', '': 'N/A', 'None': 'N/A'})
+            else:
+                lg_df["Community Name"] = "N/A"
+
+            group_cols = ["Campaign Name", "Community Name"]
             
-            lg_matrix = lg_df.groupby(group_cols)[available_targets].first().reset_index()
-            if comm_col is None:
-                lg_matrix["Community Name"] = "N/A"
+            lg_matrix = lg_df.groupby(group_cols, dropna=False)[available_targets].first().reset_index()
                 
             lg_save = lg_matrix.rename(columns={
                 "Campaign Name": "campaign_name",
@@ -310,8 +313,9 @@ def sync_donor_classifications_to_matrix(df_raw):
         # 2. Sync GiveBright rows
         gb_mask = df_raw.get("Platform", pd.Series("", index=df_raw.index)) == "GiveBright"
         if gb_mask.any():
-            gb_df = df_raw[gb_mask]
-            gb_matrix = gb_df.groupby("Campaign Name")[available_targets].first().reset_index()
+            gb_df = df_raw[gb_mask].copy()
+            gb_df["Campaign Name"] = gb_df["Campaign Name"].astype(str).fillna("N/A").replace({'nan': 'N/A', '': 'N/A', 'None': 'N/A'})
+            gb_matrix = gb_df.groupby("Campaign Name", dropna=False)[available_targets].first().reset_index()
             
             gb_save = gb_matrix.rename(columns={
                 "Campaign Name": "campaign_name",
@@ -366,8 +370,8 @@ def get_classification_matrix():
                 lg_mask = df_donations.get("Platform", pd.Series("", index=df_donations.index)) != "GiveBright"
                 lg_df = df_donations[lg_mask] if lg_mask.any() else df_donations
 
-                c_name = lg_df["Campaign Name"].astype(str).fillna("N/A")
-                comm_name = lg_df["Community Name"].astype(str).fillna("N/A") if "Community Name" in lg_df.columns else pd.Series("N/A", index=lg_df.index)
+                c_name = lg_df["Campaign Name"].astype(str).fillna("N/A").replace({'nan': 'N/A', '': 'N/A', 'None': 'N/A'})
+                comm_name = lg_df["Community Name"].astype(str).fillna("N/A").replace({'nan': 'N/A', '': 'N/A', 'None': 'N/A'}) if "Community Name" in lg_df.columns else pd.Series("N/A", index=lg_df.index)
 
                 available_target_cols = [c for c in target_cols_display if c in lg_df.columns]
                 donor_df = pd.DataFrame({"Campaign Name": c_name, "Community Name": comm_name})
@@ -375,8 +379,7 @@ def get_classification_matrix():
                     donor_df[tc] = lg_df[tc].values
 
                 # Take the most frequently occurring value per (Campaign, Community) pair.
-                # This means if 90 rows have Code=GBR-FBK and 2 have FBK-GBR, the matrix shows GBR-FBK.
-                matrix_df = donor_df.groupby(["Campaign Name", "Community Name"])[available_target_cols].agg(_mode_or_last).reset_index()
+                matrix_df = donor_df.groupby(["Campaign Name", "Community Name"], dropna=False)[available_target_cols].agg(_mode_or_last).reset_index()
                 
                 # Supplement with SQLite for any campaigns not in live Parquet
                 conn = sqlite3.connect(LOCAL_DB_PATH, timeout=30.0)
@@ -393,7 +396,9 @@ def get_classification_matrix():
                     }, inplace=True)
                     
                     if not db_matrix.empty:
-                        # Only add rows from DB that are NOT already in the live Parquet matrix
+                        db_matrix["Campaign Name"] = db_matrix["Campaign Name"].astype(str).fillna("N/A").replace({'nan': 'N/A', '': 'N/A', 'None': 'N/A'})
+                        db_matrix["Community Name"] = db_matrix["Community Name"].astype(str).fillna("N/A").replace({'nan': 'N/A', '': 'N/A', 'None': 'N/A'})
+                        
                         existing_keys = set(zip(matrix_df["Campaign Name"].astype(str), matrix_df["Community Name"].astype(str)))
                         new_rows = db_matrix[~db_matrix.apply(
                             lambda r: (str(r.get("Campaign Name", "")), str(r.get("Community Name", ""))) in existing_keys, axis=1
@@ -443,6 +448,12 @@ def save_classification_matrix(matrix_df):
 
     init_classification_db()
     save_df = matrix_df.copy()
+    save_df["Campaign Name"] = save_df["Campaign Name"].astype(str).fillna("N/A").replace({'nan': 'N/A', '': 'N/A', 'None': 'N/A'})
+    if "Community Name" in save_df.columns:
+        save_df["Community Name"] = save_df["Community Name"].astype(str).fillna("N/A").replace({'nan': 'N/A', '': 'N/A', 'None': 'N/A'})
+    else:
+        save_df["Community Name"] = "N/A"
+
     save_df.rename(columns={
         "Campaign Name": "campaign_name",
         "Community Name": "community_name",
@@ -454,7 +465,7 @@ def save_classification_matrix(matrix_df):
     }, inplace=True)
 
     db_cols = ["campaign_name", "community_name", "heading", "sub_heading", "country", "code", "zakat_eligibility"]
-    save_df = save_df[[c for c in db_cols if c in save_df.columns]]
+    save_df = save_df[[c for c in db_cols if c in save_df.columns]].drop_duplicates(subset=["campaign_name", "community_name"])
 
     conn = sqlite3.connect(LOCAL_DB_PATH)
     try:
@@ -468,15 +479,49 @@ def save_classification_matrix(matrix_df):
         df_donations = pd.read_parquet(PARQUET_PATH)
         if not df_donations.empty and "Campaign Name" in df_donations.columns:
             target_cols = ["Heading", "Sub-Heading", "Country", "Code", "Zakat Eligibility"]
-            df_donations.drop(columns=[c for c in target_cols if c in df_donations.columns], inplace=True, errors="ignore")
-            
-            clean_matrix = matrix_df[["Campaign Name", "Community Name"] + [c for c in target_cols if c in matrix_df.columns]].drop_duplicates(subset=["Campaign Name", "Community Name"])
-            df_donations = pd.merge(df_donations, clean_matrix, on=["Campaign Name", "Community Name"], how="left")
-            
-            for f in target_cols:
-                if f in df_donations.columns:
-                    df_donations[f] = df_donations[f].fillna("Unassigned").astype(str).replace({'nan': 'Unassigned', '': 'Unassigned', 'None': 'Unassigned'})
 
+            # Filter for LaunchGood / non-GiveBright records
+            lg_mask = df_donations.get("Platform", pd.Series("", index=df_donations.index)) != "GiveBright"
+            if not lg_mask.any():
+                lg_mask = pd.Series(True, index=df_donations.index)
+
+            # Build clean matrix with normalized string keys
+            clean_matrix = matrix_df.copy()
+            clean_matrix["_c_key"] = clean_matrix["Campaign Name"].astype(str).fillna("N/A").replace({'nan': 'N/A', '': 'N/A', 'None': 'N/A'})
+            if "Community Name" in clean_matrix.columns:
+                clean_matrix["_comm_key"] = clean_matrix["Community Name"].astype(str).fillna("N/A").replace({'nan': 'N/A', '': 'N/A', 'None': 'N/A'})
+            else:
+                clean_matrix["_comm_key"] = "N/A"
+
+            for f in target_cols:
+                if f not in clean_matrix.columns:
+                    clean_matrix[f] = "Unassigned"
+                clean_matrix[f] = clean_matrix[f].fillna("Unassigned").astype(str).replace({'nan': 'Unassigned', '': 'Unassigned', 'None': 'Unassigned'})
+
+            clean_matrix = clean_matrix[["_c_key", "_comm_key"] + target_cols].drop_duplicates(subset=["_c_key", "_comm_key"])
+
+            # Prepare normalized keys for lg_donations subset
+            lg_donations = df_donations[lg_mask].copy()
+            lg_donations["_c_key"] = lg_donations["Campaign Name"].astype(str).fillna("N/A").replace({'nan': 'N/A', '': 'N/A', 'None': 'N/A'})
+            if "Community Name" in lg_donations.columns:
+                lg_donations["_comm_key"] = lg_donations["Community Name"].astype(str).fillna("N/A").replace({'nan': 'N/A', '': 'N/A', 'None': 'N/A'})
+            else:
+                lg_donations["_comm_key"] = "N/A"
+
+            # Drop old classification target cols from subset
+            lg_donations.drop(columns=[c for c in target_cols if c in lg_donations.columns], inplace=True, errors="ignore")
+
+            # Merge with clean matrix
+            lg_merged = pd.merge(lg_donations, clean_matrix, on=["_c_key", "_comm_key"], how="left")
+
+            for f in target_cols:
+                lg_merged[f] = lg_merged[f].fillna("Unassigned").astype(str).replace({'nan': 'Unassigned', '': 'Unassigned', 'None': 'Unassigned'})
+
+            # Re-assign updated target cols back to df_donations for lg_mask rows
+            for f in target_cols:
+                df_donations.loc[lg_mask, f] = lg_merged[f].values
+
+            df_donations = deduplicate_dataframe_columns(df_donations)
             df_donations.to_parquet(PARQUET_PATH, index=False)
             conn = sqlite3.connect(LOCAL_DB_PATH, timeout=30.0)
             df_donations.to_sql("donations", con=conn, if_exists="replace", index=False)
@@ -613,6 +658,7 @@ def save_givebright_classification_matrix(matrix_df):
 
     init_givebright_classification_db()
     save_df = matrix_df.copy()
+    save_df["Campaign Name"] = save_df["Campaign Name"].astype(str).fillna("N/A").replace({'nan': 'N/A', '': 'N/A', 'None': 'N/A'})
     save_df.rename(columns={
         "Campaign Name": "campaign_name",
         "Heading": "heading",
@@ -637,15 +683,24 @@ def save_givebright_classification_matrix(matrix_df):
         df_donations = pd.read_parquet(PARQUET_PATH)
         if not df_donations.empty and "Campaign Name" in df_donations.columns:
             target_cols = ["Heading", "Sub-Heading", "Country", "Code", "Zakat Eligibility"]
-            map_data = matrix_df.set_index("Campaign Name")
+            
+            clean_matrix = matrix_df.copy()
+            clean_matrix["_c_key"] = clean_matrix["Campaign Name"].astype(str).fillna("N/A").replace({'nan': 'N/A', '': 'N/A', 'None': 'N/A'})
+            for f in target_cols:
+                if f not in clean_matrix.columns:
+                    clean_matrix[f] = "Unassigned"
+                clean_matrix[f] = clean_matrix[f].fillna("Unassigned").astype(str).replace({'nan': 'Unassigned', '': 'Unassigned', 'None': 'Unassigned'})
+            
+            map_data = clean_matrix.set_index("_c_key")
             
             gb_mask = df_donations.get("Platform", pd.Series("", index=df_donations.index)) == "GiveBright"
             if gb_mask.any():
+                c_keys = df_donations.loc[gb_mask, "Campaign Name"].astype(str).fillna("N/A").replace({'nan': 'N/A', '': 'N/A', 'None': 'N/A'})
                 for f in target_cols:
-                    if f in matrix_df.columns:
-                        map_dict = map_data[f].to_dict() if f in map_data.columns else {}
-                        mapped_vals = df_donations.loc[gb_mask, "Campaign Name"].map(map_dict).fillna("Unassigned")
-                        df_donations.loc[gb_mask, f] = mapped_vals
+                    if f in map_data.columns:
+                        map_dict = map_data[f].to_dict()
+                        mapped_vals = c_keys.map(map_dict).fillna("Unassigned")
+                        df_donations.loc[gb_mask, f] = mapped_vals.values
 
                 df_donations = deduplicate_dataframe_columns(df_donations)
                 df_donations.to_parquet(PARQUET_PATH, index=False)

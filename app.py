@@ -1271,19 +1271,33 @@ elif selected_tab == "📋 Data Explorer & Export":
         
         editable_cols = sorted([str(c) for c in df_raw.columns if str(c).strip() != ""])
         
-        be1, be2 = st.columns(2)
-        with be1:
+        row1_col1, row1_col2 = st.columns(2)
+        with row1_col1:
             st.markdown("**Field #1**")
             target_col_1 = st.selectbox("Select Target Column #1", ["-- Select Column --"] + editable_cols, key="bulk_target_col_1")
             val_1 = st.text_input("New Value for Column #1", placeholder="Type new value...", key="bulk_val_1")
             
-        with be2:
+        with row1_col2:
             st.markdown("**Field #2 (Optional)**")
             target_col_2 = st.selectbox("Select Target Column #2", ["-- Select Column --"] + editable_cols, key="bulk_target_col_2")
             val_2 = st.text_input("New Value for Column #2", placeholder="Type new value...", key="bulk_val_2")
+
+        row2_col1, row2_col2 = st.columns(2)
+        with row2_col1:
+            st.markdown("**Field #3 (Optional)**")
+            target_col_3 = st.selectbox("Select Target Column #3", ["-- Select Column --"] + editable_cols, key="bulk_target_col_3")
+            val_3 = st.text_input("New Value for Column #3", placeholder="Type new value...", key="bulk_val_3")
+            
+        with row2_col2:
+            st.markdown("**Field #4 (Optional)**")
+            target_col_4 = st.selectbox("Select Target Column #4", ["-- Select Column --"] + editable_cols, key="bulk_target_col_4")
+            val_4 = st.text_input("New Value for Column #4", placeholder="Type new value...", key="bulk_val_4")
             
         if st.button("⚡ Apply Bulk Changes to Filtered Records", use_container_width=True, key="bulk_apply_donors_btn"):
-            if target_col_1 == "-- Select Column --" and target_col_2 == "-- Select Column --":
+            if (target_col_1 == "-- Select Column --" and 
+                target_col_2 == "-- Select Column --" and 
+                target_col_3 == "-- Select Column --" and 
+                target_col_4 == "-- Select Column --"):
                 st.warning("Please select at least one column to update.")
             else:
                 with st.spinner("Applying and saving changes..."):
@@ -1295,6 +1309,10 @@ elif selected_tab == "📋 Data Explorer & Export":
                             df_raw_copy.at[idx, target_col_1] = val_1.strip()
                         if target_col_2 != "-- Select Column --" and val_2.strip():
                             df_raw_copy.at[idx, target_col_2] = val_2.strip()
+                        if target_col_3 != "-- Select Column --" and val_3.strip():
+                            df_raw_copy.at[idx, target_col_3] = val_3.strip()
+                        if target_col_4 != "-- Select Column --" and val_4.strip():
+                            df_raw_copy.at[idx, target_col_4] = val_4.strip()
 
                     # Persist immediately to Parquet + SQLite
                     df_raw_copy.to_parquet(PARQUET_PATH, index=False)
