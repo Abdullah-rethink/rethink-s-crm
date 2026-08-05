@@ -25,6 +25,11 @@ from components.sidebar import render_sidebar_filters, render_sidebar_user_pill
 from config.settings import SESSION_TIMEOUT_SECONDS
 from config.styles import apply_custom_css
 from core.auth import authenticate_user, change_user_password, get_user_by_identity, init_user_db
+from core.auth_bridge import (
+    clear_local_storage_auth,
+    restore_auth_from_local_storage,
+    sync_auth_to_local_storage,
+)
 from core.data_processor import load_data, process_and_upload_excel
 from views.admin_view import render_admin_tab
 from views.classification_view import render_classification_tab
@@ -47,6 +52,7 @@ def render_auth_screen():
         
         if (now - last_active) > SESSION_TIMEOUT_SECONDS:
             idle_mins = int((now - last_active) // 60)
+            clear_local_storage_auth()
             if "session_user" in st.query_params:
                 del st.query_params["session_user"]
             st.session_state.pop("authenticated_user", None)
@@ -54,16 +60,22 @@ def render_auth_screen():
             st.warning(f"🔒 **Session Expired:** You were automatically signed out after {idle_mins} minutes of inactivity. Please log in again.")
         else:
             st.session_state["last_activity_time"] = now
-            return st.session_state["authenticated_user"]
+            user = st.session_state["authenticated_user"]
+            sync_auth_to_local_storage(user.get("username", user.get("email")))
+            return user
 
-    # 2. Check Query Params for Refresh Persistence
+    # 2. Check Query Params & Browser LocalStorage for Refresh Persistence
     query_session_user = st.query_params.get("session_user")
     if query_session_user:
         restored_user = get_user_by_identity(query_session_user)
         if restored_user:
             st.session_state["authenticated_user"] = restored_user
             st.session_state["last_activity_time"] = time.time()
+            sync_auth_to_local_storage(restored_user.get("username", restored_user.get("email")))
             return restored_user
+
+    # Execute LocalStorage JS Restoration Bridge on login page
+    restore_auth_from_local_storage()
 
     st.markdown("<br>", unsafe_allow_html=True)
     _c1, c2, _c3 = st.columns([2, 5, 2])
@@ -91,9 +103,11 @@ def render_auth_screen():
                     with st.spinner("Authenticating credentials..."):
                         user = authenticate_user(login_identity, login_password)
                         if user:
-                            st.query_params["session_user"] = user.get("username", user.get("email"))
+                            u_name = user.get("username", user.get("email"))
+                            st.query_params["session_user"] = u_name
                             st.session_state["authenticated_user"] = user
                             st.session_state["last_activity_time"] = time.time()
+                            sync_auth_to_local_storage(u_name)
                             st.rerun()
                         else:
                             st.error("❌ Invalid credentials or user not found. Please try again.")

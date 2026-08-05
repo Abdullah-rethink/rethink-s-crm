@@ -3,6 +3,7 @@ import streamlit as st
 
 from config.settings import DONOR_TIER_ORDER
 from core.auth import change_user_password
+from core.auth_bridge import clear_local_storage_auth
 
 
 def render_sidebar_user_pill(user_session):
@@ -19,6 +20,7 @@ def render_sidebar_user_pill(user_session):
     """, unsafe_allow_html=True)
 
     if st.sidebar.button("🚪 Sign Out", key="sidebar_sign_out_btn", use_container_width=True):
+        clear_local_storage_auth()
         if "session_user" in st.query_params:
             del st.query_params["session_user"]
         st.session_state.pop("authenticated_user", None)
