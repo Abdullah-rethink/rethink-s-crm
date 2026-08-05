@@ -3,3 +3,5 @@ launchgood_donations.db
 __pycache__/
 
 scratch/
+*.csv
+*.xlsx
