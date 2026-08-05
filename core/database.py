@@ -7,21 +7,29 @@ from sqlalchemy import create_engine
 from config.settings import DATABASE_URL, LOCAL_DB_PATH, LOCAL_DB_URL
 
 # Create local SQLAlchemy engine
-local_engine = create_engine(LOCAL_DB_URL)
+try:
+    local_engine = create_engine(LOCAL_DB_URL)
+except Exception as e:
+    print(f"Local engine init notice: {e}")
+    local_engine = None
 
 # Setup Cloud Database Engine (Supabase PostgreSQL)
-connect_args = {}
-if "postgres" in DATABASE_URL:
-    connect_args = {"options": "-c statement_timeout=30000"}
-
-cloud_engine = create_engine(
-    DATABASE_URL, 
-    connect_args=connect_args,
-    pool_pre_ping=True
-) if "postgres" in DATABASE_URL else None
+try:
+    if "postgres" in DATABASE_URL:
+        connect_args = {"options": "-c statement_timeout=30000"}
+        cloud_engine = create_engine(
+            DATABASE_URL, 
+            connect_args=connect_args,
+            pool_pre_ping=True
+        )
+    else:
+        cloud_engine = None
+except Exception as e:
+    print(f"Cloud DB engine init notice: {e}")
+    cloud_engine = None
 
 # Main engine defaults to local_engine for ultra-fast query performance
-engine = local_engine
+engine = local_engine if local_engine else cloud_engine
 
 def _write_sync_status(success: bool, op_type: str, err: str = ""):
     """Helper to record cloud DB background sync status in SQLite."""

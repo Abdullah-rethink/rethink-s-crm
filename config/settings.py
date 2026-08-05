@@ -13,7 +13,10 @@ CACHE_DIR = os.path.join(BASE_DIR, "data_cache")
 
 # Database Connection URLs
 LOCAL_DB_URL = f"sqlite:///{LOCAL_DB_PATH}"
-DATABASE_URL = os.environ.get("DATABASE_URL", LOCAL_DB_URL)
+raw_db_url = os.environ.get("DATABASE_URL", LOCAL_DB_URL).strip()
+if raw_db_url.startswith("postgres://"):
+    raw_db_url = raw_db_url.replace("postgres://", "postgresql://", 1)
+DATABASE_URL = raw_db_url
 
 # Supabase Auth Configuration
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "").strip()
