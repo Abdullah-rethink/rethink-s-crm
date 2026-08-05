@@ -64,31 +64,30 @@ def render_admin_tab(df_raw, user_session):
         with src_col1:
             st.dataframe(source_counts, use_container_width=True, hide_index=True)
         with src_col2:
-            with st.form("rename_tag_form", clear_on_submit=False):
-                old_tag_choice = st.selectbox("Select Dataset Tag", options=source_counts["Source Tag"].tolist(), key="select_tag_admin")
-                new_tag_input = st.text_input("New Corrected Tag Name", placeholder="e.g. Ramadan 2025", key="rename_tag_admin")
-                submit_rename = st.form_submit_button("✏️ Rename Tag", use_container_width=True)
+            if user_session.get("role") != "super_admin":
+                st.info("🔒 **Read-Only Access:** Logged in as Admin (`admin@analytics.com`). Dataset tag renaming and dataset deletion are restricted to **Super Admin** accounts.")
+            else:
+                with st.form("rename_tag_form", clear_on_submit=False):
+                    old_tag_choice = st.selectbox("Select Dataset Tag", options=source_counts["Source Tag"].tolist(), key="select_tag_admin")
+                    new_tag_input = st.text_input("New Corrected Tag Name", placeholder="e.g. Ramadan 2025", key="rename_tag_admin")
+                    submit_rename = st.form_submit_button("✏️ Rename Tag", use_container_width=True)
 
-            if submit_rename:
-                if user_session.get("role") != "super_admin":
-                    st.error("🔒 **Access Restricted:** Renaming dataset tags is restricted to Super Admin accounts.")
-                elif old_tag_choice and new_tag_input.strip():
-                    n_updated = update_source_tag(old_tag_choice, new_tag_input.strip())
-                    st.session_state.pop("df_raw", None)
-                    st.success(f"✅ Updated {n_updated:,} records from '{old_tag_choice}' ➔ '{new_tag_input.strip()}'!")
-                    st.rerun()
-                else:
-                    st.warning("Please type a new tag name.")
+                if submit_rename:
+                    if old_tag_choice and new_tag_input.strip():
+                        n_updated = update_source_tag(old_tag_choice, new_tag_input.strip())
+                        st.session_state.pop("df_raw", None)
+                        st.success(f"✅ Updated {n_updated:,} records from '{old_tag_choice}' ➔ '{new_tag_input.strip()}'!")
+                        st.rerun()
+                    else:
+                        st.warning("Please type a new tag name.")
 
-            st.markdown("<br>", unsafe_allow_html=True)
-            if st.button("🗑️ Delete Dataset", type="primary", use_container_width=True):
-                if user_session.get("role") != "super_admin":
-                    st.error("🔒 **Access Restricted:** Deleting dataset batches is restricted to **Super Admin** accounts only.")
-                elif old_tag_choice:
-                    n_deleted = delete_single_dataset(old_tag_choice)
-                    st.session_state.pop("df_raw", None)
-                    st.success(f"✅ Successfully deleted dataset '{old_tag_choice}' ({n_deleted:,} records removed)!")
-                    st.rerun()
+                st.markdown("<br>", unsafe_allow_html=True)
+                if st.button("🗑️ Delete Dataset", type="primary", use_container_width=True):
+                    if old_tag_choice:
+                        n_deleted = delete_single_dataset(old_tag_choice)
+                        st.session_state.pop("df_raw", None)
+                        st.success(f"✅ Successfully deleted dataset '{old_tag_choice}' ({n_deleted:,} records removed)!")
+                        st.rerun()
 
     # Database Purge / Reset Section (RESTRICTED TO SUPER ADMIN)
     st.markdown('<hr class="custom-divider">', unsafe_allow_html=True)
