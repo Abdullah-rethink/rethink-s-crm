@@ -11,7 +11,7 @@ from utils import (
     import_givebright_classifications_file, delete_single_dataset,
     sync_donor_classifications_to_matrix, get_cloud_sync_status, PARQUET_PATH,
     DATABASE_URL, LOCAL_DB_PATH, authenticate_user, send_password_reset_request, 
-    change_user_password, init_user_db
+    change_user_password, init_user_db, style_donor_classifications
 )
 
 # Allow Pandas Styler to render large tables (up to 2M cells)
@@ -81,10 +81,12 @@ def render_auth_screen():
 
         with auth_tab_login:
             st.markdown("<br>", unsafe_allow_html=True)
-            login_identity = st.text_input("Email or Username", placeholder="e.g. superadmin@analytics.com", key="auth_login_identity")
-            login_password = st.text_input("Password", type="password", placeholder="Enter your password...", key="auth_login_password")
+            with st.form("login_form", clear_on_submit=False):
+                login_identity = st.text_input("Email or Username", placeholder="e.g. superadmin@analytics.com", key="auth_login_identity")
+                login_password = st.text_input("Password", type="password", placeholder="Enter your password...", key="auth_login_password")
+                submit_login = st.form_submit_button("🚀 Log In to Dashboard", type="primary", use_container_width=True)
 
-            if st.button("🚀 Log In to Dashboard", type="primary", use_container_width=True, key="auth_login_btn"):
+            if submit_login:
                 if not login_identity.strip() or not login_password.strip():
                     st.error("Please enter both email/username and password.")
                 else:
@@ -100,11 +102,13 @@ def render_auth_screen():
         with auth_tab_change:
             st.markdown("<br>", unsafe_allow_html=True)
             st.caption("Change your password by providing your email/username and current password.")
-            ch_user = st.text_input("Email / Username", placeholder="e.g. admin@analytics.com", key="auth_tab_ch_user")
-            ch_old_p = st.text_input("Current Password", type="password", placeholder="Current password...", key="auth_tab_ch_old_p")
-            ch_new_p = st.text_input("New Password", type="password", placeholder="At least 6 characters...", key="auth_tab_ch_new_p")
+            with st.form("change_pwd_form", clear_on_submit=False):
+                ch_user = st.text_input("Email / Username", placeholder="e.g. admin@analytics.com", key="auth_tab_ch_user")
+                ch_old_p = st.text_input("Current Password", type="password", placeholder="Current password...", key="auth_tab_ch_old_p")
+                ch_new_p = st.text_input("New Password", type="password", placeholder="At least 6 characters...", key="auth_tab_ch_new_p")
+                submit_change = st.form_submit_button("💾 Change Password Now", type="primary", use_container_width=True)
 
-            if st.button("💾 Change Password Now", type="primary", use_container_width=True, key="auth_tab_ch_btn"):
+            if submit_change:
                 if not ch_user.strip() or not ch_old_p or not ch_new_p:
                     st.warning("Please fill in all fields.")
                 else:
@@ -186,9 +190,12 @@ if st.sidebar.button("🚪 Sign Out", key="sidebar_sign_out_btn", use_container_
     st.rerun()
 
 with st.sidebar.expander("🔐 Account Security & Password"):
-    sb_old_pwd = st.text_input("Current Password", type="password", key="sb_change_old_pwd")
-    sb_new_pwd = st.text_input("New Password", type="password", key="sb_change_new_pwd")
-    if st.button("Update Password", key="sb_change_pwd_btn", use_container_width=True):
+    with st.form("sidebar_pwd_form", clear_on_submit=False):
+        sb_old_pwd = st.text_input("Current Password", type="password", key="sb_change_old_pwd")
+        sb_new_pwd = st.text_input("New Password", type="password", key="sb_change_new_pwd")
+        submit_sb_pwd = st.form_submit_button("Update Password", use_container_width=True)
+
+    if submit_sb_pwd:
         if not sb_old_pwd or not sb_new_pwd:
             st.warning("Please enter current and new password.")
         else:
@@ -660,30 +667,35 @@ def render_classification_tab():
     # ── Bulk Edit Tool ──────────────────────────────────────────────
     with st.expander("⚡ Bulk Edit Filtered Rows", expanded=False):
         st.markdown(f"Apply new values to all **{filtered_count:,} matching rows** currently filtered below:")
-        b_col1, b_col2, b_col3, b_col4 = st.columns(4)
-        with b_col1:
-            bulk_heading = st.text_input("New Heading", placeholder="e.g. Infrastructure", key=f"bulk_h_{matrix_platform}")
-        with b_col2:
-            bulk_subheading = st.text_input("New Sub-Heading", placeholder="e.g. Clean Water", key=f"bulk_sh_{matrix_platform}")
-        with b_col3:
-            bulk_country = st.text_input("New Country", placeholder="e.g. Gaza", key=f"bulk_c_{matrix_platform}")
-        with b_col4:
-            bulk_zakat = st.selectbox("New Zakat Eligibility", ["Leave Unchanged", "Zakat", "Non-Zakat", "Unassigned"], key=f"bulk_z_{matrix_platform}")
-            
-        if st.button("⚡ Apply Bulk Values to Filtered Rows", use_container_width=True, key=f"bulk_apply_btn_{matrix_platform}"):
-            matrix_df_copy = matrix_df.copy()
-            for idx in filtered_indices:
-                if bulk_heading.strip():
-                    matrix_df_copy.at[idx, "Heading"] = bulk_heading.strip()
-                if bulk_subheading.strip():
-                    matrix_df_copy.at[idx, "Sub-Heading"] = bulk_subheading.strip()
-                if bulk_country.strip():
-                    matrix_df_copy.at[idx, "Country"] = bulk_country.strip()
-                if bulk_zakat != "Leave Unchanged":
-                    matrix_df_copy.at[idx, "Zakat Eligibility"] = bulk_zakat
-            st.session_state[state_key] = matrix_df_copy
-            st.success(f"✅ Applied changes to {filtered_count} rows in-memory! Click 'Save & Apply Rules Now' below to save to database.")
-            st.rerun()
+        with st.form(key=f"bulk_matrix_form_{matrix_platform}", clear_on_submit=False):
+            b_col1, b_col2, b_col3, b_col4 = st.columns(4)
+            with b_col1:
+                bulk_heading = st.text_input("New Heading", placeholder="e.g. Infrastructure", key=f"bulk_h_{matrix_platform}")
+            with b_col2:
+                bulk_subheading = st.text_input("New Sub-Heading", placeholder="e.g. Clean Water", key=f"bulk_sh_{matrix_platform}")
+            with b_col3:
+                bulk_country = st.text_input("New Country", placeholder="e.g. Gaza", key=f"bulk_c_{matrix_platform}")
+            with b_col4:
+                bulk_zakat = st.selectbox("New Zakat Eligibility", ["Leave Unchanged", "Zakat", "Non-Zakat", "Unassigned"], key=f"bulk_z_{matrix_platform}")
+            submit_bulk_matrix = st.form_submit_button("⚡ Apply Bulk Values to Filtered Rows", use_container_width=True)
+
+        if submit_bulk_matrix:
+            if user_session.get("role") != "super_admin":
+                st.error("🔒 **Access Restricted:** Bulk editing classification rules is restricted to Super Admin accounts.")
+            else:
+                matrix_df_copy = matrix_df.copy()
+                for idx in filtered_indices:
+                    if bulk_heading.strip():
+                        matrix_df_copy.at[idx, "Heading"] = bulk_heading.strip()
+                    if bulk_subheading.strip():
+                        matrix_df_copy.at[idx, "Sub-Heading"] = bulk_subheading.strip()
+                    if bulk_country.strip():
+                        matrix_df_copy.at[idx, "Country"] = bulk_country.strip()
+                    if bulk_zakat != "Leave Unchanged":
+                        matrix_df_copy.at[idx, "Zakat Eligibility"] = bulk_zakat
+                st.session_state[state_key] = matrix_df_copy
+                st.success(f"✅ Applied changes to {filtered_count} rows in-memory! Click 'Save & Apply Rules Now' below to save to database.")
+                st.rerun()
 
     st.markdown("<br>", unsafe_allow_html=True)
     st.subheader(f"📝 Edit {matrix_platform} Rules Inline")
@@ -847,28 +859,31 @@ def render_admin_tab():
         with src_col1:
             st.dataframe(source_counts, use_container_width=True, hide_index=True)
         with src_col2:
-            old_tag_choice = st.selectbox("Select Dataset Tag", options=source_counts["Source Tag"].tolist(), key="select_tag_admin")
-            new_tag_input = st.text_input("New Corrected Tag Name", placeholder="e.g. Ramadan 2025", key="rename_tag_admin")
-            
-            btn_act1, btn_act2 = st.columns(2)
-            with btn_act1:
-                if st.button("✏️ Rename Tag", type="secondary", use_container_width=True):
-                    if old_tag_choice and new_tag_input.strip():
-                        n_updated = update_source_tag(old_tag_choice, new_tag_input.strip())
-                        st.session_state.pop("df_raw", None)
-                        st.success(f"✅ Updated {n_updated:,} records from '{old_tag_choice}' ➔ '{new_tag_input.strip()}'!")
-                        st.rerun()
-                    else:
-                        st.warning("Please type a new tag name.")
-            with btn_act2:
-                if st.button("🗑️ Delete Dataset", type="primary", use_container_width=True):
-                    if user_session.get("role") != "super_admin":
-                        st.error("🔒 **Access Restricted:** Deleting dataset batches is restricted to **Super Admin** accounts only. Contact your Super Admin to remove this dataset.")
-                    elif old_tag_choice:
-                        n_deleted = delete_single_dataset(old_tag_choice)
-                        st.session_state.pop("df_raw", None)
-                        st.success(f"✅ Successfully deleted dataset '{old_tag_choice}' ({n_deleted:,} records removed)!")
-                        st.rerun()
+            with st.form("rename_tag_form", clear_on_submit=False):
+                old_tag_choice = st.selectbox("Select Dataset Tag", options=source_counts["Source Tag"].tolist(), key="select_tag_admin")
+                new_tag_input = st.text_input("New Corrected Tag Name", placeholder="e.g. Ramadan 2025", key="rename_tag_admin")
+                submit_rename = st.form_submit_button("✏️ Rename Tag", use_container_width=True)
+
+            if submit_rename:
+                if user_session.get("role") != "super_admin":
+                    st.error("🔒 **Access Restricted:** Renaming dataset tags is restricted to Super Admin accounts.")
+                elif old_tag_choice and new_tag_input.strip():
+                    n_updated = update_source_tag(old_tag_choice, new_tag_input.strip())
+                    st.session_state.pop("df_raw", None)
+                    st.success(f"✅ Updated {n_updated:,} records from '{old_tag_choice}' ➔ '{new_tag_input.strip()}'!")
+                    st.rerun()
+                else:
+                    st.warning("Please type a new tag name.")
+
+            st.markdown("<br>", unsafe_allow_html=True)
+            if st.button("🗑️ Delete Dataset", type="primary", use_container_width=True):
+                if user_session.get("role") != "super_admin":
+                    st.error("🔒 **Access Restricted:** Deleting dataset batches is restricted to **Super Admin** accounts only. Contact your Super Admin to remove this dataset.")
+                elif old_tag_choice:
+                    n_deleted = delete_single_dataset(old_tag_choice)
+                    st.session_state.pop("df_raw", None)
+                    st.success(f"✅ Successfully deleted dataset '{old_tag_choice}' ({n_deleted:,} records removed)!")
+                    st.rerun()
 
     # Database Purge / Reset Section (RESTRICTED TO SUPER ADMIN)
     st.markdown('<hr class="custom-divider">', unsafe_allow_html=True)
@@ -1289,7 +1304,8 @@ elif selected_tab == "📋 Data Explorer & Export":
     with ctrl2:
         col_group = st.selectbox(
             "Column Preset",
-            ["Donor + Donation + Campaign (Default)", "Donor Identity Only", "Donation Details Only", "Campaign Details Only", "All Columns"]
+            ["Donor + Donation + Campaign (Default)", "Donor Identity Only", "Donation Details Only", "Campaign Details Only", "All Columns"],
+            key="data_explorer_col_preset"
         )
 
     with ctrl3:
@@ -1306,6 +1322,11 @@ elif selected_tab == "📋 Data Explorer & Export":
         visible_cols = list(df.columns)
     else:
         visible_cols = [c for c in ALL_DEFAULT if c in df.columns]
+
+    # Sync Column Preset with multiselect state if preset changed
+    if st.session_state.get("prev_col_preset") != col_group:
+        st.session_state["prev_col_preset"] = col_group
+        st.session_state["advanced_col_select"] = visible_cols
 
     # Apply quick search
     full_df_for_search = df.copy()
@@ -1379,33 +1400,37 @@ elif selected_tab == "📋 Data Explorer & Export":
     # ── Bulk Edit matching records ──────────────────────────────────────────
     with st.expander("⚡ Bulk Edit Filtered Donor Records", expanded=False):
         st.markdown(f"Select column(s) to update for all **{total_matching:,} matching donor records** currently filtered:")
-        
-        editable_cols = sorted([str(c) for c in df_raw.columns if str(c).strip() != ""])
-        
-        row1_col1, row1_col2 = st.columns(2)
-        with row1_col1:
-            st.markdown("**Field #1**")
-            target_col_1 = st.selectbox("Select Target Column #1", ["-- Select Column --"] + editable_cols, key="bulk_target_col_1")
-            val_1 = st.text_input("New Value for Column #1", placeholder="Type new value...", key="bulk_val_1")
+        with st.form("bulk_edit_donors_form", clear_on_submit=False):
+            editable_cols = sorted([str(c) for c in df_raw.columns if str(c).strip() != ""])
             
-        with row1_col2:
-            st.markdown("**Field #2 (Optional)**")
-            target_col_2 = st.selectbox("Select Target Column #2", ["-- Select Column --"] + editable_cols, key="bulk_target_col_2")
-            val_2 = st.text_input("New Value for Column #2", placeholder="Type new value...", key="bulk_val_2")
+            row1_col1, row1_col2 = st.columns(2)
+            with row1_col1:
+                st.markdown("**Field #1**")
+                target_col_1 = st.selectbox("Select Target Column #1", ["-- Select Column --"] + editable_cols, key="bulk_target_col_1")
+                val_1 = st.text_input("New Value for Column #1", placeholder="Type new value...", key="bulk_val_1")
+                
+            with row1_col2:
+                st.markdown("**Field #2 (Optional)**")
+                target_col_2 = st.selectbox("Select Target Column #2", ["-- Select Column --"] + editable_cols, key="bulk_target_col_2")
+                val_2 = st.text_input("New Value for Column #2", placeholder="Type new value...", key="bulk_val_2")
 
-        row2_col1, row2_col2 = st.columns(2)
-        with row2_col1:
-            st.markdown("**Field #3 (Optional)**")
-            target_col_3 = st.selectbox("Select Target Column #3", ["-- Select Column --"] + editable_cols, key="bulk_target_col_3")
-            val_3 = st.text_input("New Value for Column #3", placeholder="Type new value...", key="bulk_val_3")
-            
-        with row2_col2:
-            st.markdown("**Field #4 (Optional)**")
-            target_col_4 = st.selectbox("Select Target Column #4", ["-- Select Column --"] + editable_cols, key="bulk_target_col_4")
-            val_4 = st.text_input("New Value for Column #4", placeholder="Type new value...", key="bulk_val_4")
-            
-        if st.button("⚡ Apply Bulk Changes to Filtered Records", use_container_width=True, key="bulk_apply_donors_btn"):
-            if (target_col_1 == "-- Select Column --" and 
+            row2_col1, row2_col2 = st.columns(2)
+            with row2_col1:
+                st.markdown("**Field #3 (Optional)**")
+                target_col_3 = st.selectbox("Select Target Column #3", ["-- Select Column --"] + editable_cols, key="bulk_target_col_3")
+                val_3 = st.text_input("New Value for Column #3", placeholder="Type new value...", key="bulk_val_3")
+                
+            with row2_col2:
+                st.markdown("**Field #4 (Optional)**")
+                target_col_4 = st.selectbox("Select Target Column #4", ["-- Select Column --"] + editable_cols, key="bulk_target_col_4")
+                val_4 = st.text_input("New Value for Column #4", placeholder="Type new value...", key="bulk_val_4")
+                
+            submit_bulk_donors = st.form_submit_button("⚡ Apply Bulk Changes to Filtered Records", use_container_width=True)
+
+        if submit_bulk_donors:
+            if user_session.get("role") != "super_admin":
+                st.error("🔒 **Access Restricted:** Bulk editing donor records is restricted to Super Admin accounts.")
+            elif (target_col_1 == "-- Select Column --" and 
                 target_col_2 == "-- Select Column --" and 
                 target_col_3 == "-- Select Column --" and 
                 target_col_4 == "-- Select Column --"):
@@ -1487,67 +1512,75 @@ elif selected_tab == "📋 Data Explorer & Export":
             st.rerun()
 
     # ── The Main Data Table ─────────────────────────────────────────────────
-    st.caption("Double-click any cell below to edit donor information. The Donation ID index column is read-only for alignment safety.")
+    if user_session.get("role") != "super_admin":
+        st.info("🔒 **Read-Only Mode:** Logged in as Admin (`admin@analytics.com`). You can view, search, filter, and export donor data. Inline cell editing, bulk updates, dataset uploading, deleting, and purging are restricted to Super Admin accounts.")
+        st.dataframe(
+            style_donor_classifications(display_df_show),
+            use_container_width=True,
+            height=520
+        )
+    else:
+        st.caption("Double-click any cell below to edit donor information. The Donation ID index column is read-only for alignment safety.")
 
-    # Set index to Donation ID for the editor
-    display_df_show_editor = display_df_show.set_index("Donation ID") if "Donation ID" in display_df_show.columns else display_df_show
+        # Set index to Donation ID for the editor
+        display_df_show_editor = display_df_show.set_index("Donation ID") if "Donation ID" in display_df_show.columns else display_df_show
 
-    edited_filtered_df = st.data_editor(
-        display_df_show_editor,
-        use_container_width=True,
-        height=520,
-        num_rows="dynamic",
-        key=editor_key
-    )
+        edited_filtered_df = st.data_editor(
+            display_df_show_editor,
+            use_container_width=True,
+            height=520,
+            num_rows="dynamic",
+            key=editor_key
+        )
 
-    df_raw_updated = st.session_state.get("df_raw", df_raw)
-        
-    st.markdown("<br>", unsafe_allow_html=True)
-    if st.button("💾 Save Donor Changes Now", type="primary", use_container_width=True, key="save_donors_btn"):
-        with st.spinner("Saving changes and updating database metrics..."):
-            from utils import PARQUET_PATH, LOCAL_DB_PATH
-            import sqlite3
-            df_raw_updated.to_parquet(PARQUET_PATH, index=False)
+        df_raw_updated = st.session_state.get("df_raw", df_raw)
             
-            conn = sqlite3.connect(LOCAL_DB_PATH, timeout=30.0)
-            df_raw_updated.to_sql("donations", con=conn, if_exists="replace", index=False)
-            conn.close()
-            
-            # Sync donor classification changes into campaign matrices
-            sync_donor_classifications_to_matrix(df_raw_updated)
-            st.session_state.pop("matrix_df_⚡ LaunchGood Matrix", None)
-            st.session_state.pop("matrix_df_🎁 GiveBright Matrix", None)
-            st.session_state.pop("prev_matrix_platform", None)
-            
-            # Sync to cloud
-            if DATABASE_URL and "postgres" in DATABASE_URL:
-                def sync_to_cloud_fast(data_df):
-                    import io, psycopg2
-                    try:
-                        buf = io.StringIO()
-                        data_df.to_csv(buf, index=False, header=False, sep='\t', na_rep='')
-                        buf.seek(0)
-                        conn = psycopg2.connect(DATABASE_URL)
-                        cur = conn.cursor()
-                        cur.execute('DROP TABLE IF EXISTS "donations";')
-                        cols_def = ', '.join([f'"{c}" TEXT' for c in data_df.columns])
-                        cur.execute(f'CREATE TABLE "donations" ({cols_def});')
-                        conn.commit()
-                        target_cols = ', '.join([f'"{c}"' for c in data_df.columns])
-                        copy_sql = f'COPY "donations" ({target_cols}) FROM STDIN WITH (FORMAT csv, DELIMITER \'\t\', NULL \'\');'
-                        cur.copy_expert(sql=copy_sql, file=buf)
-                        conn.commit()
-                        cur.close()
-                        conn.close()
-                    except Exception as e:
-                        print(f"Cloud DB sync notice: {e}")
-                threading.Thread(target=sync_to_cloud_fast, args=(df_raw_updated,), daemon=True).start()
+        st.markdown("<br>", unsafe_allow_html=True)
+        if st.button("💾 Save Donor Changes Now", type="primary", use_container_width=True, key="save_donors_btn"):
+            with st.spinner("Saving changes and updating database metrics..."):
+                from utils import PARQUET_PATH, LOCAL_DB_PATH
+                import sqlite3
+                df_raw_updated.to_parquet(PARQUET_PATH, index=False)
                 
-            st.session_state["df_raw"] = df_raw_updated
-            st.cache_data.clear()
-            st.cache_resource.clear()
-            st.success("✅ Successfully saved donor changes and re-calculated metrics!")
-            st.rerun()
+                conn = sqlite3.connect(LOCAL_DB_PATH, timeout=30.0)
+                df_raw_updated.to_sql("donations", con=conn, if_exists="replace", index=False)
+                conn.close()
+                
+                # Sync donor classification changes into campaign matrices
+                sync_donor_classifications_to_matrix(df_raw_updated)
+                st.session_state.pop("matrix_df_⚡ LaunchGood Matrix", None)
+                st.session_state.pop("matrix_df_🎁 GiveBright Matrix", None)
+                st.session_state.pop("prev_matrix_platform", None)
+                
+                # Sync to cloud
+                if DATABASE_URL and "postgres" in DATABASE_URL:
+                    def sync_to_cloud_fast(data_df):
+                        import io, psycopg2
+                        try:
+                            buf = io.StringIO()
+                            data_df.to_csv(buf, index=False, header=False, sep='\t', na_rep='')
+                            buf.seek(0)
+                            conn = psycopg2.connect(DATABASE_URL)
+                            cur = conn.cursor()
+                            cur.execute('DROP TABLE IF EXISTS "donations";')
+                            cols_def = ', '.join([f'"{c}" TEXT' for c in data_df.columns])
+                            cur.execute(f'CREATE TABLE "donations" ({cols_def});')
+                            conn.commit()
+                            target_cols = ', '.join([f'"{c}"' for c in data_df.columns])
+                            copy_sql = f'COPY "donations" ({target_cols}) FROM STDIN WITH (FORMAT csv, DELIMITER \'\t\', NULL \'\');'
+                            cur.copy_expert(sql=copy_sql, file=buf)
+                            conn.commit()
+                            cur.close()
+                            conn.close()
+                        except Exception as e:
+                            print(f"Cloud DB sync notice: {e}")
+                    threading.Thread(target=sync_to_cloud_fast, args=(df_raw_updated,), daemon=True).start()
+                    
+                st.session_state["df_raw"] = df_raw_updated
+                st.cache_data.clear()
+                st.cache_resource.clear()
+                st.success("✅ Successfully saved donor changes and re-calculated metrics!")
+                st.rerun()
 
     # ── Export Buttons ───────────────────────────────────────────────────────
     st.markdown('<hr class="custom-divider">', unsafe_allow_html=True)

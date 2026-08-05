@@ -1725,6 +1725,34 @@ def send_password_reset_request(email):
     finally:
         conn.close()
 
+def style_donor_classifications(df_input):
+    """
+    Applies custom background color badges to Lifetime Donor Classification
+    and Transaction Donor Classification columns for gorgeous visual distinction.
+    """
+    if df_input.empty:
+        return df_input
+
+    def _color_tier(val):
+        s_val = str(val).strip()
+        if s_val == "Super High":
+            return "background-color: rgba(236, 72, 153, 0.3); color: #F472B6; font-weight: 700;"
+        elif s_val == "High":
+            return "background-color: rgba(245, 158, 11, 0.3); color: #FBBF24; font-weight: 700;"
+        elif s_val == "Medium":
+            return "background-color: rgba(16, 185, 129, 0.3); color: #34D399; font-weight: 700;"
+        elif s_val == "Medium Low":
+            return "background-color: rgba(56, 189, 248, 0.3); color: #38BDF8; font-weight: 700;"
+        elif s_val == "Low End":
+            return "background-color: rgba(148, 163, 184, 0.25); color: #CBD5E1; font-weight: 700;"
+        return ""
+
+    styler = df_input.style
+    target_cols = [c for c in ["Lifetime Donor Classification", "Transaction Donor Classification"] if c in df_input.columns]
+    if target_cols:
+        styler = styler.map(_color_tier, subset=target_cols)
+    return styler
+
 def change_user_password(email_or_username, current_password, new_password):
     """
     Changes password for logged in user via Supabase Auth API if configured,
@@ -1741,16 +1769,17 @@ def change_user_password(email_or_username, current_password, new_password):
     def _hash_pwd(p):
         return hashlib.sha256(p.encode('utf-8')).hexdigest()
 
+    user_identity = str(email_or_username).strip()
+
     # 1. Try Supabase Auth API if configured
     supabase_url = os.environ.get("SUPABASE_URL", "").strip()
     supabase_key = os.environ.get("SUPABASE_KEY") or os.environ.get("SUPABASE_ANON_KEY", "").strip()
 
     if supabase_url and supabase_key:
         import requests
-        # First verify current password
         token_endpoint = f"{supabase_url.rstrip('/')}/auth/v1/token?grant_type=password"
         headers = {"apikey": supabase_key, "Content-Type": "application/json"}
-        payload = {"email": email_or_username.strip(), "password": current_password}
+        payload = {"email": user_identity, "password": current_password}
         try:
             res = requests.post(token_endpoint, json=payload, headers=headers, timeout=10)
             if res.status_code == 200:
@@ -1783,8 +1812,8 @@ def change_user_password(email_or_username, current_password, new_password):
 
         cur.execute("""
             SELECT id FROM users
-            WHERE (email = ? OR username = ?) AND password_hash = ?
-        """, (email_or_username.strip(), email_or_username.strip(), old_hashed))
+            WHERE (LOWER(email) = LOWER(?) OR LOWER(username) = LOWER(?)) AND password_hash = ?
+        """, (user_identity, user_identity, old_hashed))
         row = cur.fetchone()
         if not row:
             return False, "❌ Current password is incorrect."
@@ -1797,5 +1826,6 @@ def change_user_password(email_or_username, current_password, new_password):
         return False, f"Database error: {e}"
     finally:
         conn.close()
+
 
 
