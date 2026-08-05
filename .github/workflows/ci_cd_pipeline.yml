@@ -1,0 +1,73 @@
+name: Production CI/CD & Automated Email Pipeline
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  build-test-lint:
+    name: Build, Lint, Test & Notify
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Checkout Repository Code
+        uses: actions/checkout@v4
+
+      - name: 🐍 Set up Python Environment
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: 📦 Install Project Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install ruff pytest
+          pip install -r requirements.txt
+
+      - name: 🔍 Code Quality & Formatting Check (Ruff Lint)
+        run: |
+          ruff check .
+
+      - name: ⚙️ Python Syntax Compilation Check
+        run: |
+          python -m py_compile app.py utils.py
+
+      - name: 🧪 Run Automated Integration Sanity Tests
+        run: |
+          python -c "import pandas, streamlit, sqlalchemy, plotly, requests; print('All core libraries imported cleanly!')"
+
+      - name: 📩 Send Email Notification (Pass or Fail)
+        if: always() # Always runs regardless of whether previous steps passed or failed
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          secure: true
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_PASSWORD }}
+          subject: "🚀 CI/CD Pipeline Result: ${{ job.status == 'success' && '✅ SUCCESS' || '❌ FAILURE' }} [${{ github.repository }}]"
+          to: ${{ secrets.NOTIFICATION_EMAIL }}
+          from: "GitHub CI/CD Automation <${{ secrets.MAIL_USERNAME }}>"
+          html_body: |
+            <div style="font-family: Arial, sans-serif; padding: 20px; border: 1px solid #E2E8F0; border-radius: 8px; max-width: 600px;">
+              <h2 style="color: ${{ job.status == 'success' && '#10B981' || '#EF4444' }};">
+                ${{ job.status == 'success' && '✅ Build & Test Succeeded!' || '❌ Build or Test Failed!' }}
+              </h2>
+              <p>The CI/CD pipeline run has completed with status: <b>${{ job.status }}</b>.</p>
+              <hr style="border: 0; border-top: 1px solid #E2E8F0;">
+              <ul>
+                <li><b>Repository:</b> ${{ github.repository }}</li>
+                <li><b>Branch:</b> ${{ github.ref_name }}</li>
+                <li><b>Trigger Event:</b> ${{ github.event_name }}</li>
+                <li><b>Commit:</b> <code>${{ github.sha }}</code></li>
+                <li><b>Triggered By:</b> ${{ github.actor }}</li>
+              </ul>
+              <br>
+              <a href="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}" 
+                 style="background: #0284C7; color: white; padding: 10px 18px; text-decoration: none; border-radius: 6px; font-weight: bold;">
+                 View Full Workflow Log on GitHub
+              </a>
+            </div>
