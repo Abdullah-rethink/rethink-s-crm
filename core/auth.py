@@ -109,6 +109,37 @@ def authenticate_user(email_or_username, password):
 
     return None
 
+def get_user_by_identity(user_identity):
+    """
+    Retrieves user dict by username or email for session persistence across browser refreshes.
+    """
+    if not user_identity or not str(user_identity).strip():
+        return None
+
+    ident = str(user_identity).strip()
+    init_user_db()
+    conn = sqlite3.connect(LOCAL_DB_PATH, timeout=30.0)
+    try:
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT username, email, role FROM users
+            WHERE LOWER(email) = LOWER(?) OR LOWER(username) = LOWER(?)
+        """, (ident, ident))
+        row = cur.fetchone()
+        if row:
+            return {
+                "username": row[0],
+                "email": row[1],
+                "role": row[2],
+                "provider": "local"
+            }
+    except Exception as e:
+        print(f"Session restoration notice: {e}")
+    finally:
+        conn.close()
+
+    return None
+
 def send_password_reset_request(email):
     """
     Sends password reset email via Supabase Auth API if configured,
