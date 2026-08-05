@@ -4,8 +4,8 @@ import streamlit as st
 from core.data_processor import get_classification_matrix, save_classification_matrix
 
 
-def get_givebright_classification_matrix():
-    """Returns GiveBright classification matrix DataFrame dynamically from Parquet & SQLite DB."""
+def get_givebright_classification_matrix(df_raw=None):
+    """Returns GiveBright classification matrix DataFrame dynamically from df_raw, Parquet & SQLite DB."""
     import os
     import sqlite3
 
@@ -15,29 +15,34 @@ def get_givebright_classification_matrix():
     matrix_df = pd.DataFrame(columns=["Campaign Name", "Community Name"] + target_cols_display)
 
     try:
-        if os.path.exists(PARQUET_PATH):
-            df_donations = pd.read_parquet(PARQUET_PATH)
-            if not df_donations.empty and "Campaign Name" in df_donations.columns:
-                platform_s = df_donations.get("Platform", pd.Series("", index=df_donations.index)).astype(str).str.lower()
-                source_s = df_donations.get("Source", pd.Series("", index=df_donations.index)).astype(str).str.lower()
+        df_donations = df_raw
+        if (df_donations is None or df_donations.empty) and os.path.exists(PARQUET_PATH):
+            try:
+                df_donations = pd.read_parquet(PARQUET_PATH)
+            except Exception:
+                df_donations = None
 
-                gb_mask = (platform_s == "givebright") | source_s.str.contains("givebright|give_bright|file-", na=False)
-                gb_df = df_donations[gb_mask] if gb_mask.any() else df_donations.iloc[0:0]
+        if df_donations is not None and not df_donations.empty and "Campaign Name" in df_donations.columns:
+            platform_s = df_donations.get("Platform", pd.Series("", index=df_donations.index)).astype(str).str.lower()
+            source_s = df_donations.get("Source", pd.Series("", index=df_donations.index)).astype(str).str.lower()
 
-                if not gb_df.empty:
-                    c_name = gb_df["Campaign Name"].astype(str).fillna("N/A").replace({'nan': 'N/A', '': 'N/A', 'None': 'N/A'})
-                    comm_name = gb_df["Community Name"].astype(str).fillna("N/A").replace({'nan': 'N/A', '': 'N/A', 'None': 'N/A'}) if "Community Name" in gb_df.columns else pd.Series("N/A", index=gb_df.index)
+            gb_mask = (platform_s == "givebright") | source_s.str.contains("givebright|give_bright|file-", na=False)
+            gb_df = df_donations[gb_mask] if gb_mask.any() else df_donations.iloc[0:0]
 
-                    available_target_cols = [c for c in target_cols_display if c in gb_df.columns]
-                    donor_df = pd.DataFrame({"Campaign Name": c_name, "Community Name": comm_name})
-                    for tc in available_target_cols:
-                        donor_df[tc] = gb_df[tc].values
+            if not gb_df.empty:
+                c_name = gb_df["Campaign Name"].astype(str).fillna("N/A").replace({'nan': 'N/A', '': 'N/A', 'None': 'N/A'})
+                comm_name = gb_df["Community Name"].astype(str).fillna("N/A").replace({'nan': 'N/A', '': 'N/A', 'None': 'N/A'}) if "Community Name" in gb_df.columns else pd.Series("N/A", index=gb_df.index)
 
-                    for tc in target_cols_display:
-                        if tc not in donor_df.columns:
-                            donor_df[tc] = "Unassigned"
+                available_target_cols = [c for c in target_cols_display if c in gb_df.columns]
+                donor_df = pd.DataFrame({"Campaign Name": c_name, "Community Name": comm_name})
+                for tc in available_target_cols:
+                    donor_df[tc] = gb_df[tc].values
 
-                    matrix_df = donor_df.groupby(["Campaign Name", "Community Name"], dropna=False)[target_cols_display].first().reset_index()
+                for tc in target_cols_display:
+                    if tc not in donor_df.columns:
+                        donor_df[tc] = "Unassigned"
+
+                matrix_df = donor_df.groupby(["Campaign Name", "Community Name"], dropna=False)[target_cols_display].first().reset_index()
 
         # Merge with saved entries from SQLite
         conn = sqlite3.connect(LOCAL_DB_PATH, timeout=30.0)
@@ -123,7 +128,7 @@ def save_givebright_classification_matrix(matrix_df):
     conn.close()
     return len(matrix_df)
 
-def render_classification_tab(user_session):
+def render_classification_tab(df_raw, user_session):
     """Renders Campaign Classification matrix rules manager with strict RBAC."""
     st.header("🏷️ Campaign Classification Manager (Source of Truth)")
     st.markdown("This matrix is your **source of truth** for mapping (`Campaign Name`, `Community Name`) ➔ `Heading`, `Sub-Heading`, `Country`, `Code`, and `Zakat Eligibility`.")
@@ -139,7 +144,7 @@ def render_classification_tab(user_session):
         if matrix_platform == "⚡ LaunchGood Matrix":
             matrix_df = get_classification_matrix()
         else:
-            matrix_df = get_givebright_classification_matrix()
+            matrix_df = get_givebright_classification_matrix(df_raw)
     else:
         matrix_df = st.session_state[state_key]
 

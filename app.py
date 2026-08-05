@@ -260,7 +260,7 @@ with tab2:
     render_ltv_tab(df, col_amount, currency_symbol="£")
 
 with tab3:
-    render_classification_tab(user_session)
+    render_classification_tab(df_raw, user_session)
 
 with tab4:
     render_explorer_tab(df, df_raw, user_session, col_amount, col_campaign, col_community)

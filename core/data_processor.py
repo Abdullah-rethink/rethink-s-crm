@@ -97,55 +97,61 @@ def init_classification_db():
     except Exception as e:
         print(f"Classification DB init notice: {e}")
 
-def get_classification_matrix():
-    """Returns the campaign_classifications matrix DataFrame from SQLite DB."""
+def get_classification_matrix(df_raw=None):
+    """Returns the campaign_classifications matrix DataFrame from active df_raw, Parquet & SQLite DB."""
     init_classification_db()
     target_cols_display = ["Heading", "Sub-Heading", "Country", "Code", "Zakat Eligibility"]
+    matrix_df = pd.DataFrame(columns=["Campaign Name", "Community Name"] + target_cols_display)
 
     try:
-        if os.path.exists(PARQUET_PATH):
-            df_donations = pd.read_parquet(PARQUET_PATH)
-            if not df_donations.empty and "Campaign Name" in df_donations.columns:
-                lg_mask = df_donations.get("Platform", pd.Series("", index=df_donations.index)) != "GiveBright"
-                lg_df = df_donations[lg_mask] if lg_mask.any() else df_donations
+        df_donations = df_raw
+        if (df_donations is None or df_donations.empty) and os.path.exists(PARQUET_PATH):
+            try:
+                df_donations = pd.read_parquet(PARQUET_PATH)
+            except Exception:
+                df_donations = None
 
-                c_name = lg_df["Campaign Name"].astype(str).fillna("N/A").replace({'nan': 'N/A', '': 'N/A', 'None': 'N/A'})
-                comm_name = lg_df["Community Name"].astype(str).fillna("N/A").replace({'nan': 'N/A', '': 'N/A', 'None': 'N/A'}) if "Community Name" in lg_df.columns else pd.Series("N/A", index=lg_df.index)
+        if df_donations is not None and not df_donations.empty and "Campaign Name" in df_donations.columns:
+            lg_mask = df_donations.get("Platform", pd.Series("", index=df_donations.index)).astype(str).str.lower() != "givebright"
+            lg_df = df_donations[lg_mask] if lg_mask.any() else df_donations
 
-                available_target_cols = [c for c in target_cols_display if c in lg_df.columns]
-                donor_df = pd.DataFrame({"Campaign Name": c_name, "Community Name": comm_name})
-                for tc in available_target_cols:
-                    donor_df[tc] = lg_df[tc].values
+            c_name = lg_df["Campaign Name"].astype(str).fillna("N/A").replace({'nan': 'N/A', '': 'N/A', 'None': 'N/A'})
+            comm_name = lg_df["Community Name"].astype(str).fillna("N/A").replace({'nan': 'N/A', '': 'N/A', 'None': 'N/A'}) if "Community Name" in lg_df.columns else pd.Series("N/A", index=lg_df.index)
 
-                matrix_df = donor_df.groupby(["Campaign Name", "Community Name"], dropna=False)[available_target_cols].agg(_mode_or_last).reset_index()
+            available_target_cols = [c for c in target_cols_display if c in lg_df.columns]
+            donor_df = pd.DataFrame({"Campaign Name": c_name, "Community Name": comm_name})
+            for tc in available_target_cols:
+                donor_df[tc] = lg_df[tc].values
+
+            matrix_df = donor_df.groupby(["Campaign Name", "Community Name"], dropna=False)[available_target_cols].agg(_mode_or_last).reset_index()
                 
-                conn = sqlite3.connect(LOCAL_DB_PATH, timeout=30.0)
-                try:
-                    db_matrix = pd.read_sql_query("SELECT * FROM campaign_classifications", conn)
-                    db_matrix.rename(columns={
-                        "campaign_name": "Campaign Name",
-                        "community_name": "Community Name",
-                        "heading": "Heading",
-                        "sub_heading": "Sub-Heading",
-                        "country": "Country",
-                        "code": "Code",
-                        "zakat_eligibility": "Zakat Eligibility"
-                    }, inplace=True)
+            conn = sqlite3.connect(LOCAL_DB_PATH, timeout=30.0)
+            try:
+                db_matrix = pd.read_sql_query("SELECT * FROM campaign_classifications", conn)
+                db_matrix.rename(columns={
+                    "campaign_name": "Campaign Name",
+                    "community_name": "Community Name",
+                    "heading": "Heading",
+                    "sub_heading": "Sub-Heading",
+                    "country": "Country",
+                    "code": "Code",
+                    "zakat_eligibility": "Zakat Eligibility"
+                }, inplace=True)
+                
+                if not db_matrix.empty:
+                    db_matrix["Campaign Name"] = db_matrix["Campaign Name"].astype(str).fillna("N/A").replace({'nan': 'N/A', '': 'N/A', 'None': 'N/A'})
+                    db_matrix["Community Name"] = db_matrix["Community Name"].astype(str).fillna("N/A").replace({'nan': 'N/A', '': 'N/A', 'None': 'N/A'})
                     
-                    if not db_matrix.empty:
-                        db_matrix["Campaign Name"] = db_matrix["Campaign Name"].astype(str).fillna("N/A").replace({'nan': 'N/A', '': 'N/A', 'None': 'N/A'})
-                        db_matrix["Community Name"] = db_matrix["Community Name"].astype(str).fillna("N/A").replace({'nan': 'N/A', '': 'N/A', 'None': 'N/A'})
-                        
-                        existing_keys = set(zip(matrix_df["Campaign Name"].astype(str), matrix_df["Community Name"].astype(str)))
-                        new_rows = db_matrix[~db_matrix.apply(
-                            lambda r: (str(r.get("Campaign Name", "")), str(r.get("Community Name", ""))) in existing_keys, axis=1
-                        )]
-                        if not new_rows.empty:
-                            matrix_df = pd.concat([matrix_df, new_rows], ignore_index=True)
-                except Exception:
-                    pass
-                finally:
-                    conn.close()
+                    existing_keys = set(zip(matrix_df["Campaign Name"].astype(str), matrix_df["Community Name"].astype(str)))
+                    new_rows = db_matrix[~db_matrix.apply(
+                        lambda r: (str(r.get("Campaign Name", "")), str(r.get("Community Name", ""))) in existing_keys, axis=1
+                    )]
+                    if not new_rows.empty:
+                        matrix_df = pd.concat([matrix_df, new_rows], ignore_index=True)
+            except Exception:
+                pass
+            finally:
+                conn.close()
                     
     except Exception as e:
         print(f"Matrix load notice: {e}")
