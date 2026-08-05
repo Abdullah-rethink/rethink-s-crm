@@ -61,6 +61,15 @@ def render_ltv_tab(df, col_amount, currency_symbol):
 
         st.markdown('<hr class="custom-divider">', unsafe_allow_html=True)
         st.markdown("**Detailed LTV Tier Breakdown Table**")
-        st.dataframe(ltv_summary, use_container_width=True, hide_index=True)
+        st.dataframe(
+            ltv_summary,
+            column_config={
+                "Total_Raised": st.column_config.NumberColumn("Total Raised", format=f"{currency_symbol}%.2f"),
+                "Avg_Donation": st.column_config.NumberColumn("Average Donation", format=f"{currency_symbol}%.2f"),
+                "Donation_Count": st.column_config.NumberColumn("Donation Count", format="%d")
+            },
+            use_container_width=True,
+            hide_index=True
+        )
     else:
         st.info("No Lifetime Donor Classification data available.")
