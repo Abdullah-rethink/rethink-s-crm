@@ -10,7 +10,8 @@ from utils import (
     get_givebright_classification_matrix, save_givebright_classification_matrix,
     import_givebright_classifications_file, delete_single_dataset,
     sync_donor_classifications_to_matrix, get_cloud_sync_status, PARQUET_PATH,
-    DATABASE_URL, LOCAL_DB_PATH
+    DATABASE_URL, LOCAL_DB_PATH, authenticate_user, send_password_reset_request, 
+    change_user_password, init_user_db
 )
 
 # Allow Pandas Styler to render large tables (up to 2M cells)
@@ -42,6 +43,82 @@ pio.templates["custom_dark"].layout.update(
     )
 )
 pio.templates.default = "custom_dark"
+
+# ── AUTHENTICATION & ACCESS CONTROL GATING (WITH INACTIVITY TIMEOUT) ─────────
+import time
+
+SESSION_TIMEOUT_MINUTES = 15
+SESSION_TIMEOUT_SECONDS = SESSION_TIMEOUT_MINUTES * 60
+
+def render_auth_screen():
+    # Check session inactivity timeout for logged in user
+    if "authenticated_user" in st.session_state and st.session_state["authenticated_user"]:
+        last_active = st.session_state.get("last_activity_time", time.time())
+        now = time.time()
+        
+        # If user has been idle longer than SESSION_TIMEOUT_MINUTES, log out automatically
+        if (now - last_active) > SESSION_TIMEOUT_SECONDS:
+            idle_mins = int((now - last_active) // 60)
+            st.session_state.pop("authenticated_user", None)
+            st.session_state.pop("last_activity_time", None)
+            st.warning(f"🔒 **Session Expired:** You were automatically signed out after {idle_mins} minutes of inactivity. Please log in again to continue.")
+        else:
+            # Update activity timestamp on active interaction
+            st.session_state["last_activity_time"] = now
+            return st.session_state["authenticated_user"]
+
+    st.markdown("<br>", unsafe_allow_html=True)
+    c1, c2, c3 = st.columns([2, 5, 2])
+    with c2:
+        st.markdown("""
+        <div class="glass-panel" style="text-align: center; padding: 32px 28px; margin-top: 10px; border-left: 4px solid #38BDF8;">
+            <div style="font-size: 2.2rem; font-weight: 800; margin-bottom: 6px;">🔒 Secure Access Control</div>
+            <div style="color: #94A3B8; font-size: 0.95rem;">Please log in with your credentials to access the Crowdfunding Analytics Engine.</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        auth_tab_login, auth_tab_change = st.tabs(["🔑 Sign In", "🔐 Change Password"])
+
+        with auth_tab_login:
+            st.markdown("<br>", unsafe_allow_html=True)
+            login_identity = st.text_input("Email or Username", placeholder="e.g. superadmin@analytics.com", key="auth_login_identity")
+            login_password = st.text_input("Password", type="password", placeholder="Enter your password...", key="auth_login_password")
+
+            if st.button("🚀 Log In to Dashboard", type="primary", use_container_width=True, key="auth_login_btn"):
+                if not login_identity.strip() or not login_password.strip():
+                    st.error("Please enter both email/username and password.")
+                else:
+                    with st.spinner("Authenticating credentials..."):
+                        user = authenticate_user(login_identity, login_password)
+                        if user:
+                            st.session_state["authenticated_user"] = user
+                            st.session_state["last_activity_time"] = time.time()
+                            st.rerun()
+                        else:
+                            st.error("❌ Invalid credentials or user not found. Please try again.")
+
+        with auth_tab_change:
+            st.markdown("<br>", unsafe_allow_html=True)
+            st.caption("Change your password by providing your email/username and current password.")
+            ch_user = st.text_input("Email / Username", placeholder="e.g. admin@analytics.com", key="auth_tab_ch_user")
+            ch_old_p = st.text_input("Current Password", type="password", placeholder="Current password...", key="auth_tab_ch_old_p")
+            ch_new_p = st.text_input("New Password", type="password", placeholder="At least 6 characters...", key="auth_tab_ch_new_p")
+
+            if st.button("💾 Change Password Now", type="primary", use_container_width=True, key="auth_tab_ch_btn"):
+                if not ch_user.strip() or not ch_old_p or not ch_new_p:
+                    st.warning("Please fill in all fields.")
+                else:
+                    with st.spinner("Updating password..."):
+                        succeeded, feedback = change_user_password(ch_user.strip(), ch_old_p, ch_new_p)
+                        if succeeded:
+                            st.success(feedback)
+                        else:
+                            st.error(feedback)
+
+    st.stop()
+
+# Enforce gating & get active session user
+user_session = render_auth_screen()
 
 # Header Section
 st.markdown('<div class="header-badge">⚡ Multi-Source Crowdfunding Analytics</div>', unsafe_allow_html=True)
@@ -92,6 +169,35 @@ if _sync_status is not None:
 
 # Sidebar Configuration & Filters
 st.sidebar.header("🎯 Dataset & Global Filters")
+
+# Sidebar User Account Pill & Sign Out
+role_badge = "⚡ SUPER ADMIN" if user_session.get("role") == "super_admin" else "👤 ADMIN"
+user_display = user_session.get('email', user_session.get('username', 'User'))
+st.sidebar.markdown(f"""
+<div style="background: rgba(30, 41, 59, 0.7); padding: 10px 14px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.08); margin-bottom: 12px;">
+    <div style="color: #94A3B8; font-size: 0.75rem; font-weight: 700; text-transform: uppercase;">Authenticated Account</div>
+    <div style="color: #F8FAFC; font-weight: 800; font-size: 0.9rem; text-overflow: ellipsis; overflow: hidden;">{user_display}</div>
+    <div style="margin-top: 4px;"><span class="header-badge" style="margin: 0; font-size: 0.65rem; padding: 2px 8px;">{role_badge}</span></div>
+</div>
+""", unsafe_allow_html=True)
+
+if st.sidebar.button("🚪 Sign Out", key="sidebar_sign_out_btn", use_container_width=True):
+    st.session_state.pop("authenticated_user", None)
+    st.rerun()
+
+with st.sidebar.expander("🔐 Account Security & Password"):
+    sb_old_pwd = st.text_input("Current Password", type="password", key="sb_change_old_pwd")
+    sb_new_pwd = st.text_input("New Password", type="password", key="sb_change_new_pwd")
+    if st.button("Update Password", key="sb_change_pwd_btn", use_container_width=True):
+        if not sb_old_pwd or not sb_new_pwd:
+            st.warning("Please enter current and new password.")
+        else:
+            with st.spinner("Updating password..."):
+                ok, msg = change_user_password(user_display, sb_old_pwd, sb_new_pwd)
+                if ok:
+                    st.success(msg)
+                else:
+                    st.error(msg)
 
 
 # Data Loading from Database / Parquet Cache
@@ -756,24 +862,29 @@ def render_admin_tab():
                         st.warning("Please type a new tag name.")
             with btn_act2:
                 if st.button("🗑️ Delete Dataset", type="primary", use_container_width=True):
-                    if old_tag_choice:
+                    if user_session.get("role") != "super_admin":
+                        st.error("🔒 **Access Restricted:** Deleting dataset batches is restricted to **Super Admin** accounts only. Contact your Super Admin to remove this dataset.")
+                    elif old_tag_choice:
                         n_deleted = delete_single_dataset(old_tag_choice)
                         st.session_state.pop("df_raw", None)
                         st.success(f"✅ Successfully deleted dataset '{old_tag_choice}' ({n_deleted:,} records removed)!")
                         st.rerun()
 
-    # Database Purge / Reset Section
+    # Database Purge / Reset Section (RESTRICTED TO SUPER ADMIN)
     st.markdown('<hr class="custom-divider">', unsafe_allow_html=True)
     with st.expander("⚠️ Danger Zone: Clear / Purge All Data"):
-        st.warning("Clearing data will purge all tables from local SQLite, Parquet cache, and Supabase Cloud. You will need to upload an Excel file to view the dashboard again.")
-        confirm_purge = st.checkbox("I understand and confirm I want to clear all loaded data", key="confirm_purge_check")
-        if confirm_purge:
-            if st.button("🗑️ Purge All Loaded Data Now", type="secondary"):
-                with st.spinner("Purging all database tables and caches..."):
-                    purge_all_data()
-                    st.session_state.pop("df_raw", None)
-                    st.success("Successfully purged all database tables and caches! Reloading...")
-                    st.rerun()
+        if user_session.get("role") != "super_admin":
+            st.error("🔒 **Access Restricted:** Purging all datasets is restricted to **Super Admin** accounts only. You are currently logged in as an **Admin** user (`admin@analytics.com`).")
+        else:
+            st.warning("Clearing data will purge all tables from local SQLite, Parquet cache, and Supabase Cloud. You will need to upload an Excel file to view the dashboard again.")
+            confirm_purge = st.checkbox("I understand and confirm I want to clear all loaded data", key="confirm_purge_check")
+            if confirm_purge:
+                if st.button("🗑️ Purge All Loaded Data Now", type="secondary"):
+                    with st.spinner("Purging all database tables and caches..."):
+                        purge_all_data()
+                        st.session_state.pop("df_raw", None)
+                        st.success("Successfully purged all database tables and caches! Reloading...")
+                        st.rerun()
 
 if selected_tab == "🏷️ Campaign Classifications":
     render_classification_tab()
