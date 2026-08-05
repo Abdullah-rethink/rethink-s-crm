@@ -1,1 +1,1 @@
-# components package initialization
+# Package marker

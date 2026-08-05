@@ -1,1 +1,1 @@
-# core package initialization
+# Package marker

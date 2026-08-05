@@ -32,7 +32,7 @@ def render_explorer_tab(df, df_raw, user_session, col_amount, col_campaign, col_
         )
 
     with ctrl3:
-        max_rows = st.selectbox("Rows to Display", [50, 100, 250, 500, 1000, "All"], index=1)
+        max_rows = st.selectbox("Rows to Display", [50, 100, 250, 500, 1000, 2500, "All (Max 2,500)"], index=1)
 
     # Column preset logic
     if col_group == "Donor Identity Only":
@@ -49,8 +49,8 @@ def render_explorer_tab(df, df_raw, user_session, col_amount, col_campaign, col_
     # Ensure every default column actually exists in active dataframe
     visible_cols = [c for c in visible_cols if c in df.columns]
 
-    # Sync Column Preset with multiselect state if preset changed
-    if st.session_state.get("prev_col_preset") != col_group:
+    # Sync Column Preset with multiselect state without duplicate default warning
+    if "advanced_col_select" not in st.session_state or st.session_state.get("prev_col_preset") != col_group:
         st.session_state["prev_col_preset"] = col_group
         st.session_state["advanced_col_select"] = visible_cols
 
@@ -70,7 +70,6 @@ def render_explorer_tab(df, df_raw, user_session, col_amount, col_campaign, col_
         selected_cols_manual = st.multiselect(
             "Pick columns to show",
             options=list(df.columns),
-            default=visible_cols,
             key="advanced_col_select"
         )
         final_cols = list(dict.fromkeys(selected_cols_manual if selected_cols_manual else visible_cols))
@@ -145,8 +144,11 @@ def render_explorer_tab(df, df_raw, user_session, col_amount, col_campaign, col_
                 st.success(f"✅ Saved {total_matching:,} updated records to database!")
                 st.rerun()
 
-    # Slicing display_df_show by max_rows eliminates 100% of lag and Styler cell limits!
-    page_limit = int(max_rows) if max_rows != "All" else len(display_df_show)
+    # Slicing display_df_show with safety cap prevents memory overflow crashes on Streamlit Cloud
+    if str(max_rows).startswith("All"):
+        page_limit = min(len(display_df_show), 2500)
+    else:
+        page_limit = min(int(max_rows), len(display_df_show))
     display_df_show_page = display_df_show.iloc[0:page_limit].copy()
 
     # Round off float columns and build column_config for 2 decimal place display

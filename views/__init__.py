@@ -1,1 +1,1 @@
-# views package initialization
+# Package marker

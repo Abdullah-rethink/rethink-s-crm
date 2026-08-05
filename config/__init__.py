@@ -1,1 +1,1 @@
-# config package initialization
+# Package marker
