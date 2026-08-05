@@ -32,7 +32,7 @@ def render_explorer_tab(df, df_raw, user_session, col_amount, col_campaign, col_
         )
 
     with ctrl3:
-        max_rows = st.selectbox("Rows to Display", [50, 100, 250, 500, 1000, 2500, "All (Max 2,500)"], index=1)
+        page_size = st.selectbox("Page Size (Rows/Page)", [50, 100, 250, 500, 1000], index=1, key="explorer_page_size")
 
     # Column preset logic
     if col_group == "Donor Identity Only":
@@ -145,20 +145,39 @@ def render_explorer_tab(df, df_raw, user_session, col_amount, col_campaign, col_
     else:
         st.info("🔒 **Read-Only Access:** Logged in as Admin (`admin@analytics.com`). You can view, search, filter, and export donor data. Cell editing and bulk updates are restricted to Super Admin accounts.")
 
-    # Slicing display_df_show with safety cap prevents memory overflow crashes on Streamlit Cloud
-    if str(max_rows).startswith("All"):
-        page_limit = min(len(display_df_show), 2500)
-    else:
-        page_limit = min(int(max_rows), len(display_df_show))
-    display_df_show_page = display_df_show.iloc[0:page_limit].copy()
+    # ── Interactive Page Navigation (Pagination Engine) ──────────────────────
+    import math
+    total_pages = max(1, math.ceil(total_matching / page_size))
+    
+    st.markdown("<br>", unsafe_allow_html=True)
+    p_col1, p_col2 = st.columns([3, 7])
+    with p_col1:
+        current_page = st.number_input(
+            f"📄 Go to Page (1 - {total_pages:,})", 
+            min_value=1, 
+            max_value=total_pages, 
+            value=1, 
+            step=1, 
+            key="explorer_current_page"
+        )
+    with p_col2:
+        start_idx = (current_page - 1) * page_size
+        end_idx = min(start_idx + page_size, total_matching)
+        st.markdown(f"""
+        <div style="margin-top: 24px; color: #94A3B8; font-weight: 600; font-size: 0.95rem;">
+            Showing records <b style="color: #38BDF8;">{start_idx + 1:,} - {end_idx:,}</b> of <b style="color: #F8FAFC;">{total_matching:,}</b> total matching donor records 
+            <span style="color: #64748B;">(Page {current_page:,} of {total_pages:,})</span>
+        </div>
+        """, unsafe_allow_html=True)
+
+    display_df_show_page = display_df_show.iloc[start_idx:end_idx].copy()
 
     # Round off float columns and build column_config for 2 decimal place display
     numeric_float_cols = display_df_show_page.select_dtypes(include=['float', 'float64']).columns
     col_config_2dec = {col: st.column_config.NumberColumn(format="%.2f") for col in numeric_float_cols}
 
     # ── Main Data Table ─────────────────────────────────────────────────────
-    st.markdown("<br>", unsafe_allow_html=True)
-    st.subheader(f"📊 Donor Records Table (Showing {len(display_df_show_page):,} of {total_matching:,} matching records)")
+    st.subheader(f"📊 Donor Records Table — Page {current_page:,}")
 
     # Render Styled Table with Full Background Colored Boxes
     st.dataframe(
