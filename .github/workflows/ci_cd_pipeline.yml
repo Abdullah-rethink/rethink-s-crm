@@ -29,19 +29,19 @@ jobs:
 
       - name: 🔍 Code Quality & Formatting Check (Ruff Lint)
         run: |
-          ruff check .
+          python -m ruff check .
 
       - name: ⚙️ Python Syntax Compilation Check
         run: |
-          python -m py_compile app.py utils.py
+          python -m py_compile app.py utils.py config/settings.py config/styles.py core/database.py core/auth.py core/data_processor.py views/overview_view.py views/ltv_view.py views/classification_view.py views/explorer_view.py views/admin_view.py
 
       - name: 🧪 Run Automated Integration Sanity Tests
         run: |
           python -c "import pandas, streamlit, sqlalchemy, plotly, requests; print('All core libraries imported cleanly!')"
 
       - name: 📩 Send Email Notification (Pass or Fail)
-        if: always() # Always runs regardless of whether previous steps passed or failed
-        uses: dawidd6/action-send-mail@v3
+        if: always() && secrets.MAIL_USERNAME != '' && secrets.MAIL_PASSWORD != ''
+        uses: dawidd6/action-send-mail@v4
         with:
           server_address: smtp.gmail.com
           server_port: 465
