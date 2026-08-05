@@ -79,70 +79,71 @@ def render_explorer_tab(df, df_raw, user_session, col_amount, col_campaign, col_
     display_df_show = display_df[valid_cols]
     display_df_show = display_df_show.loc[:, ~display_df_show.columns.duplicated()]
 
-    # ── ⚡ Bulk Edit Filtered Donor Records ────────────────────────────────────
-    with st.expander("⚡ Bulk Edit Filtered Donor Records", expanded=False):
-        st.markdown(f"Select column(s) to update for all **{total_matching:,} matching donor records** currently filtered:")
-        with st.form("bulk_edit_donors_form", clear_on_submit=False):
-            editable_cols = sorted([str(c) for c in df_raw.columns if str(c).strip() != ""])
-            
-            row1_col1, row1_col2 = st.columns(2)
-            with row1_col1:
-                st.markdown("**Field #1**")
-                target_col_1 = st.selectbox("Select Target Column #1", ["-- Select Column --"] + editable_cols, key="bulk_target_col_1")
-                val_1 = st.text_input("New Value for Column #1", placeholder="Type new value...", key="bulk_val_1")
+    # ── ⚡ Bulk Edit Filtered Donor Records (Super Admin Only) ────────────────
+    if user_session.get("role") == "super_admin":
+        with st.expander("⚡ Bulk Edit Filtered Donor Records", expanded=False):
+            st.markdown(f"Select column(s) to update for all **{total_matching:,} matching donor records** currently filtered:")
+            with st.form("bulk_edit_donors_form", clear_on_submit=False):
+                editable_cols = sorted([str(c) for c in df_raw.columns if str(c).strip() != ""])
                 
-            with row1_col2:
-                st.markdown("**Field #2 (Optional)**")
-                target_col_2 = st.selectbox("Select Target Column #2", ["-- Select Column --"] + editable_cols, key="bulk_target_col_2")
-                val_2 = st.text_input("New Value for Column #2", placeholder="Type new value...", key="bulk_val_2")
+                row1_col1, row1_col2 = st.columns(2)
+                with row1_col1:
+                    st.markdown("**Field #1**")
+                    target_col_1 = st.selectbox("Select Target Column #1", ["-- Select Column --"] + editable_cols, key="bulk_target_col_1")
+                    val_1 = st.text_input("New Value for Column #1", placeholder="Type new value...", key="bulk_val_1")
+                    
+                with row1_col2:
+                    st.markdown("**Field #2 (Optional)**")
+                    target_col_2 = st.selectbox("Select Target Column #2", ["-- Select Column --"] + editable_cols, key="bulk_target_col_2")
+                    val_2 = st.text_input("New Value for Column #2", placeholder="Type new value...", key="bulk_val_2")
 
-            row2_col1, row2_col2 = st.columns(2)
-            with row2_col1:
-                st.markdown("**Field #3 (Optional)**")
-                target_col_3 = st.selectbox("Select Target Column #3", ["-- Select Column --"] + editable_cols, key="bulk_target_col_3")
-                val_3 = st.text_input("New Value for Column #3", placeholder="Type new value...", key="bulk_val_3")
-                
-            with row2_col2:
-                st.markdown("**Field #4 (Optional)**")
-                target_col_4 = st.selectbox("Select Target Column #4", ["-- Select Column --"] + editable_cols, key="bulk_target_col_4")
-                val_4 = st.text_input("New Value for Column #4", placeholder="Type new value...", key="bulk_val_4")
-                
-            submit_bulk_donors = st.form_submit_button("⚡ Apply Bulk Changes to Filtered Records", use_container_width=True)
+                row2_col1, row2_col2 = st.columns(2)
+                with row2_col1:
+                    st.markdown("**Field #3 (Optional)**")
+                    target_col_3 = st.selectbox("Select Target Column #3", ["-- Select Column --"] + editable_cols, key="bulk_target_col_3")
+                    val_3 = st.text_input("New Value for Column #3", placeholder="Type new value...", key="bulk_val_3")
+                    
+                with row2_col2:
+                    st.markdown("**Field #4 (Optional)**")
+                    target_col_4 = st.selectbox("Select Target Column #4", ["-- Select Column --"] + editable_cols, key="bulk_target_col_4")
+                    val_4 = st.text_input("New Value for Column #4", placeholder="Type new value...", key="bulk_val_4")
+                    
+                submit_bulk_donors = st.form_submit_button("⚡ Apply Bulk Changes to Filtered Records", use_container_width=True)
 
-        if submit_bulk_donors:
-            if user_session.get("role") != "super_admin":
-                st.error("🔒 **Access Restricted:** Bulk editing donor records is restricted to Super Admin accounts.")
-            elif (target_col_1 == "-- Select Column --" and 
-                target_col_2 == "-- Select Column --" and 
-                target_col_3 == "-- Select Column --" and 
-                target_col_4 == "-- Select Column --"):
-                st.warning("Please select at least one column to update.")
-            else:
-                with st.spinner("Applying and saving changes..."):
-                    import sqlite3 as _sqlite3
-                    df_raw_copy = df_raw.copy()
-                    for idx in display_df.index:
-                        if target_col_1 != "-- Select Column --" and val_1.strip():
-                            df_raw_copy.at[idx, target_col_1] = val_1.strip()
-                        if target_col_2 != "-- Select Column --" and val_2.strip():
-                            df_raw_copy.at[idx, target_col_2] = val_2.strip()
-                        if target_col_3 != "-- Select Column --" and val_3.strip():
-                            df_raw_copy.at[idx, target_col_3] = val_3.strip()
-                        if target_col_4 != "-- Select Column --" and val_4.strip():
-                            df_raw_copy.at[idx, target_col_4] = val_4.strip()
+            if submit_bulk_donors:
+                if (target_col_1 == "-- Select Column --" and 
+                    target_col_2 == "-- Select Column --" and 
+                    target_col_3 == "-- Select Column --" and 
+                    target_col_4 == "-- Select Column --"):
+                    st.warning("Please select at least one column to update.")
+                else:
+                    with st.spinner("Applying and saving changes..."):
+                        import sqlite3 as _sqlite3
+                        df_raw_copy = df_raw.copy()
+                        for idx in display_df.index:
+                            if target_col_1 != "-- Select Column --" and val_1.strip():
+                                df_raw_copy.at[idx, target_col_1] = val_1.strip()
+                            if target_col_2 != "-- Select Column --" and val_2.strip():
+                                df_raw_copy.at[idx, target_col_2] = val_2.strip()
+                            if target_col_3 != "-- Select Column --" and val_3.strip():
+                                df_raw_copy.at[idx, target_col_3] = val_3.strip()
+                            if target_col_4 != "-- Select Column --" and val_4.strip():
+                                df_raw_copy.at[idx, target_col_4] = val_4.strip()
 
-                    # Persist immediately to Parquet + SQLite
-                    df_raw_copy.to_parquet(PARQUET_PATH, index=False)
-                    _conn = _sqlite3.connect(LOCAL_DB_PATH, timeout=30.0)
-                    df_raw_copy.to_sql("donations", con=_conn, if_exists="replace", index=False)
-                    _conn.close()
+                        # Persist immediately to Parquet + SQLite
+                        df_raw_copy.to_parquet(PARQUET_PATH, index=False)
+                        _conn = _sqlite3.connect(LOCAL_DB_PATH, timeout=30.0)
+                        df_raw_copy.to_sql("donations", con=_conn, if_exists="replace", index=False)
+                        _conn.close()
 
-                    st.session_state["df_raw"] = df_raw_copy
-                    sync_donor_classifications_to_matrix(df_raw_copy)
-                    st.cache_data.clear()
-                    st.cache_resource.clear()
-                st.success(f"✅ Saved {total_matching:,} updated records to database!")
-                st.rerun()
+                        st.session_state["df_raw"] = df_raw_copy
+                        sync_donor_classifications_to_matrix(df_raw_copy)
+                        st.cache_data.clear()
+                        st.cache_resource.clear()
+                    st.success(f"✅ Saved {total_matching:,} updated records to database!")
+                    st.rerun()
+    else:
+        st.info("🔒 **Read-Only Access:** Logged in as Admin (`admin@analytics.com`). You can view, search, filter, and export donor data. Cell editing and bulk updates are restricted to Super Admin accounts.")
 
     # Slicing display_df_show with safety cap prevents memory overflow crashes on Streamlit Cloud
     if str(max_rows).startswith("All"):
