@@ -164,6 +164,10 @@ def style_donor_classifications(df_input):
         return ""
 
     styler = df_input.style
+    float_cols = df_input.select_dtypes(include=['float', 'float64']).columns
+    if len(float_cols) > 0:
+        styler = styler.format("{:.2f}", subset=float_cols, na_rep="")
+
     target_cols = [c for c in ["Lifetime Donor Classification", "Transaction Donor Classification"] if c in df_input.columns]
     if target_cols:
         styler = styler.map(_color_tier, subset=target_cols)

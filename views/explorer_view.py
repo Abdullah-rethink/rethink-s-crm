@@ -149,10 +149,9 @@ def render_explorer_tab(df, df_raw, user_session, col_amount, col_campaign, col_
     page_limit = int(max_rows) if max_rows != "All" else len(display_df_show)
     display_df_show_page = display_df_show.iloc[0:page_limit].copy()
 
-    # Round off float columns to 2 decimal places cleanly
+    # Round off float columns and build column_config for 2 decimal place display
     numeric_float_cols = display_df_show_page.select_dtypes(include=['float', 'float64']).columns
-    for nc in numeric_float_cols:
-        display_df_show_page[nc] = display_df_show_page[nc].round(2)
+    col_config_2dec = {col: st.column_config.NumberColumn(format="%.2f") for col in numeric_float_cols}
 
     # ── Main Data Table ─────────────────────────────────────────────────────
     st.markdown("<br>", unsafe_allow_html=True)
@@ -161,6 +160,7 @@ def render_explorer_tab(df, df_raw, user_session, col_amount, col_campaign, col_
     # Render Styled Table with Full Background Colored Boxes
     st.dataframe(
         style_donor_classifications(display_df_show_page),
+        column_config=col_config_2dec,
         use_container_width=True,
         height=520
     )
@@ -171,6 +171,7 @@ def render_explorer_tab(df, df_raw, user_session, col_amount, col_campaign, col_
             st.caption("Double-click any cell below to edit donor information.")
             st.data_editor(
                 display_df_show_page,
+                column_config=col_config_2dec,
                 use_container_width=True,
                 height=450,
                 num_rows="dynamic",
