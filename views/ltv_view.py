@@ -1,8 +1,8 @@
-import streamlit as st
 import plotly.express as px
-import pandas as pd
+import streamlit as st
+
 from config.settings import DONOR_TIER_ORDER, PLOTLY_COLORS
-from components.metrics import format_currency, format_number
+
 
 def render_ltv_tab(df, col_amount, currency_symbol):
     """Renders Lifetime LTV Analytics & Donor Segmentation tab."""
@@ -33,10 +33,10 @@ def render_ltv_tab(df, col_amount, currency_symbol):
             fig_ltv_bar.update_layout(
                 paper_bgcolor='rgba(0,0,0,0)',
                 plot_bgcolor='rgba(0,0,0,0)',
-                font=dict(color='#94A3B8'),
+                font={"color": '#94A3B8'},
                 showlegend=False,
-                margin=dict(l=10, r=10, t=10, b=10),
-                yaxis=dict(gridcolor='rgba(255,255,255,0.05)', tickprefix=currency_symbol)
+                margin={"l": 10, "r": 10, "t": 10, "b": 10},
+                yaxis={"gridcolor": 'rgba(255,255,255,0.05)', "tickprefix": currency_symbol}
             )
             st.plotly_chart(fig_ltv_bar, use_container_width=True)
 
@@ -50,9 +50,9 @@ def render_ltv_tab(df, col_amount, currency_symbol):
             fig_ltv_pie.update_layout(
                 paper_bgcolor='rgba(0,0,0,0)',
                 plot_bgcolor='rgba(0,0,0,0)',
-                font=dict(color='#94A3B8'),
-                margin=dict(l=10, r=10, t=10, b=10),
-                legend=dict(orientation="h", y=-0.1)
+                font={"color": '#94A3B8'},
+                margin={"l": 10, "r": 10, "t": 10, "b": 10},
+                legend={"orientation": "h", "y": -0.1}
             )
             st.plotly_chart(fig_ltv_pie, use_container_width=True)
 

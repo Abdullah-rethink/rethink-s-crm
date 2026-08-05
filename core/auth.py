@@ -1,7 +1,8 @@
-import sqlite3
-import os
 import hashlib
-from config.settings import LOCAL_DB_PATH, SUPABASE_URL, SUPABASE_KEY
+import sqlite3
+
+from config.settings import LOCAL_DB_PATH, SUPABASE_KEY, SUPABASE_URL
+
 
 def init_user_db():
     """Ensure users table exists in SQLite database with default super_admin and admin accounts."""

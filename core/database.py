@@ -1,9 +1,10 @@
-import os
 import sqlite3
 import threading
 import time
+
 from sqlalchemy import create_engine
-from config.settings import LOCAL_DB_PATH, LOCAL_DB_URL, DATABASE_URL, PARQUET_PATH
+
+from config.settings import DATABASE_URL, LOCAL_DB_PATH, LOCAL_DB_URL
 
 # Create local SQLAlchemy engine
 local_engine = create_engine(LOCAL_DB_URL)
@@ -68,7 +69,9 @@ def sync_to_cloud_async(data_df, mode="append"):
         return
 
     def _sync_worker(df, m):
-        import io, psycopg2
+        import io
+
+        import psycopg2
         try:
             t0 = time.time()
             buf = io.StringIO()

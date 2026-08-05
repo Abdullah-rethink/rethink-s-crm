@@ -1,7 +1,9 @@
-import streamlit as st
 import pandas as pd
-from core.auth import change_user_password
+import streamlit as st
+
 from config.settings import DONOR_TIER_ORDER
+from core.auth import change_user_password
+
 
 def render_sidebar_user_pill(user_session):
     """Renders user account status badge, sign out button, and password manager expander."""
@@ -93,35 +95,35 @@ def render_sidebar_filters(df_raw):
                 df = df[df["Source"] == selected_source_mode]
 
     if col_heading in df.columns:
-        headings_all = sorted(list(set(str(c).strip() for c in df[col_heading].dropna() if str(c).strip() != "")))
+        headings_all = sorted({str(c).strip() for c in df[col_heading].dropna() if str(c).strip() != ""})
         headings = ["All Headings"] + headings_all
         selected_heading = st.sidebar.selectbox("Filter by Heading", headings)
         if selected_heading != "All Headings":
             df = df[df[col_heading].astype(str).str.strip() == selected_heading]
 
     if col_subheading in df.columns:
-        subheadings_all = sorted(list(set(str(c).strip() for c in df[col_subheading].dropna() if str(c).strip() != "")))
+        subheadings_all = sorted({str(c).strip() for c in df[col_subheading].dropna() if str(c).strip() != ""})
         subheadings = ["All Sub-Headings"] + subheadings_all
         selected_subheading = st.sidebar.selectbox("Filter by Sub-Heading", subheadings)
         if selected_subheading != "All Sub-Headings":
             df = df[df[col_subheading].astype(str).str.strip() == selected_subheading]
 
     if "Country" in df.columns:
-        countries_all = sorted(list(set(str(c).strip() for c in df["Country"].dropna() if str(c).strip() != "")))
+        countries_all = sorted({str(c).strip() for c in df["Country"].dropna() if str(c).strip() != ""})
         proj_countries = ["All Project Countries"] + countries_all
         selected_proj_country = st.sidebar.selectbox("Filter by Project Country", proj_countries)
         if selected_proj_country != "All Project Countries":
             df = df[df["Country"].astype(str).str.contains(selected_proj_country, case=False, regex=False, na=False)]
 
     if "Code" in df.columns:
-        codes_all = sorted(list(set(str(c).strip() for c in df["Code"].dropna() if str(c).strip() != "")))
+        codes_all = sorted({str(c).strip() for c in df["Code"].dropna() if str(c).strip() != ""})
         codes = ["All Codes"] + codes_all
         selected_code = st.sidebar.selectbox("Filter by Code", codes)
         if selected_code != "All Codes":
             df = df[df["Code"].astype(str).str.strip() == selected_code]
 
     if "Zakat Eligibility" in df.columns:
-        z_all = sorted(list(set(str(c).strip() for c in df["Zakat Eligibility"].dropna() if str(c).strip() != "")))
+        z_all = sorted({str(c).strip() for c in df["Zakat Eligibility"].dropna() if str(c).strip() != ""})
         z_options = ["All Zakat Status"] + z_all
         selected_zakat = st.sidebar.selectbox("Filter by Zakat Eligibility", z_options)
         if selected_zakat != "All Zakat Status":

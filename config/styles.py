@@ -1,5 +1,5 @@
 import streamlit as st
-import pandas as pd
+
 
 def apply_custom_css():
     """

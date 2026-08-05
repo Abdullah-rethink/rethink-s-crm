@@ -1,9 +1,9 @@
-import streamlit as st
+
 import pandas as pd
-import threading
+import streamlit as st
+
+from config.settings import LOCAL_DB_PATH, PARQUET_PATH
 from config.styles import style_donor_classifications
-from config.settings import PARQUET_PATH, LOCAL_DB_PATH, DATABASE_URL
-from components.metrics import format_currency, format_number
 from core.data_processor import sync_donor_classifications_to_matrix
 
 DONOR_IDENTITY_COLS = ["Donation ID", "First Name", "Last Name", "Display Name", "Email", "Phone", "Billing Address Line 1", "Billing City", "Billing State", "Billing Post Code", "Billing Country"]
@@ -169,7 +169,7 @@ def render_explorer_tab(df, df_raw, user_session, col_amount, col_campaign, col_
     if user_session.get("role") == "super_admin":
         with st.expander("📝 Edit Donor Records Inline (Super Admin Only)", expanded=False):
             st.caption("Double-click any cell below to edit donor information.")
-            edited_df = st.data_editor(
+            st.data_editor(
                 display_df_show_page,
                 use_container_width=True,
                 height=450,

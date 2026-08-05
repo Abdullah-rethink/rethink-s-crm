@@ -1,5 +1,6 @@
 import pandas as pd
 
+
 def format_currency(val, symbol="£"):
     """Formats numeric values into clean currency strings rounded to 2 decimal places."""
     if pd.isna(val) or val is None:

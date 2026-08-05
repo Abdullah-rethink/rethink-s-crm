@@ -1,8 +1,8 @@
-import streamlit as st
 import plotly.express as px
-import pandas as pd
+import streamlit as st
+
 from config.settings import PLOTLY_COLORS
-from components.metrics import format_currency
+
 
 def render_overview_tab(df, col_amount, col_campaign, col_heading, col_date, currency_symbol):
     """Renders Executive Overview tab charts and timeline visualizations."""
@@ -21,14 +21,14 @@ def render_overview_tab(df, col_amount, col_campaign, col_heading, col_date, cur
                 hover_data=['Donation Count'],
                 color_discrete_sequence=['#38BDF8']
             )
-            fig_time.update_traces(line=dict(width=2.5))
+            fig_time.update_traces(line={"width": 2.5})
             fig_time.update_layout(
                 paper_bgcolor='rgba(0,0,0,0)',
                 plot_bgcolor='rgba(0,0,0,0)',
-                font=dict(color='#94A3B8'),
-                margin=dict(l=10, r=10, t=10, b=10),
-                xaxis=dict(gridcolor='rgba(255,255,255,0.05)'),
-                yaxis=dict(gridcolor='rgba(255,255,255,0.05)', tickprefix=currency_symbol)
+                font={"color": '#94A3B8'},
+                margin={"l": 10, "r": 10, "t": 10, "b": 10},
+                xaxis={"gridcolor": 'rgba(255,255,255,0.05)'},
+                yaxis={"gridcolor": 'rgba(255,255,255,0.05)', "tickprefix": currency_symbol}
             )
             st.plotly_chart(fig_time, use_container_width=True)
         else:
@@ -48,9 +48,9 @@ def render_overview_tab(df, col_amount, col_campaign, col_heading, col_date, cur
             fig_pie.update_layout(
                 paper_bgcolor='rgba(0,0,0,0)',
                 plot_bgcolor='rgba(0,0,0,0)',
-                font=dict(color='#94A3B8'),
-                margin=dict(l=10, r=10, t=10, b=10),
-                legend=dict(orientation="h", y=-0.1)
+                font={"color": '#94A3B8'},
+                margin={"l": 10, "r": 10, "t": 10, "b": 10},
+                legend={"orientation": "h", "y": -0.1}
             )
             st.plotly_chart(fig_pie, use_container_width=True)
         else:
@@ -72,10 +72,10 @@ def render_overview_tab(df, col_amount, col_campaign, col_heading, col_date, cur
             fig_camp.update_layout(
                 paper_bgcolor='rgba(0,0,0,0)',
                 plot_bgcolor='rgba(0,0,0,0)',
-                font=dict(color='#94A3B8'),
-                margin=dict(l=10, r=10, t=10, b=10),
-                xaxis=dict(gridcolor='rgba(255,255,255,0.05)', tickprefix=currency_symbol),
-                yaxis=dict(gridcolor='rgba(255,255,255,0.05)')
+                font={"color": '#94A3B8'},
+                margin={"l": 10, "r": 10, "t": 10, "b": 10},
+                xaxis={"gridcolor": 'rgba(255,255,255,0.05)', "tickprefix": currency_symbol},
+                yaxis={"gridcolor": 'rgba(255,255,255,0.05)'}
             )
             st.plotly_chart(fig_camp, use_container_width=True)
 
@@ -92,9 +92,9 @@ def render_overview_tab(df, col_amount, col_campaign, col_heading, col_date, cur
             fig_sub.update_layout(
                 paper_bgcolor='rgba(0,0,0,0)',
                 plot_bgcolor='rgba(0,0,0,0)',
-                font=dict(color='#94A3B8'),
-                margin=dict(l=10, r=10, t=10, b=10),
-                xaxis=dict(gridcolor='rgba(255,255,255,0.05)', tickprefix=currency_symbol),
-                yaxis=dict(gridcolor='rgba(255,255,255,0.05)')
+                font={"color": '#94A3B8'},
+                margin={"l": 10, "r": 10, "t": 10, "b": 10},
+                xaxis={"gridcolor": 'rgba(255,255,255,0.05)', "tickprefix": currency_symbol},
+                yaxis={"gridcolor": 'rgba(255,255,255,0.05)'}
             )
             st.plotly_chart(fig_sub, use_container_width=True)

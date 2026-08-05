@@ -1,12 +1,13 @@
-import streamlit as st
 import pandas as pd
-from core.data_processor import (
-    get_classification_matrix, save_classification_matrix
-)
+import streamlit as st
+
+from core.data_processor import get_classification_matrix, save_classification_matrix
+
 
 def get_givebright_classification_matrix():
     """Returns GiveBright classification matrix from SQLite."""
     import sqlite3
+
     from config.settings import LOCAL_DB_PATH
     conn = sqlite3.connect(LOCAL_DB_PATH, timeout=30.0)
     try:
@@ -29,6 +30,7 @@ def get_givebright_classification_matrix():
 def save_givebright_classification_matrix(matrix_df):
     """Saves updated GiveBright classification matrix to SQLite."""
     import sqlite3
+
     from config.settings import LOCAL_DB_PATH
     if matrix_df.empty:
         return 0

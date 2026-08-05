@@ -1,10 +1,12 @@
-import pandas as pd
-import numpy as np
 import os
 import sqlite3
+
+import pandas as pd
 import streamlit as st
-from config.settings import LOCAL_DB_PATH, PARQUET_PATH, COUNTRY_ISO_MAP, DATABASE_URL
+
+from config.settings import LOCAL_DB_PATH, PARQUET_PATH
 from core.database import sync_to_cloud_async
+
 
 def fix_mojibake(text):
     """
@@ -275,7 +277,7 @@ def process_and_upload_excel(file_buffer, source_name=None, upload_mode="replace
     else:
         sheets_dict = pd.read_excel(file_buffer, sheet_name=None)
         list_of_dfs = []
-        for sname, sdf in sheets_dict.items():
+        for sdf in sheets_dict.values():
             if not sdf.empty:
                 sdf.columns = [str(c).strip() for c in sdf.columns]
                 list_of_dfs.append(sdf)

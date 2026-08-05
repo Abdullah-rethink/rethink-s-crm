@@ -1,7 +1,7 @@
-import streamlit as st
-import pandas as pd
 import time
-import os
+
+import pandas as pd
+import streamlit as st
 
 # Page configuration
 st.set_page_config(
@@ -15,17 +15,17 @@ st.set_page_config(
 pd.set_option('styler.render.max_elements', 50000000)
 
 # Import Modular Component Architecture
-from config.settings import SESSION_TIMEOUT_SECONDS, DONOR_TIER_ORDER
+from components.metrics import format_currency, format_number
+from components.sidebar import render_sidebar_filters, render_sidebar_user_pill
+from config.settings import SESSION_TIMEOUT_SECONDS
 from config.styles import apply_custom_css
 from core.auth import authenticate_user, change_user_password, init_user_db
 from core.data_processor import load_data, process_and_upload_excel
-from components.sidebar import render_sidebar_user_pill, render_sidebar_filters
-from components.metrics import format_currency, format_number
-from views.overview_view import render_overview_tab
-from views.ltv_view import render_ltv_tab
+from views.admin_view import render_admin_tab
 from views.classification_view import render_classification_tab
 from views.explorer_view import render_explorer_tab
-from views.admin_view import render_admin_tab
+from views.ltv_view import render_ltv_tab
+from views.overview_view import render_overview_tab
 
 # Apply Custom Glassmorphism Theme CSS
 apply_custom_css()
@@ -35,7 +35,7 @@ init_user_db()
 
 # ── Authentication Router & Session Inactivity Check ───────────────────────
 def render_auth_screen():
-    if "authenticated_user" in st.session_state and st.session_state["authenticated_user"]:
+    if st.session_state.get("authenticated_user"):
         last_active = st.session_state.get("last_activity_time", time.time())
         now = time.time()
         
@@ -49,7 +49,7 @@ def render_auth_screen():
             return st.session_state["authenticated_user"]
 
     st.markdown("<br>", unsafe_allow_html=True)
-    c1, c2, c3 = st.columns([2, 5, 2])
+    _c1, c2, _c3 = st.columns([2, 5, 2])
     with c2:
         st.markdown("""
         <div class="glass-panel" style="text-align: center; padding: 32px 28px; margin-top: 10px; border-left: 4px solid #38BDF8;">

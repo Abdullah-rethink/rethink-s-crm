@@ -1,11 +1,11 @@
-import pandas as pd
-import numpy as np
-import streamlit as st
 import os
 import sqlite3
 import time
-from sqlalchemy import create_engine
+
+import pandas as pd
+import streamlit as st
 from dotenv import load_dotenv
+from sqlalchemy import create_engine
 
 # Load environment variables from .env file if present
 load_dotenv()
@@ -978,11 +978,13 @@ def _enrich_dataframe(df):
 
 import threading
 
+
 def purge_all_data():
     """
     Completely purges all loaded data across Parquet cache, local SQLite, and Supabase cloud DB.
     """
-    import sqlite3, gc
+    import gc
+    import sqlite3
     st.cache_data.clear()
     st.cache_resource.clear()
     
@@ -1050,7 +1052,7 @@ def process_and_upload_excel(file_buffer, source_name=None, upload_mode="replace
                     raise ValueError("Excel file is empty.")
                 
                 list_of_dfs = []
-                for sname, sdf in sheets_dict.items():
+                for sdf in sheets_dict.values():
                     if not sdf.empty:
                         # Clean column whitespace
                         sdf.columns = [str(c).strip() for c in sdf.columns]
@@ -1169,7 +1171,9 @@ def process_and_upload_excel(file_buffer, source_name=None, upload_mode="replace
     # 6. Push to Cloud Database in non-blocking background thread via high-speed native COPY stream
     if DATABASE_URL and "postgres" in DATABASE_URL:
         def sync_to_cloud_fast(data_df, mode):
-            import io, psycopg2
+            import io
+
+            import psycopg2
             try:
                 t0 = time.time()
                 buf = io.StringIO()
