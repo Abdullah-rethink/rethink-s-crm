@@ -165,28 +165,56 @@ def render_explorer_tab(df, df_raw, user_session, col_amount, col_campaign, col_
     else:
         st.info("🔒 **Read-Only Access:** Logged in as Admin (`admin@analytics.com`). You can view, search, filter, and export donor data. Cell editing and bulk updates are restricted to Super Admin accounts.")
 
-    # ── Interactive Page Navigation (Pagination Engine) ──────────────────────
+    # ── Interactive Page Navigation (Pagination Toolbar) ─────────────────────
     import math
     total_pages = max(1, math.ceil(total_matching / page_size))
-    
+
+    if "explorer_current_page" not in st.session_state:
+        st.session_state["explorer_current_page"] = 1
+
+    # Ensure current page stays within valid bounds
+    if st.session_state["explorer_current_page"] > total_pages:
+        st.session_state["explorer_current_page"] = total_pages
+    elif st.session_state["explorer_current_page"] < 1:
+        st.session_state["explorer_current_page"] = 1
+
+    curr_p = int(st.session_state["explorer_current_page"])
+
     st.markdown("<br>", unsafe_allow_html=True)
-    p_col1, p_col2 = st.columns([3, 7])
-    with p_col1:
-        current_page = st.number_input(
-            f"📄 Go to Page (1 - {total_pages:,})", 
-            min_value=1, 
-            max_value=total_pages, 
-            value=1, 
-            step=1, 
-            key="explorer_current_page"
-        )
-    with p_col2:
-        start_idx = (current_page - 1) * page_size
-        end_idx = min(start_idx + page_size, total_matching)
+    
+    # Sleek Glassmorphic Pagination Bar
+    p_btn1, p_btn2, p_badge, p_jump, p_info = st.columns([1.5, 1.5, 2.5, 2, 4.5])
+    
+    with p_btn1:
+        if st.button("◀ Prev", disabled=(curr_p <= 1), use_container_width=True, key="btn_prev_page"):
+            st.session_state["explorer_current_page"] = max(1, curr_p - 1)
+            st.rerun()
+
+    with p_btn2:
+        if st.button("Next ▶", disabled=(curr_p >= total_pages), use_container_width=True, key="btn_next_page"):
+            st.session_state["explorer_current_page"] = min(total_pages, curr_p + 1)
+            st.rerun()
+
+    with p_badge:
         st.markdown(f"""
-        <div style="margin-top: 24px; color: #94A3B8; font-weight: 600; font-size: 0.95rem;">
-            Showing records <b style="color: #38BDF8;">{start_idx + 1:,} - {end_idx:,}</b> of <b style="color: #F8FAFC;">{total_matching:,}</b> total matching donor records 
-            <span style="color: #64748B;">(Page {current_page:,} of {total_pages:,})</span>
+        <div style="text-align: center; padding-top: 6px;">
+            <span class="header-badge" style="font-size: 0.85rem; padding: 6px 14px; margin: 0;">Page {curr_p:,} / {total_pages:,}</span>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with p_jump:
+        new_jump = st.number_input("Jump Page", min_value=1, max_value=total_pages, value=curr_p, step=1, label_visibility="collapsed", key="num_jump_page")
+        if new_jump != curr_p:
+            st.session_state["explorer_current_page"] = new_jump
+            st.rerun()
+
+    start_idx = (curr_p - 1) * page_size
+    end_idx = min(start_idx + page_size, total_matching)
+
+    with p_info:
+        st.markdown(f"""
+        <div style="padding-top: 8px; color: #94A3B8; font-weight: 600; font-size: 0.9rem; text-align: right;">
+            Showing <b style="color: #38BDF8;">{start_idx + 1:,} - {end_idx:,}</b> of <b style="color: #F8FAFC;">{total_matching:,}</b> records
         </div>
         """, unsafe_allow_html=True)
 
@@ -197,7 +225,7 @@ def render_explorer_tab(df, df_raw, user_session, col_amount, col_campaign, col_
     col_config_2dec = {col: st.column_config.NumberColumn(format="%.2f") for col in numeric_float_cols}
 
     # ── Main Data Table ─────────────────────────────────────────────────────
-    st.subheader(f"📊 Donor Records Table — Page {current_page:,}")
+    st.subheader(f"📊 Donor Records Table — Page {curr_p:,}")
 
     # Render Styled Table with Full Background Colored Boxes
     st.dataframe(
