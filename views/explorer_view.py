@@ -6,13 +6,31 @@ from config.settings import LOCAL_DB_PATH, PARQUET_PATH
 from config.styles import style_donor_classifications
 from core.data_processor import sync_donor_classifications_to_matrix
 
-DONOR_IDENTITY_COLS = ["Donation ID", "First Name", "Last Name", "Display Name", "Email", "Phone", "Billing Address Line 1", "Billing City", "Billing State", "Billing Post Code", "Billing Country"]
-DONATION_COLS = ["Donation ID", "Donation Amount in Project Currency (May be approx.)", "Donation Currency (DC)", "Donation Amount (in Donation Currency)", "Payment Frequency", "Zakat (yes or no)", "Settlement Currency", "Total Online Donations Net Amount in Settled Currency", "Source", "Platform"]
-CAMPAIGN_COLS = ["Donation ID", "Campaign Name", "Community Name", "Heading", "Sub-Heading", "Country", "Code", "Zakat Eligibility"]
-DATE_COLS = ["Created Date (UTC)", "Disbursed / Settled Date (UTC)"]
+# ── Clean Column Preset Definitions ──────────────────────────────────────────
+DEFAULT_COLS = [
+    "Display Name", "First Name", "Last Name", "Email",
+    "Total Online Donations Net Amount in Settled Currency",
+    "Lifetime Donor Classification", "Transaction Donor Classification",
+    "Campaign Name", "Community Name", "Created Date (UTC)", "Payment Frequency"
+]
 
-# Preserve order while deduplicating column names
-ALL_DEFAULT = list(dict.fromkeys(DONOR_IDENTITY_COLS + DONATION_COLS + CAMPAIGN_COLS + DATE_COLS))
+DONOR_IDENTITY_COLS = [
+    "Donor ID", "Display Name", "First Name", "Last Name", "Email",
+    "Lifetime Donor Classification", "Transaction Donor Classification",
+    "Total LTV", "Payment Frequency", "Billing Country", "Billing City"
+]
+
+DONATION_COLS = [
+    "Donation ID", "Total Online Donations Net Amount in Settled Currency",
+    "Donation Amount in Project Currency (May be approx.)", "Donation Currency (DC)",
+    "Donation Amount (in Donation Currency)", "Payment Frequency", "Payment Method",
+    "Created Date (UTC)", "Source", "Platform"
+]
+
+CAMPAIGN_COLS = [
+    "Campaign Name", "Community Name", "Heading", "Sub-Heading",
+    "Country", "Code", "Zakat Eligibility", "Source", "Platform"
+]
 
 def render_explorer_tab(df, df_raw, user_session, col_amount, col_campaign, col_community):
     """Renders Data Explorer tab with column presets, bulk editing, Styler colors, and exports."""
@@ -34,20 +52,22 @@ def render_explorer_tab(df, df_raw, user_session, col_amount, col_campaign, col_
     with ctrl3:
         page_size = st.selectbox("Page Size (Rows/Page)", [50, 100, 250, 500, 1000], index=1, key="explorer_page_size")
 
-    # Column preset logic
+    # Column preset selection logic
     if col_group == "Donor Identity Only":
-        visible_cols = list(dict.fromkeys(DONOR_IDENTITY_COLS + [c for c in ["Lifetime Donor Classification", "Total LTV", "Payment Frequency"] if c in df.columns]))
+        preset_cols = DONOR_IDENTITY_COLS
     elif col_group == "Donation Details Only":
-        visible_cols = list(dict.fromkeys(DONATION_COLS + DATE_COLS))
+        preset_cols = DONATION_COLS
     elif col_group == "Campaign Details Only":
-        visible_cols = list(dict.fromkeys(CAMPAIGN_COLS + DATE_COLS))
+        preset_cols = CAMPAIGN_COLS
     elif col_group == "All Columns":
-        visible_cols = list(dict.fromkeys(list(df.columns)))
+        preset_cols = list(df.columns)
     else:
-        visible_cols = list(dict.fromkeys([c for c in ALL_DEFAULT if c in df.columns]))
+        preset_cols = DEFAULT_COLS
 
     # Ensure every default column actually exists in active dataframe
-    visible_cols = [c for c in visible_cols if c in df.columns]
+    visible_cols = [c for c in preset_cols if c in df.columns]
+    if not visible_cols:
+        visible_cols = list(df.columns[:8])
 
     # Sync Column Preset with multiselect state without duplicate default warning
     if "advanced_col_select" not in st.session_state or st.session_state.get("prev_col_preset") != col_group:
