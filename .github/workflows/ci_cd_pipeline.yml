@@ -40,7 +40,7 @@ jobs:
           python -c "import pandas, streamlit, sqlalchemy, plotly, requests; print('All core libraries imported cleanly!')"
 
       - name: 📩 Send Email Notification (Pass or Fail)
-        if: always() && secrets.MAIL_USERNAME != '' && secrets.MAIL_PASSWORD != ''
+        if: always()
         uses: dawidd6/action-send-mail@v4
         with:
           server_address: smtp.gmail.com
