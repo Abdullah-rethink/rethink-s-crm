@@ -22,6 +22,18 @@ DATABASE_URL = raw_db_url
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "").strip()
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY") or os.environ.get("SUPABASE_ANON_KEY", "").strip()
 
+# Base URL for API & Approval Email Link Generation
+APP_BASE_URL = os.environ.get("APP_BASE_URL", "http://127.0.0.1:8000").rstrip("/")
+APPROVAL_EMAIL = os.environ.get("APPROVAL_EMAIL", "office@rethinkcharity.org.uk").strip()
+
+# SMTP Email Configuration
+SMTP_HOST = os.environ.get("SMTP_HOST", "smtp.gmail.com").strip()
+SMTP_PORT = int(os.environ.get("SMTP_PORT", "587"))
+SMTP_USER = os.environ.get("SMTP_USER", "").strip()
+SMTP_PASSWORD = os.environ.get("SMTP_PASSWORD", "").strip()
+SMTP_FROM_NAME = os.environ.get("SMTP_FROM_NAME", "Rethink Charity CRM").strip()
+SMTP_FROM_EMAIL = os.environ.get("SMTP_FROM_EMAIL", "").strip()
+
 # Session Timeout Configuration
 SESSION_TIMEOUT_MINUTES = 15
 SESSION_TIMEOUT_SECONDS = SESSION_TIMEOUT_MINUTES * 60

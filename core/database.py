@@ -103,7 +103,7 @@ def sync_to_cloud_async(data_df, mode="append"):
             conn.close()
             elapsed = time.time() - t0
             _write_sync_status(True, f"upload ({m})", "")
-            print(f"✅ Supabase Cloud PostgreSQL native COPY complete in {elapsed:.2f}s!")
+            print(f"[Cloud DB] Supabase Cloud PostgreSQL native COPY complete in {elapsed:.2f}s!")
         except Exception as e:
             _write_sync_status(False, f"upload ({m})", str(e))
             print(f"Cloud DB sync notice: {e}")

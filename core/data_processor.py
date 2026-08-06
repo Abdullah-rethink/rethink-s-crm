@@ -62,9 +62,9 @@ def classify_donor_amount(amount):
         return "Low End"
     elif val < 600:
         return "Medium Low"
-    elif val < 1500:
+    elif val < 1000:
         return "Medium"
-    elif val < 3000:
+    elif val <= 3000:
         return "High"
     else:
         return "Super High"
@@ -123,7 +123,7 @@ def get_classification_matrix(df_raw=None):
             for tc in available_target_cols:
                 donor_df[tc] = lg_df[tc].values
 
-            matrix_df = donor_df.groupby(["Campaign Name", "Community Name"], dropna=False)[available_target_cols].agg(_mode_or_last).reset_index()
+            matrix_df = donor_df.groupby(["Campaign Name", "Community Name"], dropna=False)[available_target_cols].first().reset_index()
                 
             conn = sqlite3.connect(LOCAL_DB_PATH, timeout=30.0)
             try:
@@ -323,6 +323,49 @@ def sync_donor_classifications_to_matrix(df_donations):
         save_classification_matrix(matrix_df)
     except Exception as e:
         print(f"Donor to matrix sync notice: {e}")
+
+def sync_matrix_classifications_to_donors(matrix_df):
+    """Applies classification matrix rule changes directly to all matching donor donation records instantly."""
+    if matrix_df.empty or "Campaign Name" not in matrix_df.columns:
+        return 0
+
+    df_donations = load_data()
+    if df_donations.empty or "Campaign Name" not in df_donations.columns:
+        return 0
+
+    try:
+        camp_rule_map = {}
+        for _, r in matrix_df.iterrows():
+            c_name = str(r["Campaign Name"]).strip().lower()
+            camp_rule_map[c_name] = {
+                "Heading": str(r.get("Heading", "Unassigned")),
+                "Sub-Heading": str(r.get("Sub-Heading", "Unassigned")),
+                "Country": str(r.get("Country", "Unassigned")),
+                "Code": str(r.get("Code", "N/A")),
+                "Zakat Eligibility": str(r.get("Zakat Eligibility", "Unassigned"))
+            }
+
+        c_keys = df_donations["Campaign Name"].astype(str).str.strip().str.lower()
+        target_fields = ["Heading", "Sub-Heading", "Country", "Code", "Zakat Eligibility"]
+        updated_count = 0
+
+        for col in target_fields:
+            if col in df_donations.columns:
+                col_map = {k: v[col] for k, v in camp_rule_map.items()}
+                mapped_series = c_keys.map(col_map)
+                mask = mapped_series.notna()
+                df_donations.loc[mask, col] = mapped_series[mask]
+                updated_count = int(mask.sum())
+
+        df_donations.to_parquet(PARQUET_PATH, index=False)
+        conn = sqlite3.connect(LOCAL_DB_PATH, timeout=30.0)
+        df_donations.to_sql("donations", con=conn, if_exists="replace", index=False)
+        conn.close()
+
+        return updated_count
+    except Exception as e:
+        print(f"Matrix to donor sync notice: {e}")
+        return 0
 
 def purge_all_data():
     """Purges all tables and cache files."""

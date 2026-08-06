@@ -5,7 +5,7 @@ from config.settings import LOCAL_DB_PATH, SUPABASE_KEY, SUPABASE_URL
 
 
 def init_user_db():
-    """Ensure users table exists in SQLite database with default super_admin and admin accounts."""
+    """Ensure users table exists in SQLite database with default accounts and granular permissions."""
     try:
         conn = sqlite3.connect(LOCAL_DB_PATH, timeout=30.0)
         conn.execute("""
@@ -15,12 +15,24 @@ def init_user_db():
                 email TEXT UNIQUE NOT NULL,
                 password_hash TEXT NOT NULL,
                 role TEXT DEFAULT 'admin',
+                can_edit_donors INTEGER DEFAULT 0,
+                can_edit_matrix INTEGER DEFAULT 0,
+                can_manage_tags INTEGER DEFAULT 0,
+                can_purge_data INTEGER DEFAULT 0,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
         """)
         conn.commit()
 
+        # Check column migration
         cursor = conn.cursor()
+        cursor.execute("PRAGMA table_info(users)")
+        cols = [c[1] for c in cursor.fetchall()]
+        for perm_col in ["can_edit_donors", "can_edit_matrix", "can_manage_tags", "can_purge_data"]:
+            if perm_col not in cols:
+                conn.execute(f"ALTER TABLE users ADD COLUMN {perm_col} INTEGER DEFAULT 0")
+                conn.commit()
+
         cursor.execute("SELECT COUNT(*) FROM users")
         count = cursor.fetchone()[0]
         if count == 0:
@@ -28,17 +40,59 @@ def init_user_db():
                 return hashlib.sha256(p.encode('utf-8')).hexdigest()
 
             seed_users = [
-                ('superadmin', 'superadmin@analytics.com', _hash_pwd('SuperAdmin@123'), 'super_admin'),
-                ('admin', 'admin@analytics.com', _hash_pwd('Admin@123'), 'admin')
+                ('superadmin', 'superadmin@analytics.com', _hash_pwd('SuperAdmin@123'), 'super_admin', 1, 1, 1, 1),
+                ('admin', 'admin@analytics.com', _hash_pwd('Admin@123'), 'admin', 0, 0, 0, 0)
             ]
             cursor.executemany("""
-                INSERT INTO users (username, email, password_hash, role)
-                VALUES (?, ?, ?, ?)
+                INSERT INTO users (username, email, password_hash, role, can_edit_donors, can_edit_matrix, can_manage_tags, can_purge_data)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """, seed_users)
             conn.commit()
+        else:
+            # Ensure superadmin has all permissions
+            conn.execute("""
+                UPDATE users SET 
+                    can_edit_donors = 1,
+                    can_edit_matrix = 1,
+                    can_manage_tags = 1,
+                    can_purge_data = 1
+                WHERE role = 'super_admin'
+            """)
+            conn.commit()
+
         conn.close()
     except Exception as e:
         print(f"User DB init notice: {e}")
+
+
+def get_all_users():
+    """Returns list of all registered users with their roles and granular permissions."""
+    init_user_db()
+    conn = sqlite3.connect(LOCAL_DB_PATH, timeout=30.0)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, username, email, role, can_edit_donors, can_edit_matrix, can_manage_tags, can_purge_data, created_at FROM users")
+    rows = cursor.fetchall()
+    users = [dict(r) for r in rows]
+    conn.close()
+    return users
+
+
+def update_user_permissions(email, role, can_edit_donors, can_edit_matrix, can_manage_tags, can_purge_data):
+    """Updates user role and granular permissions in SQLite."""
+    conn = sqlite3.connect(LOCAL_DB_PATH, timeout=30.0)
+    conn.execute("""
+        UPDATE users SET
+            role = ?,
+            can_edit_donors = ?,
+            can_edit_matrix = ?,
+            can_manage_tags = ?,
+            can_purge_data = ?
+        WHERE email = ? OR username = ?
+    """, (role, int(can_edit_donors), int(can_edit_matrix), int(can_manage_tags), int(can_purge_data), email, email))
+    conn.commit()
+    conn.close()
+    return True
 
 def authenticate_user(email_or_username, password):
     """
@@ -91,15 +145,20 @@ def authenticate_user(email_or_username, password):
         cur = conn.cursor()
         hashed = _hash_pwd(password)
         cur.execute("""
-            SELECT username, email, role FROM users
+            SELECT username, email, role, can_edit_donors, can_edit_matrix, can_manage_tags, can_purge_data FROM users
             WHERE (LOWER(email) = LOWER(?) OR LOWER(username) = LOWER(?)) AND password_hash = ?
         """, (user_identity, user_identity, hashed))
         row = cur.fetchone()
         if row:
+            is_super = (row[2] == "super_admin")
             return {
                 "username": row[0],
                 "email": row[1],
                 "role": row[2],
+                "can_edit_donors": 1 if (is_super or row[3]) else 0,
+                "can_edit_matrix": 1 if (is_super or row[4]) else 0,
+                "can_manage_tags": 1 if (is_super or row[5]) else 0,
+                "can_purge_data": 1 if (is_super or row[6]) else 0,
                 "provider": "local"
             }
     except Exception as e:
