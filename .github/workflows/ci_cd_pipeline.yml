@@ -1,4 +1,4 @@
-name: Northflank + Vercel Production CI/CD Pipeline
+name: Hugging Face Spaces + Vercel Production CI/CD Pipeline
 
 on:
   push:
@@ -32,7 +32,7 @@ jobs:
 
       - name: ⚙️ Backend Core Health & Import Test
         run: |
-          python -c "from backend.main import app; print('FastAPI app initialized successfully for Northflank deployment!')"
+          python -c "from backend.main import app; print('FastAPI app initialized successfully for Hugging Face Spaces deployment!')"
 
   frontend-ci:
     name: ⚡ Frontend (React 18 + Vite) CI
@@ -58,6 +58,25 @@ jobs:
           cd frontend
           npm run build
 
+  sync-to-huggingface:
+    name: 🤗 Sync Code to Hugging Face Spaces
+    needs: [backend-ci, frontend-ci]
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 🚀 Push to Hugging Face Space
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_SPACE_URL: ${{ secrets.HF_SPACE_URL }}
+        if: env.HF_TOKEN != '' && env.HF_SPACE_URL != ''
+        run: |
+          git push --force https://user:${HF_TOKEN}@${HF_SPACE_URL#https://} HEAD:main
+
   deploy-notify:
     name: 🚀 Continuous Deployment Status & Notification
     needs: [backend-ci, frontend-ci]
@@ -79,7 +98,7 @@ jobs:
           html_body: |
             <div style="font-family: Arial, sans-serif; padding: 20px; border: 1px solid #E2E8F0; border-radius: 8px; max-width: 600px;">
               <h2 style="color: ${{ job.status == 'success' && '#10B981' || '#EF4444' }};">
-                ${{ job.status == 'success' && '✅ Build & Test Passed! Continuous Deployment Triggered on Northflank & Vercel.' || '❌ Build or Test Failed!' }}
+                ${{ job.status == 'success' && '✅ Build & Test Passed! Automated Deployment Triggered on Hugging Face Spaces & Vercel.' || '❌ Build or Test Failed!' }}
               </h2>
               <p>The CI/CD pipeline run has completed with status: <b>${{ job.status }}</b>.</p>
               <hr style="border: 0; border-top: 1px solid #E2E8F0;">

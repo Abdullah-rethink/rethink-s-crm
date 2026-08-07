@@ -142,12 +142,23 @@ export default function ExpenseView({ user }) {
     loadCodes();
     if (isSuperAdmin) loadSettings();
 
-    // WebSocket real-time events listener
+    // WebSocket real-time events listener with HTTP polling fallback for Vercel Serverless
     const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsHost = API_BASE_URL ? API_BASE_URL.replace(/^http/, 'ws') : `${wsProtocol}//${window.location.host}`;
     const wsUrl = `${wsHost}/ws/events`;
 
     let socket;
+    let fallbackInterval;
+
+    const startPollingFallback = () => {
+      if (!fallbackInterval) {
+        fallbackInterval = setInterval(() => {
+          loadExpenses();
+          loadCodes();
+        }, 15000);
+      }
+    };
+
     try {
       socket = new WebSocket(wsUrl);
       socket.onmessage = (event) => {
@@ -159,10 +170,16 @@ export default function ExpenseView({ user }) {
           }
         } catch (e) {}
       };
-    } catch (e) {}
+      socket.onerror = () => {
+        startPollingFallback();
+      };
+    } catch (e) {
+      startPollingFallback();
+    }
 
     return () => {
       if (socket) socket.close();
+      if (fallbackInterval) clearInterval(fallbackInterval);
     };
   }, []);
 

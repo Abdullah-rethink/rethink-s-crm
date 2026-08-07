@@ -83,32 +83,66 @@ def sync_to_cloud_async(data_df, mode="append", max_retries=3):
         attempts = 0
         last_error = ""
 
+        # Preserving 100% full data fidelity without any string truncation
+        sync_df = df.copy()
+
         while attempts < max_retries:
             attempts += 1
             try:
                 t0 = time.time()
                 buf = io.StringIO()
-                df.to_csv(buf, index=False, header=False, sep='\t', na_rep='')
+                sync_df.to_csv(buf, index=False, header=False, sep='\t', na_rep='')
                 buf.seek(0)
                 
                 conn = psycopg2.connect(DATABASE_URL)
                 cur = conn.cursor()
                 
-                cols_def = ', '.join([f'"{c}" TEXT' for c in df.columns])
+                # Infer exact PostgreSQL types (DOUBLE PRECISION for floats, BIGINT for ints, TEXT for strings)
+                col_defs = []
+                for col in sync_df.columns:
+                    dtype = sync_df[col].dtype
+                    if pd.api.types.is_float_dtype(dtype):
+                        col_defs.append(f'"{col}" DOUBLE PRECISION')
+                    elif pd.api.types.is_integer_dtype(dtype):
+                        col_defs.append(f'"{col}" BIGINT')
+                    else:
+                        col_defs.append(f'"{col}" TEXT')
+                
+                cols_def = ', '.join(col_defs)
                 cur.execute(f'CREATE TABLE IF NOT EXISTS "donations" ({cols_def});')
+                
+                # Enable PostgreSQL TOAST tuple compression for compact storage without data loss
+                try:
+                    cur.execute('ALTER TABLE "donations" SET (toast_tuple_target = 128);')
+                except Exception:
+                    pass
+
                 if m == "replace":
                     cur.execute('TRUNCATE TABLE "donations";')
                 conn.commit()
                 
-                target_cols = ', '.join([f'"{c}"' for c in df.columns])
+                target_cols = ', '.join([f'"{c}"' for c in sync_df.columns])
                 copy_sql = f'COPY "donations" ({target_cols}) FROM STDIN WITH (FORMAT csv, DELIMITER \'\t\', NULL \'\');'
-                cur.copy_expert(sql=copy_sql, file=buf)
-                conn.commit()
+                
+                # Low-RAM 5,000-row Chunked Stream to prevent Supabase RAM Commitment spikes
+                chunk_size = 5000
+                total_rows = len(sync_df)
+                num_chunks = (total_rows + chunk_size - 1) // chunk_size
+
+                for i in range(num_chunks):
+                    chunk = sync_df.iloc[i * chunk_size : (i + 1) * chunk_size]
+                    buf = io.StringIO()
+                    chunk.to_csv(buf, index=False, header=False, sep='\t', na_rep='')
+                    buf.seek(0)
+                    cur.copy_expert(sql=copy_sql, file=buf)
+                    buf.close()
+                    conn.commit()
+
                 cur.close()
                 conn.close()
                 elapsed = time.time() - t0
                 _write_sync_status(True, f"upload ({m})", f"Completed in {elapsed:.2f}s on attempt {attempts}")
-                print(f"[Cloud DB] Supabase Cloud PostgreSQL native COPY complete in {elapsed:.2f}s (Attempt {attempts}/{max_retries})!")
+                print(f"[Cloud DB] Supabase Cloud PostgreSQL low-RAM chunked COPY complete in {elapsed:.2f}s (Attempt {attempts}/{max_retries})!")
                 return
             except Exception as e:
                 last_error = str(e)
