@@ -1,36 +1,10 @@
 from typing import Optional
 from fastapi import APIRouter, Query
+import pandas as pd
 from core.data_processor import load_data
+from backend.api.donors import _apply_filters
 
 router = APIRouter(prefix="/api/metrics", tags=["Metrics"])
-
-
-def _apply_global_filters(df, payment_type, tier, source, heading, subheading, country):
-    if df.empty:
-        return df
-    filtered_df = df.copy()
-
-    if payment_type and payment_type != "All Payment Types" and "Payment Frequency" in filtered_df.columns:
-        filtered_df = filtered_df[filtered_df["Payment Frequency"] == payment_type]
-
-    if tier and tier != "All Classifications" and "Lifetime Donor Classification" in filtered_df.columns:
-        filtered_df = filtered_df[filtered_df["Lifetime Donor Classification"] == tier]
-
-    if source and source != "All Sources (Combined)" and "Source" in filtered_df.columns:
-        sources_list = [s.strip() for s in str(source).split(",") if s.strip()]
-        if sources_list:
-            filtered_df = filtered_df[filtered_df["Source"].isin(sources_list)]
-
-    if heading and heading != "All Headings" and "Heading" in filtered_df.columns:
-        filtered_df = filtered_df[filtered_df["Heading"].astype(str).str.strip() == heading]
-
-    if subheading and subheading != "All Sub-Headings" and "Sub-Heading" in filtered_df.columns:
-        filtered_df = filtered_df[filtered_df["Sub-Heading"].astype(str).str.strip() == subheading]
-
-    if country and country != "All Project Countries" and "Country" in filtered_df.columns:
-        filtered_df = filtered_df[filtered_df["Country"].astype(str).str.contains(country, case=False, regex=False, na=False)]
-
-    return filtered_df
 
 
 @router.get("/summary")
@@ -40,10 +14,15 @@ def get_metrics_summary(
     source: Optional[str] = None,
     heading: Optional[str] = None,
     subheading: Optional[str] = None,
-    country: Optional[str] = None
+    country: Optional[str] = None,
+    code: Optional[str] = None,
+    zakat: Optional[str] = None,
+    donor_country: Optional[str] = None,
+    campaign_search: Optional[str] = None,
+    gift_aid: Optional[str] = None
 ):
     df_raw = load_data()
-    df = _apply_global_filters(df_raw, payment_type, tier, source, heading, subheading, country)
+    df = _apply_filters(df_raw, payment_type, tier, source, heading, subheading, country, code, zakat, donor_country, campaign_search, gift_aid)
 
     if df.empty:
         return {

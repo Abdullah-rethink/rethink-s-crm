@@ -142,6 +142,16 @@ def get_classification_matrix(df_raw=None):
                     db_matrix["Campaign Name"] = db_matrix["Campaign Name"].astype(str).fillna("N/A").replace({'nan': 'N/A', '': 'N/A', 'None': 'N/A'})
                     db_matrix["Community Name"] = db_matrix["Community Name"].astype(str).fillna("N/A").replace({'nan': 'N/A', '': 'N/A', 'None': 'N/A'})
                     
+                    # Merge saved DB rules over matrix_df
+                    db_rule_map = {str(r["Campaign Name"]).strip().lower(): r for _, r in db_matrix.iterrows()}
+                    for idx, row in matrix_df.iterrows():
+                        c_key = str(row["Campaign Name"]).strip().lower()
+                        if c_key in db_rule_map:
+                            db_r = db_rule_map[c_key]
+                            for tc in target_cols_display:
+                                if tc in db_r and pd.notna(db_r[tc]) and str(db_r[tc]).strip() != "":
+                                    matrix_df.at[idx, tc] = str(db_r[tc]).strip()
+
                     existing_keys = set(zip(matrix_df["Campaign Name"].astype(str), matrix_df["Community Name"].astype(str)))
                     new_rows = db_matrix[~db_matrix.apply(
                         lambda r: (str(r.get("Campaign Name", "")), str(r.get("Community Name", ""))) in existing_keys, axis=1
@@ -178,6 +188,47 @@ def get_classification_matrix(df_raw=None):
 
     return matrix_df
 
+
+def sync_matrix_classifications_to_donors(matrix_df):
+    """Updates matching donor records in Parquet and SQLite DB with saved classification matrix rules."""
+    if matrix_df is None or matrix_df.empty:
+        return 0
+
+    df_raw = load_data()
+    if df_raw.empty or "Campaign Name" not in df_raw.columns:
+        return 0
+
+    updated_count = 0
+    rule_map = {}
+    for _, row in matrix_df.iterrows():
+        cname = str(row.get("Campaign Name", "")).strip().lower()
+        if cname and cname not in ["n/a", "none", "nan", ""]:
+            rule_map[cname] = {
+                "Heading": str(row.get("Heading", "Unassigned")),
+                "Sub-Heading": str(row.get("Sub-Heading", "Unassigned")),
+                "Country": str(row.get("Country", "Unassigned")),
+                "Code": str(row.get("Code", "Unassigned")),
+                "Zakat Eligibility": str(row.get("Zakat Eligibility", "Unassigned")),
+            }
+
+    if not rule_map:
+        return 0
+
+    campaign_series = df_raw["Campaign Name"].astype(str).str.strip().str.lower()
+    for cname, rules in rule_map.items():
+        mask = campaign_series == cname
+        if mask.any():
+            updated_count += int(mask.sum())
+            for col_name, col_val in rules.items():
+                df_raw.loc[mask, col_name] = col_val
+
+    df_raw.to_parquet(PARQUET_PATH, index=False)
+    conn = sqlite3.connect(LOCAL_DB_PATH, timeout=30.0)
+    df_raw.to_sql("donations", con=conn, if_exists="replace", index=False)
+    conn.close()
+
+    return updated_count
+
 def save_classification_matrix(matrix_df):
     """Saves updated LaunchGood classification matrix."""
     init_classification_db()
@@ -190,18 +241,13 @@ def save_classification_matrix(matrix_df):
 
     conn = sqlite3.connect(LOCAL_DB_PATH, timeout=30.0)
     for _, row in clean_matrix.iterrows():
+        cname = str(row.get("Campaign Name", "Unassigned"))
+        conn.execute("DELETE FROM campaign_classifications WHERE campaign_name = ?", (cname,))
         conn.execute("""
             INSERT INTO campaign_classifications (campaign_name, community_name, heading, sub_heading, country, code, zakat_eligibility)
             VALUES (?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(campaign_name) DO UPDATE SET
-                community_name=excluded.community_name,
-                heading=excluded.heading,
-                sub_heading=excluded.sub_heading,
-                country=excluded.country,
-                code=excluded.code,
-                zakat_eligibility=excluded.zakat_eligibility;
         """, (
-            str(row.get("Campaign Name", "Unassigned")),
+            cname,
             str(row.get("Community Name", "Unassigned")),
             str(row.get("Heading", "Unassigned")),
             str(row.get("Sub-Heading", "Unassigned")),

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Shield, Save, CheckCircle, AlertCircle, RefreshCw } from 'lucide-react';
+import { Shield, Save, CheckCircle, AlertCircle, RefreshCw, Download } from 'lucide-react';
 import { API_BASE_URL } from '../config';
 
 export default function ClassificationView({ user }) {
@@ -66,11 +66,15 @@ export default function ClassificationView({ user }) {
       });
   };
 
+  const handleExportClassifications = (format) => {
+    window.open(`${API_BASE_URL}/api/classifications/export?platform=${platform}&format=${format}`, '_blank');
+  };
+
   const canEditMatrix = user?.role === 'super_admin' || user?.can_edit_matrix === 1;
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h2 className="text-xl font-extrabold text-white flex items-center gap-2">
             <Shield className="w-5 h-5 text-cyan-400" /> Campaign Classification Manager (Source of Truth)
@@ -78,11 +82,32 @@ export default function ClassificationView({ user }) {
           <p className="text-xs text-slate-400">Map Campaign Name & Community Name ➔ Heading, Sub-Heading, Country, Code, and Zakat Eligibility.</p>
         </div>
 
-        {canEditMatrix && (
-          <button onClick={handleSave} disabled={saving} className="btn-primary text-xs flex items-center gap-1.5">
-            <Save className="w-4 h-4" /> {saving ? 'Saving Rules...' : '💾 Save & Apply Rules Now'}
-          </button>
-        )}
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Export Dropdown Group */}
+          <div className="flex items-center gap-1 bg-slate-900/90 border border-emerald-500/30 p-1 rounded-xl">
+            <button 
+              onClick={() => handleExportClassifications('csv')}
+              className="text-xs font-bold text-emerald-400 hover:bg-emerald-500/20 px-2.5 py-1.5 rounded-lg flex items-center gap-1 transition-all"
+              title="Export classification matrix as CSV"
+            >
+              <Download className="w-3.5 h-3.5" /> CSV
+            </button>
+            <span className="text-white/20 text-xs">|</span>
+            <button 
+              onClick={() => handleExportClassifications('xlsx')}
+              className="text-xs font-bold text-emerald-400 hover:bg-emerald-500/20 px-2.5 py-1.5 rounded-lg flex items-center gap-1 transition-all"
+              title="Export classification matrix as Excel (.xlsx)"
+            >
+              <Download className="w-3.5 h-3.5" /> Excel (.xlsx)
+            </button>
+          </div>
+
+          {canEditMatrix && (
+            <button onClick={handleSave} disabled={saving} className="btn-primary text-xs flex items-center gap-1.5">
+              <Save className="w-4 h-4" /> {saving ? 'Saving Rules...' : '💾 Save & Apply Rules Now'}
+            </button>
+          )}
+        </div>
       </div>
 
       {saveMsg && <div className="text-xs font-bold text-emerald-400">{saveMsg}</div>}

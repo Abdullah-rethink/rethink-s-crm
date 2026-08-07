@@ -20,6 +20,7 @@ export default function KanbanBoard({ filters, onSelectDonor }) {
       if (filters.zakat) params.append('zakat', filters.zakat);
       if (filters.donor_country) params.append('donor_country', filters.donor_country);
       if (filters.campaign_search) params.append('campaign_search', filters.campaign_search);
+      if (filters.gift_aid) params.append('gift_aid', filters.gift_aid);
     }
 
     fetch(`${API_BASE_URL}/api/donors/kanban?${params.toString()}`)

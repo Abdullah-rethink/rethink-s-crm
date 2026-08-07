@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Filter, RotateCcw, CreditCard, Crown, Tag, Globe, Folder, ChevronDown, Check, CheckSquare, Square, Shield, Search } from 'lucide-react';
+import { Filter, RotateCcw, CreditCard, Crown, Tag, Globe, Folder, ChevronDown, Check, CheckSquare, Square, Shield, Search, Gift } from 'lucide-react';
 import { API_BASE_URL } from '../config';
 
 export default function Sidebar({ filters, onFilterChange, onResetFilters }) {
@@ -10,28 +10,33 @@ export default function Sidebar({ filters, onFilterChange, onResetFilters }) {
     countries: [],
     codes: [],
     zakat_statuses: ['Zakat', 'Zakat Eligible', 'Non-Zakat', 'Unassigned'],
-    donor_countries: []
+    donor_countries: [],
+    gift_aid_options: ['All Gift Aid Status', 'Yes', 'No']
   });
 
   const [showSourceDropdown, setShowSourceDropdown] = useState(false);
 
   useEffect(() => {
     const params = new URLSearchParams();
-    if (filters.source && filters.source !== 'All Sources (Combined)') {
-      params.append('source', filters.source);
-    }
-    if (filters.heading && filters.heading !== 'All Headings') {
-      params.append('heading', filters.heading);
-    }
-    if (filters.country && filters.country !== 'All Project Countries') {
-      params.append('country', filters.country);
+    if (filters) {
+      if (filters.payment_type) params.append('payment_type', filters.payment_type);
+      if (filters.tier) params.append('tier', filters.tier);
+      if (filters.source) params.append('source', filters.source);
+      if (filters.heading) params.append('heading', filters.heading);
+      if (filters.subheading) params.append('subheading', filters.subheading);
+      if (filters.country) params.append('country', filters.country);
+      if (filters.code) params.append('code', filters.code);
+      if (filters.zakat) params.append('zakat', filters.zakat);
+      if (filters.donor_country) params.append('donor_country', filters.donor_country);
+      if (filters.campaign_search) params.append('campaign_search', filters.campaign_search);
+      if (filters.gift_aid) params.append('gift_aid', filters.gift_aid);
     }
 
     fetch(`${API_BASE_URL}/api/filters/options?${params.toString()}`)
       .then(res => res.json())
       .then(data => setFilterOptions(data))
       .catch(err => console.error('Error loading filter options:', err));
-  }, [filters.source, filters.heading, filters.country]);
+  }, [filters]);
 
   const selectedSources = filters.source && filters.source !== 'All Sources (Combined)'
     ? filters.source.split(',').map(s => s.strip ? s.strip() : s.trim())
@@ -328,6 +333,27 @@ export default function Sidebar({ filters, onFilterChange, onResetFilters }) {
             borderColor: 'var(--input-border)'
           }}
         />
+      </div>
+
+      {/* 11. Gift Aid Status (Yes or No) */}
+      <div className="flex flex-col gap-1.5">
+        <label className="text-[11px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+          <Gift className="w-3.5 h-3.5 text-rose-400" /> Gift Aid (Yes / No)
+        </label>
+        <select 
+          value={filters.gift_aid || 'All Gift Aid Status'} 
+          onChange={e => onFilterChange('gift_aid', e.target.value)}
+          className="w-full border rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-cyan-500 transition-all cursor-pointer"
+          style={{
+            backgroundColor: 'var(--input-bg)',
+            color: 'var(--input-text)',
+            borderColor: 'var(--input-border)'
+          }}
+        >
+          <option value="All Gift Aid Status">All Gift Aid Status</option>
+          <option value="Yes">Yes (Gift Aid Claimed)</option>
+          <option value="No">No (Non-Gift Aid)</option>
+        </select>
       </div>
     </aside>
   );

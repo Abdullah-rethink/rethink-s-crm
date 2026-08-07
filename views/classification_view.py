@@ -104,19 +104,18 @@ def save_givebright_classification_matrix(matrix_df):
             zakat_eligibility TEXT DEFAULT 'Unassigned'
         );
     """)
+    try:
+        conn.execute("ALTER TABLE givebright_classifications ADD COLUMN community_name TEXT;")
+    except Exception:
+        pass
     for _, row in matrix_df.iterrows():
+        cname = str(row.get("Campaign Name", "Unassigned"))
+        conn.execute("DELETE FROM givebright_classifications WHERE campaign_name = ?", (cname,))
         conn.execute("""
             INSERT INTO givebright_classifications (campaign_name, community_name, heading, sub_heading, country, code, zakat_eligibility)
             VALUES (?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(campaign_name) DO UPDATE SET
-                community_name=excluded.community_name,
-                heading=excluded.heading,
-                sub_heading=excluded.sub_heading,
-                country=excluded.country,
-                code=excluded.code,
-                zakat_eligibility=excluded.zakat_eligibility;
         """, (
-            str(row.get("Campaign Name", "Unassigned")),
+            cname,
             str(row.get("Community Name", "Unassigned")),
             str(row.get("Heading", "Unassigned")),
             str(row.get("Sub-Heading", "Unassigned")),

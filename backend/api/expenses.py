@@ -16,6 +16,8 @@ from config.settings import (
     SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD, SMTP_FROM_NAME, SMTP_FROM_EMAIL
 )
 from core.data_processor import load_data, get_classification_matrix
+from core.security import encrypt_string, decrypt_string
+from backend.api.events import broadcast_event_sync
 
 router = APIRouter(prefix="/api/expenses", tags=["Expense & Payment Tracking"])
 
@@ -144,7 +146,10 @@ def _get_smtp_config():
         conn.close()
         for key, val in rows:
             if key in defaults and val is not None:
-                defaults[key] = val
+                if key == 'smtp_password':
+                    defaults[key] = decrypt_string(val)
+                else:
+                    defaults[key] = val
     except Exception:
         pass
     return defaults
@@ -278,26 +283,13 @@ def get_project_codes():
     if not matrix_df.empty and "Code" in matrix_df.columns:
         for _, r in matrix_df.iterrows():
             code_str = str(r.get("Code", "")).strip()
-            if code_str and code_str not in ["N/A", "Unassigned", "nan", "None"]:
-                if code_str not in code_map:
-                    app_expense = approved_expense_map.get(code_str, 0.0)
-                    code_map[code_str] = {
-                        "code": code_str,
-                        "heading": str(r.get("Heading", "Unassigned")),
-                        "sub_heading": str(r.get("Sub-Heading", "Unassigned")),
-                        "country": str(r.get("Country", "Unassigned")),
-                        "campaign_name": str(r.get("Campaign Name", "N/A")),
-                        "gross_raised": 0.0,
-                        "approved_expenses": round(app_expense, 2),
-                        "net_balance": round(-app_expense, 2)
-                    }
-                else:
-                    if code_map[code_str]["heading"] == "Unassigned" and r.get("Heading") != "Unassigned":
-                        code_map[code_str]["heading"] = str(r.get("Heading"))
-                    if code_map[code_str]["sub_heading"] == "Unassigned" and r.get("Sub-Heading") != "Unassigned":
-                        code_map[code_str]["sub_heading"] = str(r.get("Sub-Heading"))
-                    if code_map[code_str]["country"] == "Unassigned" and r.get("Country") != "Unassigned":
-                        code_map[code_str]["country"] = str(r.get("Country"))
+            if code_str and code_str in code_map:
+                if code_map[code_str]["heading"] == "Unassigned" and r.get("Heading") != "Unassigned":
+                    code_map[code_str]["heading"] = str(r.get("Heading"))
+                if code_map[code_str]["sub_heading"] == "Unassigned" and r.get("Sub-Heading") != "Unassigned":
+                    code_map[code_str]["sub_heading"] = str(r.get("Sub-Heading"))
+                if code_map[code_str]["country"] == "Unassigned" and r.get("Country") != "Unassigned":
+                    code_map[code_str]["country"] = str(r.get("Country"))
 
     sorted_codes = sorted(list(code_map.values()), key=lambda x: x["code"])
     return sorted_codes
@@ -432,6 +424,8 @@ def submit_expense(payload: SubmitExpenseRequest):
         expense_id, payload.title.strip(), payload.amount, payload.code.strip(), payload.requested_by, token
     )
 
+    broadcast_event_sync("EXPENSE_SUBMITTED", {"id": expense_id, "code": payload.code.strip(), "amount": payload.amount})
+
     result = {
         "status": "success",
         "expense_id": expense_id,
@@ -476,6 +470,8 @@ def review_expense(payload: ReviewExpenseRequest):
     if rows_affected == 0:
         raise HTTPException(status_code=404, detail="Expense request ID not found.")
 
+    broadcast_event_sync("EXPENSE_REVIEWED", {"id": payload.expense_id, "action": action_status})
+
     return {
         "status": "success",
         "message": f"Expense request {payload.expense_id} has been {action_status}!"
@@ -508,6 +504,8 @@ def delete_expense(payload: DeleteExpenseRequest):
     cursor.execute("DELETE FROM expense_requests WHERE id = ?", (payload.expense_id,))
     conn.commit()
     conn.close()
+
+    broadcast_event_sync("EXPENSE_DELETED", {"id": payload.expense_id, "code": exp_code})
 
     return {
         "status": "success",
@@ -544,6 +542,8 @@ def handle_email_approval(id: str, token: str, action: str):
 
     if rows_affected == 0:
         return {"status": "error", "message": "Invalid link or token expired."}
+
+    broadcast_event_sync("EXPENSE_REVIEWED", {"id": id, "action": action_status, "source": "email_link"})
 
     return {
         "status": "success",
@@ -603,7 +603,8 @@ def update_expense_settings(payload: UpdateSmtpSettingsRequest):
 
     # Only update password if a new one was provided (non-empty)
     if payload.smtp_password.strip():
-        cursor.execute(upsert, ('smtp_password', payload.smtp_password.strip()))
+        encrypted_pwd = encrypt_string(payload.smtp_password.strip())
+        cursor.execute(upsert, ('smtp_password', encrypted_pwd))
 
     conn.commit()
     conn.close()

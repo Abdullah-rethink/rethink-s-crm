@@ -1,5 +1,8 @@
+import io
+from datetime import datetime
 from typing import List, Optional
-from fastapi import APIRouter, HTTPException, status
+import pandas as pd
+from fastapi import APIRouter, HTTPException, Query, Response, status
 from pydantic import BaseModel
 
 from core.data_processor import (
@@ -60,6 +63,41 @@ def get_givebright_matrix():
     }
 
 
+@router.get("/export")
+def export_classifications(
+    platform: str = Query("launchgood", regex="^(launchgood|givebright)$"),
+    format: str = Query("csv", regex="^(csv|xlsx)$")
+):
+    """Exports campaign classification rules to CSV or Excel (.xlsx) file format."""
+    df_raw = load_data()
+    if platform.lower() == "givebright":
+        matrix_df = get_givebright_classification_matrix(df_raw).fillna("Unassigned")
+    else:
+        matrix_df = get_classification_matrix(df_raw).fillna("Unassigned")
+
+    date_str = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+    if format.lower() == "xlsx":
+        buffer = io.BytesIO()
+        with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
+            matrix_df.to_excel(writer, index=False, sheet_name=f"{platform.capitalize()} Rules")
+        buffer.seek(0)
+        headers = {"Content-Disposition": f'attachment; filename="classifications_{platform}_{date_str}.xlsx"'}
+        return Response(
+            content=buffer.getvalue(),
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers=headers
+        )
+    else:
+        csv_bytes = matrix_df.to_csv(index=False).encode('utf-8-sig')
+        headers = {"Content-Disposition": f'attachment; filename="classifications_{platform}_{date_str}.csv"'}
+        return Response(
+            content=csv_bytes,
+            media_type="text/csv",
+            headers=headers
+        )
+
+
 @router.post("/save")
 def save_matrix_rules(payload: SaveRulesRequest):
     if payload.user_role != "super_admin" and not payload.can_edit_matrix:
@@ -79,7 +117,6 @@ def save_matrix_rules(payload: SaveRulesRequest):
             "Code": r.get("Code") or r.get("code", "N/A"),
             "Zakat Eligibility": r.get("Zakat Eligibility") or r.get("zakat_eligibility", "Unassigned")
         })
-    import pandas as pd
     matrix_df = pd.DataFrame(rules_dict)
 
     if payload.platform.lower() == "givebright":

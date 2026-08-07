@@ -11,7 +11,7 @@ export default function ExpenseView({ user }) {
 
   // Search & Pagination State for Code Balances
   const [codeSearch, setCodeSearch] = useState('');
-  const [viewMode, setViewMode] = useState('table'); // 'table' or 'grid'
+  const [selectedCodeDetail, setSelectedCodeDetail] = useState(null);
   const [codePage, setCodePage] = useState(1);
   const [codePageSize, setCodePageSize] = useState(6);
 
@@ -141,6 +141,29 @@ export default function ExpenseView({ user }) {
   useEffect(() => {
     loadCodes();
     if (isSuperAdmin) loadSettings();
+
+    // WebSocket real-time events listener
+    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsHost = API_BASE_URL ? API_BASE_URL.replace(/^http/, 'ws') : `${wsProtocol}//${window.location.host}`;
+    const wsUrl = `${wsHost}/ws/events`;
+
+    let socket;
+    try {
+      socket = new WebSocket(wsUrl);
+      socket.onmessage = (event) => {
+        try {
+          const payload = JSON.parse(event.data);
+          if (['EXPENSE_SUBMITTED', 'EXPENSE_REVIEWED', 'EXPENSE_DELETED'].includes(payload?.event)) {
+            loadExpenses();
+            loadCodes();
+          }
+        } catch (e) {}
+      };
+    } catch (e) {}
+
+    return () => {
+      if (socket) socket.close();
+    };
   }, []);
 
   useEffect(() => {
@@ -556,9 +579,8 @@ export default function ExpenseView({ user }) {
             <p className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>Live gross donation revenue minus approved category expenses per project code.</p>
           </div>
 
-          {/* Search, View Mode Toggle & Page Controls */}
-          <div className="flex items-center gap-3 flex-wrap">
-            {/* Instant Search Bar */}
+          {/* Search Bar */}
+          <div className="flex items-center gap-3">
             <div className="relative flex items-center">
               <Search className="w-3.5 h-3.5 absolute left-3" style={{ color: 'var(--text-sub)' }} />
               <input 
@@ -569,7 +591,7 @@ export default function ExpenseView({ user }) {
                   setCodeSearch(e.target.value);
                   setCodePage(1);
                 }}
-                className="pl-8 pr-3 py-1.5 rounded-xl text-xs font-medium w-60 transition-all focus:outline-none"
+                className="pl-8 pr-3 py-1.5 rounded-xl text-xs font-medium w-64 transition-all focus:outline-none"
                 style={{
                   backgroundColor: 'var(--input-bg)',
                   color: 'var(--input-text)',
@@ -588,94 +610,31 @@ export default function ExpenseView({ user }) {
                 </button>
               )}
             </div>
-
-            {/* View Mode Toggle Buttons */}
-            <div className="flex items-center p-1 rounded-xl" style={{ backgroundColor: 'var(--bg-card-inner)', border: '1px solid var(--border-glass)' }}>
-              <button
-                onClick={() => setViewMode('table')}
-                className={`p-1.5 rounded-lg text-xs font-bold flex items-center gap-1 transition-all ${
-                  viewMode === 'table' ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30' : ''
-                }`}
-                style={{ color: viewMode === 'table' ? '' : 'var(--text-muted)' }}
-                title="Compact Table View"
-              >
-                <List className="w-3.5 h-3.5" /> Table
-              </button>
-              <button
-                onClick={() => setViewMode('grid')}
-                className={`p-1.5 rounded-lg text-xs font-bold flex items-center gap-1 transition-all ${
-                  viewMode === 'grid' ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30' : ''
-                }`}
-                style={{ color: viewMode === 'grid' ? '' : 'var(--text-muted)' }}
-                title="Card Grid View"
-              >
-                <LayoutGrid className="w-3.5 h-3.5" /> Cards
-              </button>
-            </div>
           </div>
         </div>
 
-        {/* Paginated Balances Display */}
+        {/* Paginated Balances Display - Cards Grid */}
         {filteredCodes.length === 0 ? (
           <div className="py-8 text-center text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>
             No project codes found matching search term '{codeSearch}'.
           </div>
-        ) : viewMode === 'table' ? (
-          /* Compact Table View */
-          <div className="overflow-x-auto rounded-xl border" style={{ borderColor: 'var(--border-glass)' }}>
-            <table className="crm-table">
-              <thead>
-                <tr>
-                  <th>Code</th>
-                  <th>Country</th>
-                  <th>Category Heading</th>
-                  <th>Sub-Heading</th>
-                  <th className="text-right">Gross Raised</th>
-                  <th className="text-right">Approved Deductions</th>
-                  <th className="text-right">Net Remaining Balance</th>
-                </tr>
-              </thead>
-              <tbody>
-                {paginatedCodes.map(b => (
-                  <tr key={b.code} className="hover:bg-cyan-500/5 transition-colors">
-                    <td className="font-mono text-xs font-bold text-cyan-400">{b.code}</td>
-                    <td>
-                      <span className="badge badge-emerald">{b.country}</span>
-                    </td>
-                    <td className="text-xs font-bold" style={{ color: 'var(--text-main)' }}>{b.heading}</td>
-                    <td className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>{b.sub_heading}</td>
-                    <td className="text-right text-xs font-bold" style={{ color: 'var(--text-main)' }}>
-                      £{b.gross_raised?.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                    </td>
-                    <td className="text-right text-xs font-medium">
-                      <span className={b.approved_expenses > 0 ? 'font-bold text-rose-400' : ''} style={{ color: b.approved_expenses > 0 ? '#F87171' : 'var(--text-muted)' }}>
-                        {b.approved_expenses > 0 ? `-£${b.approved_expenses?.toLocaleString(undefined, { minimumFractionDigits: 2 })}` : '£0.00'}
-                      </span>
-                    </td>
-                    <td className="text-right text-xs font-black">
-                      <span className={b.net_balance >= 0 ? 'text-emerald-400 font-extrabold' : 'text-rose-400 font-extrabold'}>
-                        £{b.net_balance?.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
         ) : (
-          /* Card Grid View */
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
             {paginatedCodes.map(b => (
               <div 
                 key={b.code} 
-                className="p-4 rounded-xl border flex flex-col gap-2 transition-all shadow-sm hover:border-purple-400"
+                onClick={() => setSelectedCodeDetail(b)}
+                className="p-4 rounded-xl border flex flex-col gap-2 transition-all shadow-sm hover:border-cyan-400 hover:scale-[1.02] cursor-pointer group"
                 style={{
                   backgroundColor: 'var(--bg-card-inner)',
                   borderColor: 'var(--border-glass)'
                 }}
+                title="Click to view code details & related expense claims"
               >
                 <div className="flex items-center justify-between">
-                  <span className="font-mono text-xs font-black text-cyan-400 tracking-wide">{b.code}</span>
+                  <span className="font-mono text-xs font-black text-cyan-400 tracking-wide flex items-center gap-1 group-hover:underline">
+                    {b.code} <Eye className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </span>
                   <span className="badge badge-emerald">{b.country}</span>
                 </div>
 
@@ -701,6 +660,10 @@ export default function ExpenseView({ user }) {
                       £{b.net_balance?.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                     </span>
                   </div>
+                </div>
+
+                <div className="text-[10px] text-cyan-400/70 font-semibold text-right pt-1 group-hover:text-cyan-400">
+                  Click for full details ➔
                 </div>
               </div>
             ))}
@@ -1065,6 +1028,143 @@ export default function ExpenseView({ user }) {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Project Code Details & Related Expenses Modal Overlay */}
+      {selectedCodeDetail && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fadeIn">
+          <div 
+            className="glass-panel p-6 rounded-2xl w-full max-w-4xl max-h-[90vh] flex flex-col gap-5 overflow-y-auto border-t-4 border-purple-500 shadow-2xl relative"
+            style={{ backgroundColor: 'var(--bg-panel)', borderColor: 'var(--border-glass)' }}
+          >
+            {/* Header */}
+            <div className="flex items-start justify-between border-b pb-4" style={{ borderColor: 'var(--border-glass)' }}>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="font-mono text-lg font-black text-cyan-400">{selectedCodeDetail.code}</span>
+                  <span className="badge badge-emerald">{selectedCodeDetail.country}</span>
+                </div>
+                <h3 className="text-base font-bold mt-1" style={{ color: 'var(--text-main)' }}>{selectedCodeDetail.heading}</h3>
+                <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{selectedCodeDetail.sub_heading}</p>
+              </div>
+              <button 
+                onClick={() => setSelectedCodeDetail(null)}
+                className="p-1.5 rounded-full hover:bg-white/10 text-slate-400 hover:text-white transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Financial Overview Stat Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="p-4 rounded-xl border flex flex-col gap-1" style={{ backgroundColor: 'var(--bg-card-inner)', borderColor: 'var(--border-glass)' }}>
+                <span className="text-[11px] font-bold uppercase" style={{ color: 'var(--text-muted)' }}>Gross Raised</span>
+                <span className="text-xl font-black text-white">£{selectedCodeDetail.gross_raised?.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+              </div>
+              <div className="p-4 rounded-xl border flex flex-col gap-1" style={{ backgroundColor: 'var(--bg-card-inner)', borderColor: 'var(--border-glass)' }}>
+                <span className="text-[11px] font-bold uppercase text-rose-400">Approved Deductions</span>
+                <span className="text-xl font-black text-rose-400">£{selectedCodeDetail.approved_expenses?.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+              </div>
+              <div className="p-4 rounded-xl border flex flex-col gap-1" style={{ backgroundColor: 'var(--bg-card-inner)', borderColor: 'var(--border-glass)' }}>
+                <span className="text-[11px] font-bold uppercase text-purple-400">Net Remaining Balance</span>
+                <span className={`text-xl font-black ${selectedCodeDetail.net_balance >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                  £{selectedCodeDetail.net_balance?.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                </span>
+              </div>
+            </div>
+
+            {/* Related Expenses Table */}
+            <div className="flex flex-col gap-3">
+              <div className="flex items-center justify-between">
+                <h4 className="text-xs font-extrabold uppercase tracking-wider text-slate-300 flex items-center gap-2">
+                  <CreditCard className="w-4 h-4 text-purple-400" /> Expense Claims under {selectedCodeDetail.code}
+                </h4>
+                <span className="text-xs font-bold text-slate-400">
+                  {expensesData.expenses.filter(e => e.code === selectedCodeDetail.code).length} total claims
+                </span>
+              </div>
+
+              {expensesData.expenses.filter(e => e.code === selectedCodeDetail.code).length === 0 ? (
+                <div className="py-8 text-center text-xs font-semibold rounded-xl border p-6" style={{ backgroundColor: 'var(--bg-card-inner)', borderColor: 'var(--border-glass)', color: 'var(--text-muted)' }}>
+                  💳 No expense claims have been submitted under code <span className="font-mono font-bold text-cyan-400">{selectedCodeDetail.code}</span> yet.
+                </div>
+              ) : (
+                <div className="overflow-x-auto rounded-xl border" style={{ borderColor: 'var(--border-glass)' }}>
+                  <table className="crm-table w-full">
+                    <thead>
+                      <tr>
+                        <th>Claim ID</th>
+                        <th>Title & Vendor</th>
+                        <th>Date</th>
+                        <th>Amount</th>
+                        <th>Status</th>
+                        <th>Requested By</th>
+                        {(user?.role === 'super_admin' || user?.can_edit_donors === 1) && <th>Actions</th>}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {expensesData.expenses
+                        .filter(e => e.code === selectedCodeDetail.code)
+                        .map(exp => (
+                          <tr key={exp.expense_id} className="hover:bg-cyan-500/5 transition-colors">
+                            <td className="font-mono text-xs font-bold text-cyan-400">{exp.expense_id}</td>
+                            <td>
+                              <div className="text-xs font-bold" style={{ color: 'var(--text-main)' }}>{exp.title}</div>
+                              {exp.vendor && <div className="text-[11px]" style={{ color: 'var(--text-muted)' }}>Vendor: {exp.vendor}</div>}
+                            </td>
+                            <td className="text-xs" style={{ color: 'var(--text-muted)' }}>{formatDate(exp.created_at)}</td>
+                            <td className="text-xs font-black text-white">£{exp.amount?.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                            <td>{getStatusBadge(exp.status)}</td>
+                            <td className="text-xs" style={{ color: 'var(--text-main)' }}>{exp.requested_by}</td>
+                            {(user?.role === 'super_admin' || user?.can_edit_donors === 1) && (
+                              <td>
+                                <div className="flex items-center gap-1.5">
+                                  {exp.status === 'PENDING_APPROVAL' && (
+                                    <>
+                                      <button 
+                                        onClick={() => handleReviewExpense(exp.expense_id, 'APPROVED')}
+                                        className="p-1 rounded bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 transition-colors"
+                                        title="Approve Claim"
+                                      >
+                                        <Check className="w-3.5 h-3.5" />
+                                      </button>
+                                      <button 
+                                        onClick={() => handleReviewExpense(exp.expense_id, 'REJECTED')}
+                                        className="p-1 rounded bg-rose-500/20 text-rose-400 hover:bg-rose-500/30 transition-colors"
+                                        title="Reject Claim"
+                                      >
+                                        <X className="w-3.5 h-3.5" />
+                                      </button>
+                                    </>
+                                  )}
+                                  <button 
+                                    onClick={() => handleDeleteExpense(exp.expense_id)}
+                                    className="p-1 rounded bg-slate-700/50 text-slate-400 hover:bg-rose-500/20 hover:text-rose-400 transition-colors"
+                                    title="Delete Claim"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              </td>
+                            )}
+                          </tr>
+                        ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end border-t pt-4" style={{ borderColor: 'var(--border-glass)' }}>
+              <button 
+                onClick={() => setSelectedCodeDetail(null)}
+                className="btn-secondary text-xs"
+              >
+                Close Details
+              </button>
+            </div>
           </div>
         </div>
       )}

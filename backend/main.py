@@ -7,7 +7,7 @@ from fastapi.staticfiles import StaticFiles
 # Add project root to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from backend.api import admin, auth, classifications, donors, expenses, filters, ltv, metrics, overview
+from backend.api import admin, auth, classifications, donors, events, expenses, filters, ltv, metrics, overview
 from core.auth import init_user_db
 from core.data_processor import load_data
 
@@ -20,10 +20,13 @@ app = FastAPI(
     version="2.0.0"
 )
 
-# Enable CORS for Next.js / React frontend
+# Enable CORS for React / Vercel frontend
+allowed_origins_env = os.getenv("ALLOWED_ORIGINS", "*")
+origins = [o.strip() for o in allowed_origins_env.split(",") if o.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=origins if origins else ["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -39,6 +42,7 @@ app.include_router(classifications.router)
 app.include_router(admin.router)
 app.include_router(expenses.router)
 app.include_router(filters.router)
+app.include_router(events.router)
 
 
 @app.get("/api/health", tags=["Health"])

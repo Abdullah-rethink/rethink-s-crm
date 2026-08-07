@@ -142,7 +142,17 @@ export default function ExplorerView({ user, filters, onSelectDonor }) {
         user_role: user?.role || 'admin',
         target_columns,
         new_values,
-        filter_search: search
+        filter_search: search,
+        filter_payment_type: filters?.payment_type,
+        filter_tier: filters?.tier,
+        filter_source: filters?.source,
+        filter_heading: filters?.heading,
+        filter_subheading: filters?.subheading,
+        filter_country: filters?.country,
+        filter_code: filters?.code,
+        filter_zakat: filters?.zakat,
+        filter_donor_country: filters?.donor_country,
+        filter_campaign_search: filters?.campaign_search
       })
     })
       .then(r => r.json())
@@ -191,6 +201,28 @@ export default function ExplorerView({ user, filters, onSelectDonor }) {
     return str.split('T')[0].split(' ')[0];
   };
 
+  const handleExportDonors = (format) => {
+    const params = new URLSearchParams({
+      format: format,
+      search: search
+    });
+
+    if (filters) {
+      if (filters.payment_type) params.append('payment_type', filters.payment_type);
+      if (filters.tier) params.append('tier', filters.tier);
+      if (filters.source) params.append('source', filters.source);
+      if (filters.heading) params.append('heading', filters.heading);
+      if (filters.subheading) params.append('subheading', filters.subheading);
+      if (filters.country) params.append('country', filters.country);
+      if (filters.code) params.append('code', filters.code);
+      if (filters.zakat) params.append('zakat', filters.zakat);
+      if (filters.donor_country) params.append('donor_country', filters.donor_country);
+      if (filters.campaign_search) params.append('campaign_search', filters.campaign_search);
+    }
+
+    window.open(`${API_BASE_URL}/api/donors/export?${params.toString()}`, '_blank');
+  };
+
   return (
     <div className="flex flex-col gap-6">
       {/* Header */}
@@ -202,7 +234,26 @@ export default function ExplorerView({ user, filters, onSelectDonor }) {
           <p className="text-xs text-slate-400">Search, filter, inspect donor 360° profiles, customize visible columns, and edit records.</p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Export Dropdown Group */}
+          <div className="flex items-center gap-1 bg-slate-900/90 border border-emerald-500/30 p-1 rounded-xl">
+            <button 
+              onClick={() => handleExportDonors('csv')}
+              className="text-xs font-bold text-emerald-400 hover:bg-emerald-500/20 px-2.5 py-1.5 rounded-lg flex items-center gap-1 transition-all"
+              title="Export filtered records as CSV file"
+            >
+              <Download className="w-3.5 h-3.5" /> CSV
+            </button>
+            <span className="text-white/20 text-xs">|</span>
+            <button 
+              onClick={() => handleExportDonors('xlsx')}
+              className="text-xs font-bold text-emerald-400 hover:bg-emerald-500/20 px-2.5 py-1.5 rounded-lg flex items-center gap-1 transition-all"
+              title="Export filtered records as Excel (.xlsx) file"
+            >
+              <Download className="w-3.5 h-3.5" /> Excel (.xlsx)
+            </button>
+          </div>
+
           <button 
             onClick={() => setShowColumnChooser(!showColumnChooser)}
             className="btn-secondary text-xs flex items-center gap-1.5 text-cyan-400 border-cyan-500/30 hover:bg-cyan-500/10"

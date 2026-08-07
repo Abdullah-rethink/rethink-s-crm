@@ -25,7 +25,8 @@ const INITIAL_FILTERS = {
   code: 'All Codes',
   zakat: 'All Zakat Status',
   donor_country: 'All Donor Countries',
-  campaign_search: ''
+  campaign_search: '',
+  gift_aid: 'All Gift Aid Status'
 };
 
 export default function App() {
@@ -62,11 +63,25 @@ export default function App() {
   // Fetch Live Summary Metrics
   useEffect(() => {
     if (!user) return;
-    fetch(`${API_BASE_URL}/api/metrics/summary`)
+    const params = new URLSearchParams();
+    if (filters) {
+      if (filters.payment_type) params.append('payment_type', filters.payment_type);
+      if (filters.tier) params.append('tier', filters.tier);
+      if (filters.source) params.append('source', filters.source);
+      if (filters.heading) params.append('heading', filters.heading);
+      if (filters.subheading) params.append('subheading', filters.subheading);
+      if (filters.country) params.append('country', filters.country);
+      if (filters.code) params.append('code', filters.code);
+      if (filters.zakat) params.append('zakat', filters.zakat);
+      if (filters.donor_country) params.append('donor_country', filters.donor_country);
+      if (filters.campaign_search) params.append('campaign_search', filters.campaign_search);
+      if (filters.gift_aid) params.append('gift_aid', filters.gift_aid);
+    }
+    fetch(`${API_BASE_URL}/api/metrics/summary?${params.toString()}`)
       .then(res => res.json())
       .then(data => setMetrics(data))
       .catch(err => console.error('Error fetching metrics summary:', err));
-  }, [user]);
+  }, [user, filters]);
 
   const handleFilterChange = (key, value) => {
     setFilters(prev => ({ ...prev, [key]: value }));

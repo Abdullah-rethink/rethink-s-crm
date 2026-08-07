@@ -1,8 +1,10 @@
+import io
 import math
 import sqlite3
+from datetime import datetime
 from typing import List, Optional
 import pandas as pd
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, HTTPException, Query, Response, status
 from pydantic import BaseModel
 
 from config.settings import LOCAL_DB_PATH, PARQUET_PATH
@@ -16,7 +18,17 @@ class BulkEditDonorsRequest(BaseModel):
     target_columns: List[str]
     new_values: List[str]
     filter_search: Optional[str] = ""
-    filter_tier: Optional[str] = ""
+    filter_payment_type: Optional[str] = None
+    filter_tier: Optional[str] = None
+    filter_source: Optional[str] = None
+    filter_heading: Optional[str] = None
+    filter_subheading: Optional[str] = None
+    filter_country: Optional[str] = None
+    filter_code: Optional[str] = None
+    filter_zakat: Optional[str] = None
+    filter_donor_country: Optional[str] = None
+    filter_campaign_search: Optional[str] = None
+    filter_gift_aid: Optional[str] = None
     can_edit_donors: Optional[bool] = False
 
 
@@ -32,20 +44,32 @@ def bulk_edit_donors(payload: BulkEditDonorsRequest):
     if df_raw.empty:
         raise HTTPException(status_code=400, detail="Donor dataset is empty.")
 
-    target_mask = pd.Series(True, index=df_raw.index)
+    # 1. Apply global filters to scope target dataframe
+    filtered_df = _apply_filters(
+        df_raw,
+        payload.filter_payment_type,
+        payload.filter_tier,
+        payload.filter_source,
+        payload.filter_heading,
+        payload.filter_subheading,
+        payload.filter_country,
+        payload.filter_code,
+        payload.filter_zakat,
+        payload.filter_donor_country,
+        payload.filter_campaign_search,
+        payload.filter_gift_aid
+    )
 
+    # 2. Apply search filter
     if payload.filter_search and str(payload.filter_search).strip():
         term = str(payload.filter_search).strip().lower()
-        search_cols = [c for c in ["First Name", "Last Name", "Display Name", "Email", "Campaign Name", "Community Name"] if c in df_raw.columns]
-        mask = pd.Series(False, index=df_raw.index)
+        search_cols = [c for c in ["First Name", "Last Name", "Display Name", "Email", "Campaign Name", "Community Name"] if c in filtered_df.columns]
+        mask = pd.Series(False, index=filtered_df.index)
         for sc in search_cols:
-            mask = mask | df_raw[sc].astype(str).str.lower().str.contains(term, na=False)
-        target_mask = target_mask & mask
+            mask = mask | filtered_df[sc].astype(str).str.lower().str.contains(term, na=False)
+        filtered_df = filtered_df.loc[mask]
 
-    if payload.filter_tier and payload.filter_tier != "All Classifications" and "Lifetime Donor Classification" in df_raw.columns:
-        target_mask = target_mask & (df_raw["Lifetime Donor Classification"] == payload.filter_tier)
-
-    matching_indices = df_raw.index[target_mask]
+    matching_indices = filtered_df.index
     if len(matching_indices) == 0:
         return {"status": "success", "message": "No matching records found to edit."}
 
@@ -67,7 +91,7 @@ def bulk_edit_donors(payload: BulkEditDonorsRequest):
     }
 
 
-def _apply_filters(df, payment_type=None, tier=None, source=None, heading=None, subheading=None, country=None, code=None, zakat=None, donor_country=None, campaign_search=None):
+def _apply_filters(df, payment_type=None, tier=None, source=None, heading=None, subheading=None, country=None, code=None, zakat=None, donor_country=None, campaign_search=None, gift_aid=None):
     if df.empty:
         return df
     filtered_df = df.copy()
@@ -112,6 +136,15 @@ def _apply_filters(df, payment_type=None, tier=None, source=None, heading=None, 
                 c_mask = c_mask | filtered_df[cs_col].astype(str).str.lower().str.contains(term, na=False)
         filtered_df = filtered_df[c_mask]
 
+    if gift_aid and gift_aid != "All Gift Aid Status":
+        ga_col = "Gift Aid (yes or no)" if "Gift Aid (yes or no)" in filtered_df.columns else ("is_giftaid" if "is_giftaid" in filtered_df.columns else None)
+        if ga_col:
+            val_str = str(gift_aid).strip().lower()
+            if val_str in ["yes", "1", "true"]:
+                filtered_df = filtered_df[filtered_df[ga_col].astype(str).str.lower().isin(["yes", "1", "1.0", "true"])]
+            elif val_str in ["no", "0", "false"]:
+                filtered_df = filtered_df[filtered_df[ga_col].astype(str).str.lower().isin(["no", "0", "0.0", "false"])]
+
     return filtered_df
 
 
@@ -129,8 +162,110 @@ def get_donors_paginated(
     code: Optional[str] = None,
     zakat: Optional[str] = None,
     donor_country: Optional[str] = None,
-    campaign_search: Optional[str] = None
+    campaign_search: Optional[str] = None,
+    gift_aid: Optional[str] = None
 ):
+    """Returns paginated donor records using direct SQL queries on SQLite for maximum performance and low RAM usage."""
+    try:
+        conn = sqlite3.connect(LOCAL_DB_PATH, timeout=10.0)
+        cursor = conn.cursor()
+        
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='donations'")
+        if cursor.fetchone():
+            where_clauses = []
+            params = []
+
+            if payment_type and payment_type != "All Payment Types":
+                where_clauses.append('"Payment Frequency" = ?')
+                params.append(payment_type)
+
+            if tier and tier != "All Classifications":
+                where_clauses.append('"Lifetime Donor Classification" = ?')
+                params.append(tier)
+
+            if source and source != "All Sources (Combined)":
+                where_clauses.append('"Source" = ?')
+                params.append(source)
+
+            if heading and heading != "All Headings":
+                where_clauses.append('"Heading" = ?')
+                params.append(heading)
+
+            if subheading and subheading != "All Sub-Headings":
+                where_clauses.append('"Sub-Heading" = ?')
+                params.append(subheading)
+
+            if country and country != "All Project Countries":
+                where_clauses.append('"Country" = ?')
+                params.append(country)
+
+            if code and code != "All Codes":
+                where_clauses.append('"Code" = ?')
+                params.append(code)
+
+            if zakat and zakat != "All Zakat Status":
+                where_clauses.append('"Zakat Eligibility" = ?')
+                params.append(zakat)
+
+            if donor_country and donor_country != "All Donor Countries":
+                where_clauses.append('("Donor Country" LIKE ? OR "Billing Country" LIKE ? OR "Country Code" LIKE ?)')
+                pattern = f"%{donor_country}%"
+                params.extend([pattern, pattern, pattern])
+
+            if campaign_search and str(campaign_search).strip():
+                term = f"%{str(campaign_search).strip()}%"
+                where_clauses.append('("Campaign Name" LIKE ? OR "Community Name" LIKE ?)')
+                params.extend([term, term])
+
+            if gift_aid and gift_aid != "All Gift Aid Status":
+                where_clauses.append('("Gift Aid (yes or no)" LIKE ? OR "is_giftaid" = ?)')
+                params.extend([f"%{gift_aid}%", 1 if gift_aid.lower() == "yes" else 0])
+
+            if search and search.strip():
+                term = f"%{search.strip()}%"
+                search_parts = ['"First Name" LIKE ?', '"Last Name" LIKE ?', '"Display Name" LIKE ?', '"Email" LIKE ?', '"Campaign Name" LIKE ?', '"Community Name" LIKE ?']
+                where_clauses.append(f"({' OR '.join(search_parts)})")
+                params.extend([term] * len(search_parts))
+
+            where_sql = (" WHERE " + " AND ".join(where_clauses)) if where_clauses else ""
+
+            # Count matching records
+            count_sql = f"SELECT COUNT(*) FROM donations{where_sql}"
+            cursor.execute(count_sql, params)
+            total_records = cursor.fetchone()[0]
+
+            total_pages = max(1, math.ceil(total_records / page_size))
+            page = min(page, total_pages)
+            offset = (page - 1) * page_size
+
+            # Query requested page with LIMIT & OFFSET
+            query_sql = f"SELECT * FROM donations{where_sql} LIMIT ? OFFSET ?"
+            query_params = params + [page_size, offset]
+            page_df = pd.read_sql_query(query_sql, conn, params=query_params)
+            
+            cursor.execute("PRAGMA table_info(donations)")
+            avail_cols = [col[1] for col in cursor.fetchall()]
+            conn.close()
+
+            float_cols = page_df.select_dtypes(include=['float', 'float64']).columns
+            for fc in float_cols:
+                page_df[fc] = page_df[fc].round(2)
+
+            page_df = page_df.fillna("")
+            records = page_df.to_dict(orient="records")
+
+            return {
+                "total_records": total_records,
+                "page": page,
+                "page_size": page_size,
+                "total_pages": total_pages,
+                "available_columns": avail_cols,
+                "records": records
+            }
+        conn.close()
+    except Exception as e:
+        print(f"SQL Pagination fallback notice: {e}")
+
     df_raw = load_data()
     if df_raw.empty:
         return {
@@ -144,11 +279,11 @@ def get_donors_paginated(
     filtered_df = _apply_filters(df_raw, payment_type, tier, source, heading, subheading, country, code, zakat, donor_country, campaign_search)
     display_df = filtered_df
 
-    # Search filter
     if search and search.strip():
         term = search.strip().lower()
+        search_cols_avail = [c for c in ["First Name", "Last Name", "Display Name", "Email", "Campaign Name", "Community Name"] if c in display_df.columns]
         mask = pd.Series(False, index=display_df.index)
-        for sc in search_cols:
+        for sc in search_cols_avail:
             mask = mask | display_df[sc].astype(str).str.lower().str.contains(term, na=False)
         display_df = display_df.loc[mask]
 
@@ -160,8 +295,6 @@ def get_donors_paginated(
     end_idx = min(start_idx + page_size, total_records)
 
     page_df = display_df.iloc[start_idx:end_idx].copy()
-
-    # Format float numbers to 2 decimals
     float_cols = page_df.select_dtypes(include=['float', 'float64']).columns
     for fc in float_cols:
         page_df[fc] = page_df[fc].round(2)
@@ -179,6 +312,61 @@ def get_donors_paginated(
     }
 
 
+@router.get("/export")
+def export_donors(
+    format: str = Query("csv", pattern="^(csv|xlsx)$"),
+    search: Optional[str] = "",
+    payment_type: Optional[str] = None,
+    tier: Optional[str] = None,
+    source: Optional[str] = None,
+    heading: Optional[str] = None,
+    subheading: Optional[str] = None,
+    country: Optional[str] = None,
+    code: Optional[str] = None,
+    zakat: Optional[str] = None,
+    donor_country: Optional[str] = None,
+    campaign_search: Optional[str] = None,
+    gift_aid: Optional[str] = None
+):
+    """Exports filtered donor rows to CSV or Excel (.xlsx) file format."""
+    df_raw = load_data()
+    if df_raw.empty:
+        raise HTTPException(status_code=400, detail="No donor data available to export.")
+
+    filtered_df = _apply_filters(df_raw, payment_type, tier, source, heading, subheading, country, code, zakat, donor_country, campaign_search, gift_aid)
+    display_df = filtered_df
+
+    if search and search.strip():
+        term = search.strip().lower()
+        search_cols_avail = [c for c in ["First Name", "Last Name", "Display Name", "Email", "Campaign Name", "Community Name"] if c in display_df.columns]
+        mask = pd.Series(False, index=display_df.index)
+        for sc in search_cols_avail:
+            mask = mask | display_df[sc].astype(str).str.lower().str.contains(term, na=False)
+        display_df = display_df.loc[mask]
+
+    date_str = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+    if format.lower() == "xlsx":
+        buffer = io.BytesIO()
+        with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
+            display_df.to_excel(writer, index=False, sheet_name="Filtered Donors")
+        buffer.seek(0)
+        headers = {"Content-Disposition": f'attachment; filename="filtered_donors_{date_str}.xlsx"'}
+        return Response(
+            content=buffer.getvalue(),
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers=headers
+        )
+    else:
+        csv_bytes = display_df.to_csv(index=False).encode('utf-8-sig')
+        headers = {"Content-Disposition": f'attachment; filename="filtered_donors_{date_str}.csv"'}
+        return Response(
+            content=csv_bytes,
+            media_type="text/csv",
+            headers=headers
+        )
+
+
 @router.get("/kanban")
 def get_donors_kanban(
     payment_type: Optional[str] = None,
@@ -186,11 +374,16 @@ def get_donors_kanban(
     source: Optional[str] = None,
     heading: Optional[str] = None,
     subheading: Optional[str] = None,
-    country: Optional[str] = None
+    country: Optional[str] = None,
+    code: Optional[str] = None,
+    zakat: Optional[str] = None,
+    donor_country: Optional[str] = None,
+    campaign_search: Optional[str] = None,
+    gift_aid: Optional[str] = None
 ):
     """Returns donor cards grouped by LTV Tier for the Kanban Pipeline Board with column total sums."""
     df_raw = load_data()
-    df = _apply_filters(df_raw, payment_type, tier, source, heading, subheading, country)
+    df = _apply_filters(df_raw, payment_type, tier, source, heading, subheading, country, code, zakat, donor_country, campaign_search, gift_aid)
 
     if df.empty or "Lifetime Donor Classification" not in df.columns:
         return {}

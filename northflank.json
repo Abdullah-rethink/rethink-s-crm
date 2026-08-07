@@ -1,0 +1,21 @@
+{
+  "name": "crowdfunding-crm-backend",
+  "description": "FastAPI Backend for Crowdfunding Analytics & Enterprise CRM",
+  "deployment": {
+    "instances": 1,
+    "dockerfile": "Dockerfile",
+    "ports": [
+      {
+        "name": "http",
+        "internalPort": 8000,
+        "public": true,
+        "protocol": "HTTP"
+      }
+    ],
+    "healthCheck": {
+      "path": "/api/health",
+      "port": 8000,
+      "protocol": "HTTP"
+    }
+  }
+}

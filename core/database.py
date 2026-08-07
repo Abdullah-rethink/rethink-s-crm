@@ -68,44 +68,54 @@ def get_cloud_sync_status():
         pass
     return None
 
-def sync_to_cloud_async(data_df, mode="append"):
+def sync_to_cloud_async(data_df, mode="append", max_retries=3):
     """
     Pushes DataFrame to Cloud PostgreSQL in non-blocking background thread
-    via high-speed native COPY stream.
+    via high-speed native COPY stream with automatic retries and backoff.
     """
     if not DATABASE_URL or "postgres" not in DATABASE_URL:
         return
 
     def _sync_worker(df, m):
         import io
-
         import psycopg2
-        try:
-            t0 = time.time()
-            buf = io.StringIO()
-            df.to_csv(buf, index=False, header=False, sep='\t', na_rep='')
-            buf.seek(0)
-            
-            conn = psycopg2.connect(DATABASE_URL)
-            cur = conn.cursor()
-            
-            cols_def = ', '.join([f'"{c}" TEXT' for c in df.columns])
-            cur.execute(f'CREATE TABLE IF NOT EXISTS "donations" ({cols_def});')
-            if m == "replace":
-                cur.execute('TRUNCATE TABLE "donations";')
-            conn.commit()
-            
-            target_cols = ', '.join([f'"{c}"' for c in df.columns])
-            copy_sql = f'COPY "donations" ({target_cols}) FROM STDIN WITH (FORMAT csv, DELIMITER \'\t\', NULL \'\');'
-            cur.copy_expert(sql=copy_sql, file=buf)
-            conn.commit()
-            cur.close()
-            conn.close()
-            elapsed = time.time() - t0
-            _write_sync_status(True, f"upload ({m})", "")
-            print(f"[Cloud DB] Supabase Cloud PostgreSQL native COPY complete in {elapsed:.2f}s!")
-        except Exception as e:
-            _write_sync_status(False, f"upload ({m})", str(e))
-            print(f"Cloud DB sync notice: {e}")
+
+        attempts = 0
+        last_error = ""
+
+        while attempts < max_retries:
+            attempts += 1
+            try:
+                t0 = time.time()
+                buf = io.StringIO()
+                df.to_csv(buf, index=False, header=False, sep='\t', na_rep='')
+                buf.seek(0)
+                
+                conn = psycopg2.connect(DATABASE_URL)
+                cur = conn.cursor()
+                
+                cols_def = ', '.join([f'"{c}" TEXT' for c in df.columns])
+                cur.execute(f'CREATE TABLE IF NOT EXISTS "donations" ({cols_def});')
+                if m == "replace":
+                    cur.execute('TRUNCATE TABLE "donations";')
+                conn.commit()
+                
+                target_cols = ', '.join([f'"{c}"' for c in df.columns])
+                copy_sql = f'COPY "donations" ({target_cols}) FROM STDIN WITH (FORMAT csv, DELIMITER \'\t\', NULL \'\');'
+                cur.copy_expert(sql=copy_sql, file=buf)
+                conn.commit()
+                cur.close()
+                conn.close()
+                elapsed = time.time() - t0
+                _write_sync_status(True, f"upload ({m})", f"Completed in {elapsed:.2f}s on attempt {attempts}")
+                print(f"[Cloud DB] Supabase Cloud PostgreSQL native COPY complete in {elapsed:.2f}s (Attempt {attempts}/{max_retries})!")
+                return
+            except Exception as e:
+                last_error = str(e)
+                print(f"[Cloud DB Sync Attempt {attempts}/{max_retries} Notice]: {last_error}")
+                if attempts < max_retries:
+                    time.sleep(2 ** attempts) # Exponential backoff: 2s, 4s...
+
+        _write_sync_status(False, f"upload ({m})", f"Failed after {max_retries} attempts: {last_error}")
 
     threading.Thread(target=_sync_worker, args=(data_df, mode), daemon=True).start()
