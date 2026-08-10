@@ -7,8 +7,13 @@ router = APIRouter(prefix="/api/auth", tags=["Authentication"])
 
 
 class LoginRequest(BaseModel):
-    identity: str
+    identity: str = ""
+    username: str = ""
+    email: str = ""
     password: str
+
+    def get_user_identity(self) -> str:
+        return (self.identity or self.username or self.email or "").strip()
 
 
 class ChangePasswordRequest(BaseModel):
@@ -19,12 +24,13 @@ class ChangePasswordRequest(BaseModel):
 
 @router.post("/login")
 def login_endpoint(payload: LoginRequest):
-    if not payload.identity.strip() or not payload.password.strip():
+    user_id = payload.get_user_identity()
+    if not user_id or not payload.password.strip():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Email/username and password are required."
         )
-    user = authenticate_user(payload.identity, payload.password)
+    user = authenticate_user(user_id, payload.password)
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

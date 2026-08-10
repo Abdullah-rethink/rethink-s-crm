@@ -63,4 +63,5 @@ if os.path.exists(frontend_dist):
 @app.on_event("startup")
 def startup_event():
     print("Crowdfunding Enterprise CRM API initialized.")
-    load_data()
+    if not os.environ.get("VERCEL"):
+        load_data()

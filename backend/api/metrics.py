@@ -44,6 +44,21 @@ def get_metrics_summary(
     total_txns = int(len(df))
     avg_donation = float(total_raised / total_txns) if total_txns > 0 else 0.0
 
+    gift_aid_estimate = 0.0
+    if col_amount in df.columns:
+        # Check both LaunchGood and GiveBright columns
+        mask_lg = pd.Series(False, index=df.index)
+        if "Gift Aid (yes or no)" in df.columns:
+            mask_lg = df["Gift Aid (yes or no)"].astype(str).str.strip().str.lower() == 'yes'
+            
+        mask_gb = pd.Series(False, index=df.index)
+        if "is_giftaid" in df.columns:
+            mask_gb = df["is_giftaid"] == 1.0
+            
+        gift_aid_donations = df[mask_lg | mask_gb]
+        gift_aid_total_donations = float(gift_aid_donations[col_amount].sum())
+        gift_aid_estimate = gift_aid_total_donations * 0.25
+
     top_cat = "N/A"
     if col_heading in df.columns and not df[col_heading].dropna().empty:
         modes = df[col_heading].mode()
@@ -65,6 +80,7 @@ def get_metrics_summary(
         "total_raised": round(total_raised, 2),
         "total_txns": total_txns,
         "avg_donation": round(avg_donation, 2),
+        "gift_aid_estimate": round(gift_aid_estimate, 2),
         "top_category": top_cat,
         "recurring_pct": round(recurring_pct, 1),
         "top_donor_seg": top_donor_seg

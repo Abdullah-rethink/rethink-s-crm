@@ -26,6 +26,10 @@ export default function Navbar({ user, metrics, theme, onToggleTheme, onSignOut 
             <div className="text-[10px] uppercase font-bold text-slate-400">Total Raised</div>
             <div className="text-sm font-extrabold text-cyan-400">£{metrics.total_raised?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}</div>
           </div>
+          <div className="glass-panel px-3.5 py-1.5 border-l-2 border-amber-400">
+            <div className="text-[10px] uppercase font-bold text-slate-400">Gift Aid Estimate</div>
+            <div className="text-sm font-extrabold text-amber-400">£{metrics.gift_aid_estimate?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}</div>
+          </div>
           <div className="glass-panel px-3.5 py-1.5 border-l-2 border-purple-400">
             <div className="text-[10px] uppercase font-bold text-slate-400">Donations</div>
             <div className="text-sm font-extrabold text-purple-400">{metrics.total_txns?.toLocaleString() || 0}</div>
