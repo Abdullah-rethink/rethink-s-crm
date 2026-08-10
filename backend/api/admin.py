@@ -33,6 +33,22 @@ class AssignPresetRequest(BaseModel):
     preset_name: str  # "super_admin", "admin", "data_editor"
 
 
+class RenameTagRequest(BaseModel):
+    user_role: str
+    old_tag: str
+    new_tag: str
+
+
+class DeleteTagRequest(BaseModel):
+    user_role: str
+    tag_name: str
+
+
+class PurgeDataRequest(BaseModel):
+    user_role: str
+    confirm: bool = False
+
+
 @router.get("/users")
 def get_users_list():
     return get_all_users()
