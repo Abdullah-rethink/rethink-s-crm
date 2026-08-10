@@ -126,20 +126,32 @@ export default function ClassificationView({ user }) {
         >
           🎁 GiveBright Matrix
         </button>
+        <button 
+          onClick={() => setPlatform('paysuite')}
+          className={`btn-secondary text-xs px-4 py-2 flex items-center gap-2 ${platform === 'paysuite' ? 'border-amber-400 text-amber-400 bg-amber-500/10' : ''}`}
+        >
+          💳 Paysuite Matrix
+        </button>
       </div>
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="glass-panel p-4 border-l-4 border-cyan-400">
-          <div className="text-xs font-bold text-slate-400 uppercase">Total Tracked Campaigns</div>
+        <div className={`glass-panel p-4 border-l-4 ${platform === 'launchgood' ? 'border-cyan-400' : platform === 'givebright' ? 'border-purple-400' : 'border-amber-400'}`}>
+          <div className="text-xs font-bold text-slate-400 uppercase">
+            {platform === 'paysuite' ? 'Total Tracked Direct Debits' : 'Total Tracked Campaigns'}
+          </div>
           <div className="text-2xl font-black text-white mt-1">{matrixData.total_campaigns?.toLocaleString()}</div>
         </div>
         <div className="glass-panel p-4 border-l-4 border-emerald-400">
-          <div className="text-xs font-bold text-slate-400 uppercase">Fully Classified Campaigns</div>
+          <div className="text-xs font-bold text-slate-400 uppercase">
+            {platform === 'paysuite' ? 'Fully Classified Debits' : 'Fully Classified Campaigns'}
+          </div>
           <div className="text-2xl font-black text-emerald-400 mt-1">{matrixData.classified_campaigns?.toLocaleString()}</div>
         </div>
         <div className="glass-panel p-4 border-l-4 border-amber-400">
-          <div className="text-xs font-bold text-slate-400 uppercase">Unassigned Campaigns</div>
+          <div className="text-xs font-bold text-slate-400 uppercase">
+            {platform === 'paysuite' ? 'Unassigned Debits' : 'Unassigned Campaigns'}
+          </div>
           <div className="text-2xl font-black text-amber-400 mt-1">{matrixData.unassigned_campaigns?.toLocaleString()}</div>
         </div>
       </div>
@@ -155,8 +167,8 @@ export default function ClassificationView({ user }) {
             <table className="crm-table">
               <thead>
                 <tr>
-                  <th>Campaign Name</th>
-                  <th>Community Name</th>
+                  <th>{platform === 'paysuite' ? 'Direct Debit Ref (Bank Ref)' : 'Campaign Name'}</th>
+                  <th>{platform === 'paysuite' ? 'Platform Source' : 'Community Name'}</th>
                   <th>Heading</th>
                   <th>Sub-Heading</th>
                   <th>Country</th>

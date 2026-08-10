@@ -57,8 +57,19 @@ export default function ExplorerView({ user, filters, onSelectDonor }) {
       .then(resData => {
         setData(resData);
         if (selectedColumns.length === 0 && resData.available_columns?.length > 0) {
-          // Initialize default columns
-          setSelectedColumns(resData.available_columns.slice(0, 10));
+          const defaultCols = [
+            'First Name',
+            'Last Name',
+            'Total LTV',
+            'Lifetime Donor Classification',
+            'Transaction Donor Classification',
+            'Payment Frequency',
+            'Heading',
+            'Sub-Heading',
+            'Code',
+            'Zakat Eligibility'
+          ].filter(c => resData.available_columns.includes(c));
+          setSelectedColumns(defaultCols.length > 0 ? defaultCols : resData.available_columns.slice(0, 10));
         }
         setLoading(false);
       })
@@ -484,7 +495,6 @@ export default function ExplorerView({ user, filters, onSelectDonor }) {
             <table className="crm-table">
               <thead className="sticky top-0 z-20 backdrop-blur-md bg-slate-900/90 border-b border-white/10">
                 <tr>
-                  <th className="w-12 text-center">360°</th>
                   {selectedColumns.map(c => (
                     <th key={c} className="whitespace-nowrap font-extrabold tracking-wider">
                       {COLUMN_ALIASES[c] || c}
@@ -498,17 +508,19 @@ export default function ExplorerView({ user, filters, onSelectDonor }) {
                   return (
                     <tr 
                       key={rowIdx} 
-                      className="hover:bg-cyan-500/5 transition-colors group"
+                      onClick={(e) => {
+                        if (
+                          e.target.tagName !== 'INPUT' && 
+                          e.target.tagName !== 'SELECT' && 
+                          e.target.tagName !== 'BUTTON' && 
+                          !e.target.closest('button') &&
+                          !e.target.closest('.inline-edit-input')
+                        ) {
+                          onSelectDonor(donorKey);
+                        }
+                      }}
+                      className="hover:bg-cyan-500/5 cursor-pointer transition-colors group"
                     >
-                      <td className="text-center py-2 px-3">
-                        <button 
-                          onClick={() => onSelectDonor(donorKey)}
-                          title="Open Donor 360 Profile"
-                          className="w-7 h-7 rounded-lg bg-slate-800 group-hover:bg-cyan-500/20 group-hover:text-cyan-400 flex items-center justify-center text-slate-400 transition-all"
-                        >
-                          <Eye className="w-3.5 h-3.5" />
-                        </button>
-                      </td>
                       {selectedColumns.map(c => {
                         const val = row[c];
                         const isEditingThis = editingCell?.rowIdx === rowIdx && editingCell?.colName === c;
@@ -516,7 +528,7 @@ export default function ExplorerView({ user, filters, onSelectDonor }) {
                         if (isEditingThis) {
                           return (
                             <td key={c} className="p-1">
-                              <div className="flex items-center gap-1">
+                              <div className="flex items-center gap-1 inline-edit-input">
                                 <input 
                                   type="text" 
                                   value={editingCell.value} 

@@ -33,10 +33,12 @@ def get_filter_options(
             "gift_aid_options": ["All Gift Aid Status", "Yes", "No"]
         }
 
-    # All sources available in dataset
+    # Show unique platforms as the sources filter options
     sources = []
-    if "Source" in df_raw.columns:
-        sources = sorted([str(s).strip() for s in df_raw["Source"].dropna().unique() if str(s).strip() != ""])
+    if "Platform" in df_raw.columns:
+        sources = sorted([str(p).strip() for p in df_raw["Platform"].dropna().unique() if str(p).strip() != ""])
+    if not sources:
+        sources = ["LaunchGood", "GiveBright", "Paysuite"]
 
     # 1. Headings: filter by all active criteria EXCEPT heading itself
     h_df = _apply_filters(df_raw, payment_type, tier, source, None, subheading, country, code, zakat, donor_country, campaign_search, gift_aid)

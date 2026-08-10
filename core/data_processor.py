@@ -49,6 +49,55 @@ def deduplicate_dataframe_columns(df_input):
         
     return res_df
 
+def get_code_to_classification_map():
+    """
+    Queries all known classifications from campaign, givebright, and paysuite classification tables
+    to build a dynamic dictionary mapping a Code (case-insensitive) to its corresponding
+    Heading, Sub-Heading, Country, and Zakat Eligibility.
+    """
+    init_classification_db()
+    code_map = {}
+    conn = sqlite3.connect(LOCAL_DB_PATH, timeout=30.0)
+    try:
+        tables = ["campaign_classifications", "givebright_classifications", "paysuite_classifications"]
+        for tbl in tables:
+            try:
+                # Query all records
+                df = pd.read_sql_query(f"SELECT code, heading, sub_heading, country, zakat_eligibility FROM {tbl}", conn)
+                for _, row in df.iterrows():
+                    code = str(row.get("code") or "").strip()
+                    code_lower = code.lower()
+                    if not code or code_lower in ["unassigned", "nan", "none", ""]:
+                        continue
+                    
+                    heading = str(row.get("heading") or "").strip()
+                    sub_heading = str(row.get("sub_heading") or "").strip()
+                    country = str(row.get("country") or "").strip()
+                    zakat = str(row.get("zakat_eligibility") or "").strip()
+
+                    # Only map if we have at least one valid classification field
+                    if (heading.lower() in ["unassigned", ""] and 
+                        sub_heading.lower() in ["unassigned", ""] and 
+                        country.lower() in ["unassigned", ""]):
+                        continue
+
+                    # Safe lookup cleanups
+                    code_clean = code.strip()
+                    code_lower_clean = code_clean.lower()
+
+                    if code_lower_clean not in code_map:
+                        code_map[code_lower_clean] = {
+                            "Heading": heading if heading.lower() not in ["unassigned", ""] else "Unassigned",
+                            "Sub-Heading": sub_heading if sub_heading.lower() not in ["unassigned", ""] else "Unassigned",
+                            "Country": country if country.lower() not in ["unassigned", ""] else "Unassigned",
+                            "Zakat Eligibility": zakat if zakat.lower() not in ["unassigned", ""] else "Unassigned"
+                        }
+            except Exception:
+                pass
+    finally:
+        conn.close()
+    return code_map
+
 def classify_donor_amount(amount):
     """Classify donor based on donation amount."""
     if pd.isna(amount) or amount is None:
@@ -78,7 +127,7 @@ def _mode_or_last(series):
     return mode_vals.iloc[0] if not mode_vals.empty else clean.iloc[-1]
 
 def init_classification_db():
-    """Ensure SQLite campaign_classifications table exists."""
+    """Ensure SQLite campaign_classifications, paysuite_classifications, and sponsorship_targets tables exist."""
     try:
         conn = sqlite3.connect(LOCAL_DB_PATH, timeout=30.0)
         conn.execute("""
@@ -92,6 +141,36 @@ def init_classification_db():
                 zakat_eligibility TEXT DEFAULT 'Unassigned'
             );
         """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS paysuite_classifications (
+                campaign_name TEXT PRIMARY KEY,
+                community_name TEXT,
+                heading TEXT DEFAULT 'Unassigned',
+                sub_heading TEXT DEFAULT 'Unassigned',
+                country TEXT DEFAULT 'Unassigned',
+                code TEXT DEFAULT 'Unassigned',
+                zakat_eligibility TEXT DEFAULT 'Unassigned'
+            );
+        """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS sponsorship_targets (
+                sponsorship_type TEXT PRIMARY KEY,
+                target_value REAL
+            );
+        """)
+        # Seed default target values if not exists
+        cur = conn.cursor()
+        cur.execute("SELECT count(*) FROM sponsorship_targets")
+        if cur.fetchone()[0] == 0:
+            conn.executemany("""
+                INSERT INTO sponsorship_targets (sponsorship_type, target_value)
+                VALUES (?, ?)
+            """, [
+                ("Hafiz", 240.0),
+                ("Orphan", 480.0),
+                ("Widow", 1080.0),
+                ("Ex-Prisoner", 1080.0)
+            ])
         conn.commit()
         conn.close()
     except Exception as e:
@@ -112,18 +191,20 @@ def get_classification_matrix(df_raw=None):
                 df_donations = None
 
         if df_donations is not None and not df_donations.empty and "Campaign Name" in df_donations.columns:
-            lg_mask = df_donations.get("Platform", pd.Series("", index=df_donations.index)).astype(str).str.lower() != "givebright"
-            lg_df = df_donations[lg_mask] if lg_mask.any() else df_donations
+            plat_series = df_donations.get("Platform", pd.Series("", index=df_donations.index)).astype(str).str.lower()
+            lg_mask = ~plat_series.isin(["givebright", "paysuite"])
+            lg_df = df_donations[lg_mask] if lg_mask.any() else df_donations.iloc[0:0]
 
-            c_name = lg_df["Campaign Name"].astype(str).fillna("N/A").replace({'nan': 'N/A', '': 'N/A', 'None': 'N/A'})
-            comm_name = lg_df["Community Name"].astype(str).fillna("N/A").replace({'nan': 'N/A', '': 'N/A', 'None': 'N/A'}) if "Community Name" in lg_df.columns else pd.Series("N/A", index=lg_df.index)
+            if not lg_df.empty:
+                c_name = lg_df["Campaign Name"].astype(str).fillna("N/A").replace({'nan': 'N/A', '': 'N/A', 'None': 'N/A'})
+                comm_name = lg_df["Community Name"].astype(str).fillna("N/A").replace({'nan': 'N/A', '': 'N/A', 'None': 'N/A'}) if "Community Name" in lg_df.columns else pd.Series("N/A", index=lg_df.index)
 
-            available_target_cols = [c for c in target_cols_display if c in lg_df.columns]
-            donor_df = pd.DataFrame({"Campaign Name": c_name, "Community Name": comm_name})
-            for tc in available_target_cols:
-                donor_df[tc] = lg_df[tc].values
+                available_target_cols = [c for c in target_cols_display if c in lg_df.columns]
+                donor_df = pd.DataFrame({"Campaign Name": c_name, "Community Name": comm_name})
+                for tc in available_target_cols:
+                    donor_df[tc] = lg_df[tc].values
 
-            matrix_df = donor_df.groupby(["Campaign Name", "Community Name"], dropna=False)[available_target_cols].first().reset_index()
+                matrix_df = donor_df.groupby(["Campaign Name", "Community Name"], dropna=False)[available_target_cols].first().reset_index()
                 
             conn = sqlite3.connect(LOCAL_DB_PATH, timeout=30.0)
             try:
@@ -185,6 +266,19 @@ def get_classification_matrix(df_raw=None):
     for col in target_cols_display:
         if col not in matrix_df.columns:
             matrix_df[col] = "Unassigned"
+
+    # Dynamic auto-assignment based on Code mapping
+    code_map = get_code_to_classification_map()
+    for idx, row in matrix_df.iterrows():
+        code = str(row.get("Code") or "").strip()
+        code_lower = code.lower()
+        if code and code_lower not in ["unassigned", "nan", "none", ""]:
+            if code_lower in code_map:
+                c_info = code_map[code_lower]
+                for tc in ["Heading", "Sub-Heading", "Country", "Zakat Eligibility"]:
+                    val = str(row.get(tc) or "").strip()
+                    if not val or val.lower() in ["unassigned", "nan", "none"]:
+                        matrix_df.at[idx, tc] = c_info[tc]
 
     return matrix_df
 
@@ -259,8 +353,274 @@ def save_classification_matrix(matrix_df):
     conn.close()
     return len(clean_matrix)
 
+
+def get_paysuite_classification_matrix(df_raw=None):
+    """Returns the paysuite_classifications matrix DataFrame dynamically from df_raw, Parquet & SQLite DB."""
+    init_classification_db()
+    target_cols_display = ["Heading", "Sub-Heading", "Country", "Code", "Zakat Eligibility"]
+    matrix_df = pd.DataFrame(columns=["Campaign Name", "Community Name"] + target_cols_display)
+
+    try:
+        df_donations = df_raw
+        if (df_donations is None or df_donations.empty) and os.path.exists(PARQUET_PATH):
+            try:
+                df_donations = pd.read_parquet(PARQUET_PATH)
+            except Exception:
+                df_donations = None
+
+        if df_donations is not None and not df_donations.empty and "Campaign Name" in df_donations.columns:
+            platform_s = df_donations.get("Platform", pd.Series("", index=df_donations.index)).astype(str).str.lower()
+            source_s = df_donations.get("Source", pd.Series("", index=df_donations.index)).astype(str).str.lower()
+
+            ps_mask = (platform_s == "paysuite") | source_s.str.contains("paysuite", na=False)
+            ps_df = df_donations[ps_mask] if ps_mask.any() else df_donations.iloc[0:0]
+
+            if not ps_df.empty:
+                c_name = ps_df["Campaign Name"].astype(str).fillna("N/A").replace({'nan': 'N/A', '': 'N/A', 'None': 'N/A'})
+                comm_name = ps_df["Community Name"].astype(str).fillna("N/A").replace({'nan': 'N/A', '': 'N/A', 'None': 'N/A'}) if "Community Name" in ps_df.columns else pd.Series("N/A", index=ps_df.index)
+
+                available_target_cols = [c for c in target_cols_display if c in ps_df.columns]
+                donor_df = pd.DataFrame({"Campaign Name": c_name, "Community Name": comm_name})
+                for tc in available_target_cols:
+                    donor_df[tc] = ps_df[tc].values
+
+                for tc in target_cols_display:
+                    if tc not in donor_df.columns:
+                        donor_df[tc] = "Unassigned"
+
+                matrix_df = donor_df.groupby(["Campaign Name", "Community Name"], dropna=False)[target_cols_display].first().reset_index()
+
+        # Merge with saved entries from SQLite
+        conn = sqlite3.connect(LOCAL_DB_PATH, timeout=30.0)
+        try:
+            db_matrix = pd.read_sql_query("SELECT * FROM paysuite_classifications", conn)
+            db_matrix.rename(columns={
+                "campaign_name": "Campaign Name",
+                "community_name": "Community Name",
+                "heading": "Heading",
+                "sub_heading": "Sub-Heading",
+                "country": "Country",
+                "code": "Code",
+                "zakat_eligibility": "Zakat Eligibility"
+            }, inplace=True)
+
+            if not db_matrix.empty:
+                db_matrix["Campaign Name"] = db_matrix["Campaign Name"].astype(str).fillna("N/A").replace({'nan': 'N/A', '': 'N/A', 'None': 'N/A'})
+                db_matrix["Community Name"] = db_matrix["Community Name"].astype(str).fillna("N/A").replace({'nan': 'N/A', '': 'N/A', 'None': 'N/A'})
+
+                if matrix_df.empty:
+                    matrix_df = db_matrix
+                else:
+                    existing_keys = set(zip(matrix_df["Campaign Name"].astype(str), matrix_df["Community Name"].astype(str)))
+                    new_rows = db_matrix[~db_matrix.apply(
+                        lambda r: (str(r.get("Campaign Name", "")), str(r.get("Community Name", ""))) in existing_keys, axis=1
+                    )]
+                    if not new_rows.empty:
+                        matrix_df = pd.concat([matrix_df, new_rows], ignore_index=True)
+        except Exception:
+            pass
+        finally:
+            conn.close()
+
+    except Exception as e:
+        print(f"Paysuite matrix load notice: {e}")
+
+    for col in ["Campaign Name", "Community Name"] + target_cols_display:
+        if col not in matrix_df.columns:
+            matrix_df[col] = "Unassigned"
+
+    # Dynamic auto-assignment based on Code mapping
+    code_map = get_code_to_classification_map()
+    for idx, row in matrix_df.iterrows():
+        code = str(row.get("Code") or "").strip()
+        code_lower = code.lower()
+        if code and code_lower not in ["unassigned", "nan", "none", ""]:
+            if code_lower in code_map:
+                c_info = code_map[code_lower]
+                for tc in ["Heading", "Sub-Heading", "Country", "Zakat Eligibility"]:
+                    val = str(row.get(tc) or "").strip()
+                    if not val or val.lower() in ["unassigned", "nan", "none"]:
+                        matrix_df.at[idx, tc] = c_info[tc]
+
+    return matrix_df
+
+
+def save_paysuite_classification_matrix(matrix_df):
+    """Saves updated Paysuite classification matrix to SQLite."""
+    init_classification_db()
+    if matrix_df.empty:
+        return 0
+    conn = sqlite3.connect(LOCAL_DB_PATH, timeout=30.0)
+    for _, row in matrix_df.iterrows():
+        cname = str(row.get("Campaign Name", "Unassigned"))
+        conn.execute("DELETE FROM paysuite_classifications WHERE campaign_name = ?", (cname,))
+        conn.execute("""
+            INSERT INTO paysuite_classifications (campaign_name, community_name, heading, sub_heading, country, code, zakat_eligibility)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (
+            cname,
+            str(row.get("Community Name", "Unassigned")),
+            str(row.get("Heading", "Unassigned")),
+            str(row.get("Sub-Heading", "Unassigned")),
+            str(row.get("Country", "Unassigned")),
+            str(row.get("Code", "Unassigned")),
+            str(row.get("Zakat Eligibility", "Unassigned"))
+        ))
+    conn.commit()
+    conn.close()
+    return len(matrix_df)
+
 def _enrich_dataframe(df):
     """Pre-compute all derived columns (Donor ID, LTV, Classification, Payment Frequency)."""
+    # Check if this is a Paysuite file
+    if "Bank Ref" in df.columns and "Date of collection" in df.columns:
+        # Classroom rethink village mapping
+        if "Code" in df.columns:
+            df["Code"] = df["Code"].astype(str).str.strip().replace({
+                "classroom rethink village": "SYR-VIL-SCH",
+                "classroom rethink village, Rethink Village": "SYR-VIL-SCH",
+                "CLASSROOM !!!, Rethink Village": "SYR-VIL-SCH",
+                "CLASSROOM !!!": "SYR-VIL-SCH"
+            })
+
+        # Rename standard columns
+        df = df.rename(columns={
+            "Bank Ref": "Donation ID",
+            "Firstname": "First Name",
+            "Surname": "Last Name",
+            "Email": "Email",
+            "Comments": "Comments",
+            "Address": "Billing Address",
+            "Post code": "Billing Zip",
+        })
+
+        if "Amount" in df.columns:
+            df["Total Online Donations Net Amount in Settled Currency"] = pd.to_numeric(df["Amount"], errors="coerce").fillna(0.0)
+            df["Donation Amount in Project Currency (May be approx.)"] = df["Total Online Donations Net Amount in Settled Currency"]
+            df["Donation Amount (in Donation Currency)"] = df["Total Online Donations Net Amount in Settled Currency"]
+
+        if "Date of collection" in df.columns:
+            parsed_dates = pd.to_datetime(df["Date of collection"], dayfirst=True, errors="coerce")
+            df["Created Date (UTC)"] = parsed_dates
+            df["Created Time (UTC)"] = "00:00:00"
+
+        if "Type" in df.columns:
+            df["Payment Frequency"] = df["Type"].apply(lambda t: "Recurring Payment" if str(t).lower() == "regular" else "One-Time Payment")
+
+        df["Platform"] = "Paysuite"
+        df["Payment Type"] = "Direct Debit"
+        df["Offline or online donation"] = "online"
+        
+        df["Campaign Name"] = df["Donation ID"]
+        df["Community Name"] = "Paysuite"
+
+        # Try to look up existing donor details (Email, Billing Address, Billing Zip) and classifications from database by Bank Ref
+        existing_map = {}
+        df_existing = load_data()
+        if not df_existing.empty and "Donation ID" in df_existing.columns:
+            ps_existing = df_existing[df_existing.get("Platform", pd.Series("", index=df_existing.index)).astype(str).str.lower() == "paysuite"]
+            if not ps_existing.empty:
+                mapping_df = ps_existing.drop_duplicates(subset=["Donation ID"], keep="last")
+                for _, r in mapping_df.iterrows():
+                    existing_map[str(r["Donation ID"]).strip().lower()] = {
+                        "Email": r.get("Email") if pd.notna(r.get("Email")) else None,
+                        "Billing Address": r.get("Billing Address") if pd.notna(r.get("Billing Address")) else None,
+                        "Billing Zip": r.get("Billing Zip") if pd.notna(r.get("Billing Zip")) else None,
+                        "Heading": r.get("Heading") if pd.notna(r.get("Heading")) else "Unassigned",
+                        "Sub-Heading": r.get("Sub-Heading") if pd.notna(r.get("Sub-Heading")) else "Unassigned",
+                        "Country": r.get("Country") if pd.notna(r.get("Country")) else "Unassigned",
+                        "Code": r.get("Code") if pd.notna(r.get("Code")) else "Unassigned",
+                        "Zakat Eligibility": r.get("Zakat Eligibility") if pd.notna(r.get("Zakat Eligibility")) else "Unassigned",
+                    }
+
+        # Apply or initialize classifications database for Paysuite
+        init_classification_db()
+        conn = sqlite3.connect(LOCAL_DB_PATH, timeout=30.0)
+        try:
+            db_matrix = pd.read_sql_query("SELECT * FROM paysuite_classifications", conn)
+            rule_map = {str(r["campaign_name"]).strip().lower(): r for _, r in db_matrix.iterrows()}
+        except Exception:
+            rule_map = {}
+        finally:
+            conn.close()
+
+        # Add columns if not exist
+        for col in ["Heading", "Sub-Heading", "Country", "Code", "Zakat Eligibility"]:
+            if col not in df.columns:
+                df[col] = "Unassigned"
+
+        new_rules_to_insert = []
+        for idx, row in df.iterrows():
+            bank_ref = str(row["Donation ID"]).strip()
+            bank_ref_lower = bank_ref.lower()
+
+            # 1. Fill in missing contact details from existing mapping
+            if bank_ref_lower in existing_map:
+                e_info = existing_map[bank_ref_lower]
+                if pd.isna(row.get("Email")) or not str(row.get("Email")).strip() or str(row.get("Email")).strip().lower() in ["nan", "none"]:
+                    df.at[idx, "Email"] = e_info.get("Email")
+                if pd.isna(row.get("Billing Address")) or not str(row.get("Billing Address")).strip() or str(row.get("Billing Address")).strip().lower() in ["nan", "none"]:
+                    df.at[idx, "Billing Address"] = e_info.get("Billing Address")
+                if pd.isna(row.get("Billing Zip")) or not str(row.get("Billing Zip")).strip() or str(row.get("Billing Zip")).strip().lower() in ["nan", "none"]:
+                    df.at[idx, "Billing Zip"] = e_info.get("Billing Zip")
+
+            # 2. Fill in classifications from rule_map or existing database
+            if bank_ref_lower in rule_map:
+                r = rule_map[bank_ref_lower]
+                df.at[idx, "Heading"] = r.get("heading") or "Unassigned"
+                df.at[idx, "Sub-Heading"] = r.get("sub_heading") or "Unassigned"
+                df.at[idx, "Country"] = r.get("country") or "Unassigned"
+                df.at[idx, "Code"] = r.get("code") or "Unassigned"
+                df.at[idx, "Zakat Eligibility"] = r.get("zakat_eligibility") or "Unassigned"
+            elif bank_ref_lower in existing_map:
+                e_info = existing_map[bank_ref_lower]
+                df.at[idx, "Heading"] = e_info.get("Heading") or "Unassigned"
+                df.at[idx, "Sub-Heading"] = e_info.get("Sub-Heading") or "Unassigned"
+                df.at[idx, "Country"] = e_info.get("Country") or "Unassigned"
+                df.at[idx, "Code"] = e_info.get("Code") or "Unassigned"
+                df.at[idx, "Zakat Eligibility"] = e_info.get("Zakat Eligibility") or "Unassigned"
+            else:
+                csv_code = str(row.get("Code", "Unassigned")).strip()
+                if not csv_code or csv_code.lower() in ["nan", "none"]:
+                    csv_code = "Unassigned"
+
+                # Check for "4x HAFIZ" in Customer Ref to auto-assign HUF
+                cust_ref_str = str(row.get("Customer Ref", "")).strip().lower()
+                if "hafiz" in cust_ref_str:
+                    csv_code = "SYR-SPN-HUF"
+
+                df.at[idx, "Code"] = csv_code
+                rule_map[bank_ref_lower] = {
+                    "campaign_name": bank_ref,
+                    "community_name": "Paysuite",
+                    "heading": "Unassigned",
+                    "sub_heading": "Unassigned",
+                    "country": "Unassigned",
+                    "code": csv_code,
+                    "zakat_eligibility": "Unassigned"
+                }
+                new_rules_to_insert.append((
+                    bank_ref,
+                    "Paysuite",
+                    "Unassigned",
+                    "Unassigned",
+                    "Unassigned",
+                    csv_code,
+                    "Unassigned"
+                ))
+
+        if new_rules_to_insert:
+            conn = sqlite3.connect(LOCAL_DB_PATH, timeout=30.0)
+            try:
+                conn.executemany("""
+                    INSERT OR REPLACE INTO paysuite_classifications (campaign_name, community_name, heading, sub_heading, country, code, zakat_eligibility)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                """, new_rules_to_insert)
+                conn.commit()
+            except Exception as e:
+                print(f"Error seeding new rules: {e}")
+            finally:
+                conn.close()
     if "Total Online Donations Net Amount in Settled Currency" in df.columns and "Donation Amount in Project Currency (May be approx.)" in df.columns:
         df["Total Online Donations Net Amount in Settled Currency"] = df["Total Online Donations Net Amount in Settled Currency"].fillna(df["Donation Amount in Project Currency (May be approx.)"])
     elif "Total Online Donations Net Amount in Settled Currency" not in df.columns and "Donation Amount in Project Currency (May be approx.)" in df.columns:
@@ -312,6 +672,24 @@ def _enrich_dataframe(df):
     )
 
     df = deduplicate_dataframe_columns(df)
+
+    # Dynamic auto-assignment based on Code mapping for all rows (LaunchGood, GiveBright, Paysuite)
+    code_map = get_code_to_classification_map()
+    for col in ["Heading", "Sub-Heading", "Country", "Code", "Zakat Eligibility"]:
+        if col not in df.columns:
+            df[col] = "Unassigned"
+
+    for idx, row in df.iterrows():
+        code = str(row.get("Code") or "").strip()
+        code_lower = code.lower()
+        if code and code_lower not in ["unassigned", "nan", "none", ""]:
+            if code_lower in code_map:
+                c_info = code_map[code_lower]
+                for tc in ["Heading", "Sub-Heading", "Country", "Zakat Eligibility"]:
+                    val = str(row.get(tc) or "").strip()
+                    if not val or val.lower() in ["unassigned", "nan", "none"]:
+                        df.at[idx, tc] = c_info[tc]
+
     for col in df.select_dtypes(include='object').columns:
         df[col] = df[col].astype(str).apply(fix_mojibake)
 

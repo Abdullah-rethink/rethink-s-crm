@@ -102,10 +102,15 @@ def _apply_filters(df, payment_type=None, tier=None, source=None, heading=None, 
     if tier and tier != "All Classifications" and "Lifetime Donor Classification" in filtered_df.columns:
         filtered_df = filtered_df[filtered_df["Lifetime Donor Classification"] == tier]
 
-    if source and source != "All Sources (Combined)" and "Source" in filtered_df.columns:
-        sources_list = [s.strip() for s in str(source).split(",") if s.strip()]
+    if source and source != "All Sources (Combined)":
+        sources_list = [s.strip().lower() for s in str(source).split(",") if s.strip()]
         if sources_list:
-            filtered_df = filtered_df[filtered_df["Source"].isin(sources_list)]
+            mask = pd.Series(False, index=filtered_df.index)
+            if "Platform" in filtered_df.columns:
+                mask = mask | filtered_df["Platform"].astype(str).str.lower().isin(sources_list)
+            if "Source" in filtered_df.columns:
+                mask = mask | filtered_df["Source"].astype(str).str.lower().isin(sources_list)
+            filtered_df = filtered_df[mask]
 
     if heading and heading != "All Headings" and "Heading" in filtered_df.columns:
         filtered_df = filtered_df[filtered_df["Heading"].astype(str).str.strip() == heading]
@@ -184,8 +189,12 @@ def get_donors_paginated(
                 params.append(tier)
 
             if source and source != "All Sources (Combined)":
-                where_clauses.append('"Source" = ?')
-                params.append(source)
+                sources_list = [s.strip() for s in str(source).split(",") if s.strip()]
+                if sources_list:
+                    placeholders = ", ".join(["?"] * len(sources_list))
+                    where_clauses.append(f'("Platform" IN ({placeholders}) OR "Source" IN ({placeholders}))')
+                    params.extend(sources_list)
+                    params.extend(sources_list)
 
             if heading and heading != "All Headings":
                 where_clauses.append('"Heading" = ?')
@@ -469,10 +478,52 @@ def get_donor_360_profile(donor_id_or_email: str):
     col_amount = "Total Online Donations Net Amount in Settled Currency"
     if col_amount not in df.columns:
         col_amount = "Donation Amount in Project Currency (May be approx.)"
-
     first_row = donor_txns.iloc[0]
     total_ltv = float(donor_txns[col_amount].sum()) if col_amount in donor_txns.columns else 0.0
     avg_donation = float(donor_txns[col_amount].mean()) if col_amount in donor_txns.columns else 0.0
+
+    # Find the best display name, first name, and last name (non-anonymous if possible)
+    best_display_name = "Anonymous Donor"
+    best_first_name = ""
+    best_last_name = ""
+    
+    # 1. Search display name
+    for _, row in donor_txns.iterrows():
+        disp = str(row.get("Display Name", "")).strip()
+        disp_lower = disp.lower()
+        if disp and disp_lower not in ["nan", "none", "null", "anonymous", "anonymous kind soul", "kind soul"]:
+            best_display_name = disp
+            break
+    else:
+        # Fallback to First Name + Last Name
+        for _, row in donor_txns.iterrows():
+            fn = str(row.get("First Name", "")).strip()
+            ln = str(row.get("Last Name", "")).strip()
+            if fn or ln:
+                combined = f"{fn} {ln}".strip()
+                if combined.lower() not in ["nan", "none", "null", "anonymous", "anonymous kind soul", "kind soul", ""]:
+                    best_display_name = combined
+                    break
+        else:
+            best_display_name = str(first_row.get("Display Name", "Anonymous Donor"))
+
+    # 2. Search first name
+    for _, row in donor_txns.iterrows():
+        fn = str(row.get("First Name", "")).strip()
+        if fn and fn.lower() not in ["nan", "none", "null", "anonymous", "kind soul"]:
+            best_first_name = fn
+            break
+    else:
+        best_first_name = str(first_row.get("First Name", ""))
+
+    # 3. Search last name
+    for _, row in donor_txns.iterrows():
+        ln = str(row.get("Last Name", "")).strip()
+        if ln and ln.lower() not in ["nan", "none", "null", "anonymous", "kind soul"]:
+            best_last_name = ln
+            break
+    else:
+        best_last_name = str(first_row.get("Last Name", ""))
 
     # Dual Classification: Lifetime Donor Tier AND Transaction Donor Tier!
     lifetime_tier = str(first_row.get("Lifetime Donor Classification", "Unassigned"))
@@ -481,9 +532,9 @@ def get_donor_360_profile(donor_id_or_email: str):
     # Extract all details
     details = {
         "donor_id": str(first_row.get("Donor ID", "N/A")),
-        "display_name": str(first_row.get("Display Name", "N/A")),
-        "first_name": str(first_row.get("First Name", "N/A")),
-        "last_name": str(first_row.get("Last Name", "N/A")),
+        "display_name": best_display_name,
+        "first_name": best_first_name,
+        "last_name": best_last_name,
         "email": str(first_row.get("Email", "N/A")),
         "phone": str(first_row.get("Phone", "N/A")),
         

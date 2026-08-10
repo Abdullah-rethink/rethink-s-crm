@@ -1,7 +1,13 @@
 import pandas as pd
 import streamlit as st
 
-from core.data_processor import get_classification_matrix, save_classification_matrix
+from core.data_processor import (
+    get_classification_matrix,
+    save_classification_matrix,
+    get_paysuite_classification_matrix,
+    save_paysuite_classification_matrix,
+    get_code_to_classification_map,
+)
 
 
 def get_givebright_classification_matrix(df_raw=None):
@@ -83,6 +89,19 @@ def get_givebright_classification_matrix(df_raw=None):
         if col not in matrix_df.columns:
             matrix_df[col] = "Unassigned"
 
+    # Dynamic auto-assignment based on Code mapping
+    code_map = get_code_to_classification_map()
+    for idx, row in matrix_df.iterrows():
+        code = str(row.get("Code") or "").strip()
+        code_lower = code.lower()
+        if code and code_lower not in ["unassigned", "nan", "none", ""]:
+            if code_lower in code_map:
+                c_info = code_map[code_lower]
+                for tc in ["Heading", "Sub-Heading", "Country", "Zakat Eligibility"]:
+                    val = str(row.get(tc) or "").strip()
+                    if not val or val.lower() in ["unassigned", "nan", "none"]:
+                        matrix_df.at[idx, tc] = c_info[tc]
+
     return matrix_df
 
 def save_givebright_classification_matrix(matrix_df):
@@ -132,7 +151,7 @@ def render_classification_tab(df_raw, user_session):
     st.header("🏷️ Campaign Classification Manager (Source of Truth)")
     st.markdown("This matrix is your **source of truth** for mapping (`Campaign Name`, `Community Name`) ➔ `Heading`, `Sub-Heading`, `Country`, `Code`, and `Zakat Eligibility`.")
 
-    matrix_platform = st.radio("Platform Matrix", options=["⚡ LaunchGood Matrix", "🎁 GiveBright Matrix"], horizontal=True, key="matrix_platform_toggle")
+    matrix_platform = st.radio("Platform Matrix", options=["⚡ LaunchGood Matrix", "🎁 GiveBright Matrix", "💳 Paysuite Matrix"], horizontal=True, key="matrix_platform_toggle")
     state_key = f"matrix_df_{matrix_platform}"
 
     if st.session_state.get("prev_matrix_platform") != matrix_platform:
@@ -142,6 +161,8 @@ def render_classification_tab(df_raw, user_session):
     if state_key not in st.session_state:
         if matrix_platform == "⚡ LaunchGood Matrix":
             matrix_df = get_classification_matrix()
+        elif matrix_platform == "💳 Paysuite Matrix":
+            matrix_df = get_paysuite_classification_matrix(df_raw)
         else:
             matrix_df = get_givebright_classification_matrix(df_raw)
     else:
@@ -151,17 +172,32 @@ def render_classification_tab(df_raw, user_session):
 
     col_c1, col_c2, col_c3 = st.columns(3)
     with col_c1:
-        st.metric("Total Tracked Campaigns", f"{len(matrix_df):,}")
+        st.metric(
+            "Total Tracked Direct Debits" if matrix_platform == "💳 Paysuite Matrix" else "Total Tracked Campaigns", 
+            f"{len(matrix_df):,}"
+        )
     with col_c2:
-        st.metric("Fully Classified Campaigns", f"{len(matrix_df) - unassigned_count:,}")
+        st.metric(
+            "Fully Classified Debits" if matrix_platform == "💳 Paysuite Matrix" else "Fully Classified Campaigns", 
+            f"{len(matrix_df) - unassigned_count:,}"
+        )
     with col_c3:
-        st.metric("Unassigned Campaigns", f"{unassigned_count:,}")
+        st.metric(
+            "Unassigned Debits" if matrix_platform == "💳 Paysuite Matrix" else "Unassigned Campaigns", 
+            f"{unassigned_count:,}"
+        )
 
     st.markdown('<hr class="custom-divider">', unsafe_allow_html=True)
 
     # ── Export Row ───────────────────────────────────────────
     csv_matrix = matrix_df.to_csv(index=False).encode('utf-8')
-    fname_export = "launchgood_classifications.csv" if matrix_platform == "⚡ LaunchGood Matrix" else "givebright_classifications.csv"
+    if matrix_platform == "⚡ LaunchGood Matrix":
+        fname_export = "launchgood_classifications.csv"
+    elif matrix_platform == "💳 Paysuite Matrix":
+        fname_export = "paysuite_classifications.csv"
+    else:
+        fname_export = "givebright_classifications.csv"
+
     st.download_button(
         f"⬇️ Export {matrix_platform} Matrix (CSV)",
         csv_matrix,
@@ -206,18 +242,35 @@ def render_classification_tab(df_raw, user_session):
                 st.success("✅ Applied changes to rows in-memory! Click 'Save & Apply Rules Now' below to save.")
                 st.rerun()
 
+        # Custom column headers rename for data editor
+        display_matrix_df = matrix_df.copy()
+        if matrix_platform == "💳 Paysuite Matrix":
+            display_matrix_df.rename(columns={
+                "Campaign Name": "Direct Debit Ref (Bank Ref)",
+                "Community Name": "Platform Source"
+            }, inplace=True)
+
         edited_df = st.data_editor(
-            matrix_df,
+            display_matrix_df,
             use_container_width=True,
             num_rows="dynamic",
             key=f"editor_{matrix_platform}"
         )
+
+        # Restore column names before saving
+        if matrix_platform == "💳 Paysuite Matrix":
+            edited_df.rename(columns={
+                "Direct Debit Ref (Bank Ref)": "Campaign Name",
+                "Platform Source": "Community Name"
+            }, inplace=True)
 
         if st.button(f"💾 Save & Apply {matrix_platform} Rules Now", type="primary", use_container_width=True):
             save_target_df = st.session_state.get(state_key, edited_df)
             with st.spinner("Saving rules to database..."):
                 if matrix_platform == "⚡ LaunchGood Matrix":
                     n_saved = save_classification_matrix(save_target_df)
+                elif matrix_platform == "💳 Paysuite Matrix":
+                    n_saved = save_paysuite_classification_matrix(save_target_df)
                 else:
                     n_saved = save_givebright_classification_matrix(save_target_df)
                 st.session_state.pop(state_key, None)
