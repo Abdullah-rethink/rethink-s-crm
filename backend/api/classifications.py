@@ -9,6 +9,8 @@ from core.data_processor import (
     get_classification_matrix,
     load_data,
     save_classification_matrix,
+    get_paysuite_classification_matrix,
+    save_paysuite_classification_matrix,
 )
 from views.classification_view import (
     get_givebright_classification_matrix,
@@ -63,15 +65,31 @@ def get_givebright_matrix():
     }
 
 
+@router.get("/paysuite")
+def get_paysuite_matrix():
+    df_raw = load_data()
+    matrix_df = get_paysuite_classification_matrix(df_raw).fillna("Unassigned")
+    unassigned_count = (matrix_df["Heading"] == "Unassigned").sum() if "Heading" in matrix_df.columns else 0
+    return {
+        "platform": "Paysuite",
+        "total_campaigns": len(matrix_df),
+        "classified_campaigns": int(len(matrix_df) - unassigned_count),
+        "unassigned_campaigns": int(unassigned_count),
+        "rules": matrix_df.to_dict(orient="records")
+    }
+
+
 @router.get("/export")
 def export_classifications(
-    platform: str = Query("launchgood", regex="^(launchgood|givebright)$"),
+    platform: str = Query("launchgood", regex="^(launchgood|givebright|paysuite)$"),
     format: str = Query("csv", regex="^(csv|xlsx)$")
 ):
     """Exports campaign classification rules to CSV or Excel (.xlsx) file format."""
     df_raw = load_data()
     if platform.lower() == "givebright":
         matrix_df = get_givebright_classification_matrix(df_raw).fillna("Unassigned")
+    elif platform.lower() == "paysuite":
+        matrix_df = get_paysuite_classification_matrix(df_raw).fillna("Unassigned")
     else:
         matrix_df = get_classification_matrix(df_raw).fillna("Unassigned")
 
@@ -121,6 +139,8 @@ def save_matrix_rules(payload: SaveRulesRequest):
 
     if payload.platform.lower() == "givebright":
         n_saved = save_givebright_classification_matrix(matrix_df)
+    elif payload.platform.lower() == "paysuite":
+        n_saved = save_paysuite_classification_matrix(matrix_df)
     else:
         n_saved = save_classification_matrix(matrix_df)
 

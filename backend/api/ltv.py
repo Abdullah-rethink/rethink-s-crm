@@ -17,10 +17,15 @@ def _apply_filters(df, payment_type, tier, source, heading, subheading, country)
     if tier and tier != "All Classifications" and "Lifetime Donor Classification" in filtered_df.columns:
         filtered_df = filtered_df[filtered_df["Lifetime Donor Classification"] == tier]
 
-    if source and source != "All Sources (Combined)" and "Source" in filtered_df.columns:
-        sources_list = [s.strip() for s in str(source).split(",") if s.strip()]
+    if source and source != "All Sources (Combined)":
+        sources_list = [s.strip().lower() for s in str(source).split(",") if s.strip()]
         if sources_list:
-            filtered_df = filtered_df[filtered_df["Source"].isin(sources_list)]
+            mask = pd.Series(False, index=filtered_df.index)
+            if "Platform" in filtered_df.columns:
+                mask = mask | filtered_df["Platform"].astype(str).str.lower().isin(sources_list)
+            if "Source" in filtered_df.columns:
+                mask = mask | filtered_df["Source"].astype(str).str.lower().isin(sources_list)
+            filtered_df = filtered_df[mask]
 
     if heading and heading != "All Headings" and "Heading" in filtered_df.columns:
         filtered_df = filtered_df[filtered_df["Heading"].astype(str).str.strip() == heading]
