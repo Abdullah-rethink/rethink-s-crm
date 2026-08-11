@@ -473,6 +473,78 @@ def get_donors_kanban(
     return kanban_data
 
 
+NON_NAME_PHRASES = {
+    'towards the masjid', 'for orphans', 'in memory of', 'anonymous', 
+    'anonymous kind soul', 'kind soul', 'sadaqah', 'zakat', 'general fund', 
+    'masjid project', 'may allah accept', 'donation', 'for the sake of allah',
+    'bismillah', 'jazaakallah', 'jazakallah', 'food pack', 'water well',
+    'gaza appeal', 'iftar', 'orphan sponsorship', 'super village', 'homes'
+}
+
+
+def resolve_best_donor_name(donor_txns, first_row):
+    """
+    Intelligently determines the authentic person/organization name for a donor,
+    prioritizing full legal names (First + Last, Billing Name) over intention messages 
+    or campaign phrases that donors sometimes type into the crowdfunding 'Display Name' box.
+    """
+    # 1. Search for best human First Name + Last Name across all transactions
+    name_candidates = []
+    for _, row in donor_txns.iterrows():
+        fn = str(row.get("First Name") or "").strip()
+        ln = str(row.get("Last Name") or "").strip()
+        if fn.lower() in ["nan", "none", "null", "anonymous", "kind soul", "n/a", ""]:
+            fn = ""
+        if ln.lower() in ["nan", "none", "null", "anonymous", "kind soul", "n/a", ""]:
+            ln = ""
+        
+        full = f"{fn} {ln}".strip()
+        if full and full.lower() not in NON_NAME_PHRASES and not any(p in full.lower() for p in ["towards the", "in memory of", "for orphans"]):
+            words = full.split()
+            # Score candidate based on completeness (favor full names like 'Adel Saeed' over 'A S')
+            score = sum(len(w) for w in words)
+            name_candidates.append((score, full, fn, ln))
+
+    if name_candidates:
+        name_candidates.sort(key=lambda x: x[0], reverse=True)
+        best_score, best_full, best_fn, best_ln = name_candidates[0]
+        if best_score >= 3:
+            return best_full, best_fn, best_ln
+
+    # 2. Check Billing Name
+    for _, row in donor_txns.iterrows():
+        bn = str(row.get("Billing Name") or "").strip()
+        if bn and bn.lower() not in ["nan", "none", "null", "anonymous", "kind soul", "n/a", ""] and bn.lower() not in NON_NAME_PHRASES:
+            parts = bn.split()
+            fn = parts[0] if parts else ""
+            ln = " ".join(parts[1:]) if len(parts) > 1 else ""
+            return bn, fn, ln
+
+    # 3. Check Company Name / Customer Ref
+    for _, row in donor_txns.iterrows():
+        cn = str(row.get("Company name") or row.get("Customer Ref") or "").strip()
+        if cn and cn.lower() not in ["nan", "none", "null", "anonymous", "kind soul", "n/a", ""]:
+            return cn, "", ""
+
+    # 4. Check Display Name (ignoring donation intentions/messages)
+    for _, row in donor_txns.iterrows():
+        disp = str(row.get("Display Name") or "").strip()
+        disp_lower = disp.lower()
+        if disp and disp_lower not in ["nan", "none", "null", "anonymous", "anonymous kind soul", "kind soul", "n/a", ""] and not any(p in disp_lower for p in NON_NAME_PHRASES):
+            parts = disp.split()
+            fn = parts[0] if parts else ""
+            ln = " ".join(parts[1:]) if len(parts) > 1 else ""
+            return disp, fn, ln
+
+    # 5. Fallback: single letter initial or Anonymous
+    raw_fn = str(first_row.get("First Name") or "").strip()
+    raw_ln = str(first_row.get("Last Name") or "").strip()
+    if raw_fn or raw_ln:
+        return f"{raw_fn} {raw_ln}".strip(), raw_fn, raw_ln
+
+    return "Anonymous Donor", "", ""
+
+
 @router.get("/profile/{donor_id_or_email:path}")
 def get_donor_360_profile(donor_id_or_email: str):
     """Returns complete 360° Donor Profile payload with all donor details, dual classifications, and full transaction history."""
@@ -498,48 +570,8 @@ def get_donor_360_profile(donor_id_or_email: str):
     total_ltv = float(donor_txns[col_amount].sum()) if col_amount in donor_txns.columns else 0.0
     avg_donation = float(donor_txns[col_amount].mean()) if col_amount in donor_txns.columns else 0.0
 
-    # Find the best display name, first name, and last name (non-anonymous if possible)
-    best_display_name = "Anonymous Donor"
-    best_first_name = ""
-    best_last_name = ""
-    
-    # 1. Search display name
-    for _, row in donor_txns.iterrows():
-        disp = str(row.get("Display Name", "")).strip()
-        disp_lower = disp.lower()
-        if disp and disp_lower not in ["nan", "none", "null", "anonymous", "anonymous kind soul", "kind soul"]:
-            best_display_name = disp
-            break
-    else:
-        # Fallback to First Name + Last Name
-        for _, row in donor_txns.iterrows():
-            fn = str(row.get("First Name", "")).strip()
-            ln = str(row.get("Last Name", "")).strip()
-            if fn or ln:
-                combined = f"{fn} {ln}".strip()
-                if combined.lower() not in ["nan", "none", "null", "anonymous", "anonymous kind soul", "kind soul", ""]:
-                    best_display_name = combined
-                    break
-        else:
-            best_display_name = str(first_row.get("Display Name", "Anonymous Donor"))
-
-    # 2. Search first name
-    for _, row in donor_txns.iterrows():
-        fn = str(row.get("First Name", "")).strip()
-        if fn and fn.lower() not in ["nan", "none", "null", "anonymous", "kind soul"]:
-            best_first_name = fn
-            break
-    else:
-        best_first_name = str(first_row.get("First Name", ""))
-
-    # 3. Search last name
-    for _, row in donor_txns.iterrows():
-        ln = str(row.get("Last Name", "")).strip()
-        if ln and ln.lower() not in ["nan", "none", "null", "anonymous", "kind soul"]:
-            best_last_name = ln
-            break
-    else:
-        best_last_name = str(first_row.get("Last Name", ""))
+    # Resolve authentic donor name prioritizing real human names over donation intentions
+    best_display_name, best_first_name, best_last_name = resolve_best_donor_name(donor_txns, first_row)
 
     # Dual Classification: Lifetime Donor Tier AND Transaction Donor Tier!
     lifetime_tier = str(first_row.get("Lifetime Donor Classification", "Unassigned"))
