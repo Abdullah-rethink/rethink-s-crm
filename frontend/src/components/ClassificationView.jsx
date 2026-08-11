@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { 
   Shield, 
   Save, 
@@ -14,7 +14,13 @@ import {
   ExternalLink,
   Zap,
   Gift,
-  CreditCard
+  CreditCard,
+  Search,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
+  Filter
 } from 'lucide-react';
 import { API_BASE_URL } from '../config';
 
@@ -46,6 +52,13 @@ export default function ClassificationView({ user }) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState('');
+
+  // 🚀 Fast Client-Side Search & Pagination State
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('ALL'); // 'ALL', 'CLASSIFIED', 'UNASSIGNED'
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50); // 25, 50, 100, 250, 'All'
+  const [jumpPage, setJumpPage] = useState('');
   
   // Importer Modal State
   const [showImportModal, setShowImportModal] = useState(false);
@@ -62,7 +75,13 @@ export default function ClassificationView({ user }) {
     if (newPlat === platform) return;
     setPlatform(newPlat);
     localStorage.setItem('selected_classification_platform', newPlat);
+    setCurrentPage(1);
   };
+
+  // Reset page to 1 whenever search, status filter, or page size changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [platform, statusFilter, searchQuery, pageSize]);
 
   // Fetch Code Map for dynamic Code -> Heading, Sub-Heading, Country, Zakat auto-fill
   useEffect(() => {
@@ -131,26 +150,81 @@ export default function ClassificationView({ user }) {
   }, [platform]);
 
   // Dynamic cell change handler with Code -> Classification Auto-Fill
-  const handleCellChange = (idx, field, value) => {
+  const handleCellChange = (campaignKey, field, value) => {
     if (!isSuperAdmin) return;
-    const updatedRules = [...matrixData.rules];
-    const currentRow = { ...updatedRules[idx], [field]: cleanText(value) };
+    const valClean = cleanText(value);
+    setMatrixData(prev => {
+      const updatedRules = prev.rules.map(r => {
+        const cName = r['Campaign Name'] || r['campaign_name'];
+        if (cName === campaignKey) {
+          const currentRow = { ...r, [field]: valClean };
 
-    // When Code changes, automatically resolve & fill Heading, Sub-Heading, Country, and Zakat!
-    if (field === 'Code' && value) {
-      const codeKey = value.trim().toLowerCase();
-      if (codeMap[codeKey]) {
-        const info = codeMap[codeKey];
-        if (info.Heading && info.Heading !== 'Unassigned') currentRow['Heading'] = info.Heading;
-        if (info['Sub-Heading'] && info['Sub-Heading'] !== 'Unassigned') currentRow['Sub-Heading'] = info['Sub-Heading'];
-        if (info.Country && info.Country !== 'Unassigned') currentRow['Country'] = info.Country;
-        if (info['Zakat Eligibility'] && info['Zakat Eligibility'] !== 'Unassigned') currentRow['Zakat Eligibility'] = info['Zakat Eligibility'];
-      }
+          // When Code changes, automatically resolve & fill Heading, Sub-Heading, Country, and Zakat!
+          if (field === 'Code' && valClean) {
+            const codeKey = valClean.trim().toLowerCase();
+            if (codeMap[codeKey]) {
+              const info = codeMap[codeKey];
+              if (info.Heading && info.Heading !== 'Unassigned') currentRow['Heading'] = info.Heading;
+              if (info['Sub-Heading'] && info['Sub-Heading'] !== 'Unassigned') currentRow['Sub-Heading'] = info['Sub-Heading'];
+              if (info.Country && info.Country !== 'Unassigned') currentRow['Country'] = info.Country;
+              if (info['Zakat Eligibility'] && info['Zakat Eligibility'] !== 'Unassigned') currentRow['Zakat Eligibility'] = info['Zakat Eligibility'];
+            }
+          }
+          return currentRow;
+        }
+        return r;
+      });
+
+      return {
+        ...prev,
+        classified_campaigns: updatedRules.filter(r => r['Heading'] && r['Heading'] !== 'Unassigned').length,
+        unassigned_campaigns: updatedRules.filter(r => !r['Heading'] || r['Heading'] === 'Unassigned').length,
+        rules: updatedRules
+      };
+    });
+  };
+
+  // 🔍 Filtered Rules Calculation (Status + Live Search)
+  const filteredRules = useMemo(() => {
+    let list = matrixData.rules || [];
+
+    // 1. Status Filter
+    if (statusFilter === 'CLASSIFIED') {
+      list = list.filter(r => r['Heading'] && r['Heading'] !== 'Unassigned');
+    } else if (statusFilter === 'UNASSIGNED') {
+      list = list.filter(r => !r['Heading'] || r['Heading'] === 'Unassigned');
     }
 
-    updatedRules[idx] = currentRow;
-    setMatrixData(prev => ({ ...prev, rules: updatedRules }));
-  };
+    // 2. Search Query Filter
+    if (searchQuery && searchQuery.trim()) {
+      const q = searchQuery.trim().toLowerCase();
+      list = list.filter(r => {
+        return (
+          (r['Campaign Name'] && String(r['Campaign Name']).toLowerCase().includes(q)) ||
+          (r['Community Name'] && String(r['Community Name']).toLowerCase().includes(q)) ||
+          (r['Code'] && String(r['Code']).toLowerCase().includes(q)) ||
+          (r['Heading'] && String(r['Heading']).toLowerCase().includes(q)) ||
+          (r['Sub-Heading'] && String(r['Sub-Heading']).toLowerCase().includes(q)) ||
+          (r['Country'] && String(r['Country']).toLowerCase().includes(q)) ||
+          (r['Zakat Eligibility'] && String(r['Zakat Eligibility']).toLowerCase().includes(q)) ||
+          (r['Campaign URL'] && String(r['Campaign URL']).toLowerCase().includes(q))
+        );
+      });
+    }
+
+    return list;
+  }, [matrixData.rules, statusFilter, searchQuery]);
+
+  // 📑 Pagination Bounds & Slices
+  const effectivePageSize = pageSize === 'All' ? Math.max(1, filteredRules.length) : Number(pageSize);
+  const totalPages = Math.max(1, Math.ceil(filteredRules.length / effectivePageSize));
+  const safePage = Math.min(Math.max(1, currentPage), totalPages);
+
+  const paginatedRules = useMemo(() => {
+    if (pageSize === 'All') return filteredRules;
+    const start = (safePage - 1) * effectivePageSize;
+    return filteredRules.slice(start, start + effectivePageSize);
+  }, [filteredRules, safePage, effectivePageSize, pageSize]);
 
   const handleSave = () => {
     if (!isSuperAdmin) return;
@@ -172,7 +246,6 @@ export default function ClassificationView({ user }) {
         setSaving(false);
         if (res?.status === 'success') {
           setSaveMsg(`✅ ${res.message}`);
-          setPlatform(p => p);
         } else {
           setSaveMsg(`❌ ${res?.detail || 'Failed to save rules.'}`);
         }
@@ -222,203 +295,205 @@ export default function ClassificationView({ user }) {
     }
   };
 
-  const handleClearPlatform = async () => {
-    if (!isSuperAdmin) return;
-    if (!window.confirm(`🚨 DANGER: Are you sure you want to completely DELETE ALL classification rules for ${platform.toUpperCase()}?\n\nAll matching donor records will be reset to Unassigned.`)) {
-      return;
-    }
-
-    try {
-      const res = await fetch(`${API_BASE_URL}/api/classifications/clear-platform`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          user_role: user?.role,
-          platform: platform
-        })
-      });
-      const data = await res.json();
-      if (data?.status === 'success') {
-        setSaveMsg(`🗑️ ${data.message}`);
-        setMatrixData({ total_campaigns: 0, classified_campaigns: 0, unassigned_campaigns: 0, rules: [] });
-      } else {
-        setSaveMsg(`❌ ${data?.detail || 'Failed to clear rules.'}`);
-      }
-    } catch (err) {
-      setSaveMsg(`❌ Error: ${err.message}`);
-    }
-  };
-
-  const handleExportClassifications = (format) => {
-    window.open(`${API_BASE_URL}/api/classifications/export?platform=${platform}&format=${format}`, '_blank');
+  const handleExport = (format = 'csv') => {
+    const url = `${API_BASE_URL}/api/classifications/export?platform=${platform}&format=${format}`;
+    window.open(url, '_blank');
   };
 
   const handleImportSubmit = async (e) => {
     e.preventDefault();
-    if (!isSuperAdmin || !importFile) return;
+    if (!importFile) {
+      setImportMsg('Please select a CSV or Excel file.');
+      return;
+    }
+
     setImporting(true);
     setImportMsg('');
 
     const formData = new FormData();
     formData.append('file', importFile);
     formData.append('platform', platform);
-    formData.append('user_role', user?.role || 'admin');
     formData.append('mode', importMode);
+    formData.append('user_role', user?.role || 'user');
 
     try {
-      const res = await fetch(`${API_BASE_URL}/api/classifications/import`, {
+      const res = await fetch(`${API_BASE_URL}/api/classifications/bulk-import`, {
         method: 'POST',
         body: formData
       });
       const data = await res.json();
       setImporting(false);
-      if (data?.status === 'success') {
-        setSaveMsg(`✅ ${data.message}`);
-        setShowImportModal(false);
-        setImportFile(null);
-        setLoading(true);
-        fetch(`${API_BASE_URL}/api/classifications/${platform}`)
-          .then(r => r.json())
-          .then(d => {
-            setMatrixData(d);
-            setLoading(false);
-          });
+
+      if (res.ok && data?.status === 'success') {
+        setImportMsg(`✅ ${data.message}`);
+        setTimeout(() => {
+          setShowImportModal(false);
+          setImportFile(null);
+          setImportMsg('');
+          // Re-fetch active matrix
+          setLoading(true);
+          fetch(`${API_BASE_URL}/api/classifications/${platform}`)
+            .then(r => r.json())
+            .then(d => {
+              let rules = (d.rules || []).map(r => ({
+                ...r,
+                'Campaign Name': cleanText(r['Campaign Name']),
+                'Community Name': cleanText(r['Community Name']),
+                'Heading': cleanText(r['Heading']),
+                'Sub-Heading': cleanText(r['Sub-Heading']),
+                'Country': cleanText(r['Country']),
+                'Code': cleanText(r['Code']),
+                'Zakat Eligibility': cleanText(r['Zakat Eligibility']),
+                'Campaign URL': r['Campaign URL'] || r['campaign_url'] || ''
+              }));
+              setMatrixData({
+                ...d,
+                total_campaigns: rules.length,
+                classified_campaigns: rules.filter(r => r['Heading'] && r['Heading'] !== 'Unassigned').length,
+                unassigned_campaigns: rules.filter(r => !r['Heading'] || r['Heading'] === 'Unassigned').length,
+                rules: rules
+              });
+              setLoading(false);
+            });
+        }, 1500);
       } else {
-        setImportMsg(`❌ ${data?.detail || 'Failed to import file.'}`);
+        setImportMsg(`❌ ${data?.detail || 'Bulk import failed.'}`);
       }
     } catch (err) {
       setImporting(false);
-      setImportMsg(`❌ Error: ${err.message}`);
+      setImportMsg(`❌ Error uploading file: ${err.message}`);
     }
   };
 
+  // Known valid Codes for the datalist autocomplete dropdown
   const knownCodes = Object.keys(codeMap).map(k => k.toUpperCase());
 
-  // Dynamic Theme Palette Resolver for LaunchGood / GiveBright / Paysuite
-  const getBannerStyles = () => {
-    if (platform === 'launchgood') {
-      return {
-        container: 'bg-teal-50 border-teal-300 dark:bg-cyan-950/40 dark:border-cyan-500/40 shadow-sm',
-        iconBg: 'bg-teal-600 dark:bg-cyan-500 text-white dark:text-slate-950',
-        title: 'text-teal-950 dark:text-cyan-100 font-extrabold',
-        subtitle: 'text-teal-800 dark:text-cyan-300 font-medium',
-        activePill: 'bg-teal-600 text-white dark:bg-cyan-400 dark:text-slate-950',
-        countPill: 'bg-teal-100/90 text-teal-900 border-teal-300 dark:bg-slate-900/90 dark:text-cyan-300 dark:border-cyan-500/30'
-      };
-    } else if (platform === 'givebright') {
-      return {
-        container: 'bg-purple-50 border-purple-300 dark:bg-purple-950/40 dark:border-purple-500/40 shadow-sm',
-        iconBg: 'bg-purple-600 dark:bg-purple-500 text-white dark:text-slate-950',
-        title: 'text-purple-950 dark:text-purple-100 font-extrabold',
-        subtitle: 'text-purple-800 dark:text-purple-300 font-medium',
-        activePill: 'bg-purple-600 text-white dark:bg-purple-400 dark:text-slate-950',
-        countPill: 'bg-purple-100/90 text-purple-900 border-purple-300 dark:bg-slate-900/90 dark:text-purple-300 dark:border-purple-500/30'
-      };
-    } else {
-      return {
-        container: 'bg-amber-50 border-amber-300 dark:bg-amber-950/40 dark:border-amber-500/40 shadow-sm',
-        iconBg: 'bg-amber-600 dark:bg-amber-500 text-white dark:text-slate-950',
-        title: 'text-amber-950 dark:text-amber-100 font-extrabold',
-        subtitle: 'text-amber-800 dark:text-amber-300 font-medium',
-        activePill: 'bg-amber-600 text-white dark:bg-amber-400 dark:text-slate-950',
-        countPill: 'bg-amber-100/90 text-amber-900 border-amber-300 dark:bg-slate-900/90 dark:text-amber-300 dark:border-amber-500/30'
-      };
+  // Visual Theme Badges per platform
+  const bannerStyles = {
+    launchgood: {
+      container: 'bg-gradient-to-r from-teal-500/15 via-cyan-500/10 to-transparent border-teal-500/30 text-teal-900 dark:text-teal-200',
+      iconBg: 'bg-teal-500 text-white',
+      title: 'text-teal-700 dark:text-teal-300 font-extrabold',
+      subtitle: 'text-slate-600 dark:text-slate-400 font-medium',
+      activePill: 'bg-teal-600 text-white shadow-teal-500/30',
+      countPill: 'border-teal-500/40 text-teal-700 dark:text-teal-300 bg-teal-50 dark:bg-teal-950/40'
+    },
+    givebright: {
+      container: 'bg-gradient-to-r from-purple-500/15 via-indigo-500/10 to-transparent border-purple-500/30 text-purple-900 dark:text-purple-200',
+      iconBg: 'bg-purple-600 text-white',
+      title: 'text-purple-700 dark:text-purple-300 font-extrabold',
+      subtitle: 'text-slate-600 dark:text-slate-400 font-medium',
+      activePill: 'bg-purple-600 text-white shadow-purple-500/30',
+      countPill: 'border-purple-500/40 text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-950/40'
+    },
+    paysuite: {
+      container: 'bg-gradient-to-r from-amber-500/15 via-orange-500/10 to-transparent border-amber-500/30 text-amber-900 dark:text-amber-200',
+      iconBg: 'bg-amber-600 text-white',
+      title: 'text-amber-700 dark:text-amber-300 font-extrabold',
+      subtitle: 'text-slate-600 dark:text-slate-400 font-medium',
+      activePill: 'bg-amber-600 text-white shadow-amber-500/30',
+      countPill: 'border-amber-500/40 text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40'
     }
   };
 
-  const bStyles = getBannerStyles();
+  const bStyles = bannerStyles[platform] || bannerStyles.launchgood;
 
   return (
-    <div className="flex flex-col gap-6">
-      {/* Header Banner */}
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h2 className="text-xl font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
-            <Shield className="w-5 h-5 text-cyan-600 dark:text-cyan-400" /> Campaign Classification Manager (Source of Truth)
-          </h2>
-          <p className="text-xs text-slate-600 dark:text-slate-400">
-            Define classification rules per platform. Changing a project code automatically populates headings, country, and Zakat eligibility.
-          </p>
+    <div className="flex flex-col gap-6 animate-fade-in pb-16">
+      {/* Top Header & Platform Selector Bar */}
+      <div className="flex flex-wrap items-center justify-between gap-4 pb-2 border-b border-slate-200 dark:border-white/10">
+        <div className="flex items-center gap-3">
+          <div className="p-3 bg-gradient-to-tr from-teal-600 to-cyan-500 rounded-2xl shadow-lg shadow-cyan-500/20 text-white">
+            <Shield className="w-6 h-6" />
+          </div>
+          <div>
+            <h1 className="text-xl font-black tracking-tight text-slate-900 dark:text-white flex items-center gap-2">
+              Campaign Classifications
+              <span className="text-xs px-2.5 py-0.5 rounded-full font-bold uppercase bg-cyan-100 text-cyan-800 dark:bg-cyan-500/20 dark:text-cyan-400">
+                Master Matrix
+              </span>
+            </h1>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 font-medium">
+              Dynamic classification rules with instant auto-fill, pagination, and multi-platform sync
+            </p>
+          </div>
         </div>
 
-        <div className="flex items-center gap-2 flex-wrap">
-          {/* Export Dropdown Group */}
-          <div className="flex items-center gap-1 bg-white dark:bg-slate-900/90 border border-emerald-500/40 p-1 rounded-xl shadow-sm">
+        {/* Global Action Buttons */}
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Export Dropdown */}
+          <div className="flex items-center rounded-xl overflow-hidden border border-slate-200 dark:border-white/10 bg-slate-100 dark:bg-slate-800/60 shadow-sm">
             <button 
-              onClick={() => handleExportClassifications('csv')}
-              className="text-xs font-bold text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/10 px-2.5 py-1.5 rounded-lg flex items-center gap-1 transition-all"
-              title="Export classification matrix as CSV"
+              onClick={() => handleExport('csv')}
+              className="px-3 py-2 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors flex items-center gap-1.5 cursor-pointer"
+              title="Download Classification Rules as CSV"
             >
-              <Download className="w-3.5 h-3.5" /> CSV
+              <Download className="w-3.5 h-3.5 text-cyan-600 dark:text-cyan-400" />
+              <span>CSV</span>
             </button>
-            <span className="text-slate-300 dark:text-white/20 text-xs">|</span>
+            <div className="w-[1px] h-4 bg-slate-300 dark:bg-white/10"></div>
             <button 
-              onClick={() => handleExportClassifications('xlsx')}
-              className="text-xs font-bold text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/10 px-2.5 py-1.5 rounded-lg flex items-center gap-1 transition-all"
-              title="Export classification matrix as Excel (.xlsx)"
+              onClick={() => handleExport('xlsx')}
+              className="px-3 py-2 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors flex items-center gap-1.5 cursor-pointer"
+              title="Download Classification Rules as Excel Spreadsheet"
             >
-              <Download className="w-3.5 h-3.5" /> Excel (.xlsx)
+              <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+              <span>Excel</span>
             </button>
           </div>
 
-          {/* Super Admin Action Controls */}
+          {/* Import Button */}
+          {isSuperAdmin && (
+            <button
+              onClick={() => { setShowImportModal(true); setImportMsg(''); }}
+              className="px-3.5 py-2 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800/80 dark:hover:bg-slate-700 dark:text-slate-200 border border-slate-300 dark:border-white/10 shadow-sm transition-all flex items-center gap-1.5 cursor-pointer"
+              title="Bulk import classification rules from CSV / Excel"
+            >
+              <Upload className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
+              <span>Import</span>
+            </button>
+          )}
+
+          {/* Save Button */}
           {isSuperAdmin ? (
-            <>
-              {/* Import / Bulk Upload Button */}
-              <button 
-                onClick={() => { setShowImportModal(true); setImportMsg(''); }}
-                className="btn-secondary text-xs px-3 py-2 flex items-center gap-1.5 border-purple-500/40 text-purple-700 dark:text-purple-300 hover:bg-purple-500/10 shadow-sm"
-                title={`Upload CSV/Excel to bulk assign rules for ${platform.toUpperCase()}`}
-              >
-                <Upload className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" /> 📂 Import Rules
-              </button>
-
-              {/* Clear All Platform Rules Button */}
-              <button 
-                onClick={handleClearPlatform}
-                className="btn-secondary text-xs px-3 py-2 flex items-center gap-1.5 border-rose-500/40 text-rose-600 dark:text-rose-400 hover:bg-rose-500/10 shadow-sm"
-                title={`Delete all classification rules for ${platform.toUpperCase()}`}
-              >
-                <Trash2 className="w-3.5 h-3.5" /> Clear All Rules
-              </button>
-
-              {/* Save & Apply Rules Button */}
-              <button 
-                onClick={handleSave} 
-                disabled={saving} 
-                className="btn-primary text-xs flex items-center gap-1.5 shadow-lg shadow-cyan-500/10"
-              >
-                <Save className="w-4 h-4" /> {saving ? 'Saving Rules...' : '💾 Save & Apply Rules Now'}
-              </button>
-            </>
+            <button
+              onClick={handleSave}
+              disabled={saving || loading}
+              className="btn btn-primary px-4 py-2 text-xs font-bold flex items-center gap-2 shadow-lg shadow-cyan-500/20 cursor-pointer disabled:opacity-50"
+            >
+              {saving ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+              <span>{saving ? 'Saving...' : 'Save All Changes'}</span>
+            </button>
           ) : (
-            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-400 text-xs rounded-xl">
-              <Lock className="w-3.5 h-3.5 text-amber-500 dark:text-amber-400" /> Read-Only Mode
+            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500/10 border border-amber-500/20 rounded-xl text-[11px] font-bold text-amber-600 dark:text-amber-400">
+              <Lock className="w-3.5 h-3.5 shrink-0" />
+              <span>Read-Only Mode</span>
             </div>
           )}
         </div>
       </div>
 
-      {/* RBAC Notice for Non-Super-Admin */}
-      {!isSuperAdmin && (
-        <div className="bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-400 p-3 rounded-xl text-xs flex items-center gap-2">
-          <AlertCircle className="w-4 h-4 shrink-0" />
-          <span>
-            <strong>Read-Only Access:</strong> Logged in as <strong>{user?.email || 'Admin'}</strong>. Modifying rules, bulk imports, and deleting classifications are restricted to <strong>Super Admin</strong> accounts.
-          </span>
+      {saveMsg && (
+        <div className={`p-3.5 rounded-xl border text-xs font-bold flex items-center justify-between gap-2 animate-fade-in ${
+          saveMsg.includes('✅') || saveMsg.includes('🗑️')
+            ? 'bg-emerald-50 text-emerald-800 border-emerald-300 dark:bg-emerald-500/10 dark:text-emerald-300 dark:border-emerald-500/30'
+            : 'bg-rose-50 text-rose-800 border-rose-300 dark:bg-rose-500/10 dark:text-rose-300 dark:border-rose-500/30'
+        }`}>
+          <span>{saveMsg}</span>
+          <button onClick={() => setSaveMsg('')} className="p-1 hover:opacity-75 cursor-pointer">
+            <X className="w-3.5 h-3.5" />
+          </button>
         </div>
       )}
 
-      {saveMsg && <div className="text-xs font-bold text-emerald-800 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 p-2.5 rounded-xl shadow-lg">{saveMsg}</div>}
-
-      {/* 🌟 3-Segment Platform Selector with High-Contrast Light & Dark Styling */}
-      <div className="glass-panel p-2 flex flex-wrap items-center gap-3 border border-slate-200 dark:border-white/10 shadow-lg rounded-2xl bg-white/70 dark:bg-slate-900/60">
+      {/* Platform Switcher Tabs */}
+      <div className="flex flex-wrap items-center gap-3">
         {/* LaunchGood Tab */}
         <button 
           onClick={() => handleSelectPlatform('launchgood')}
           className={`relative px-5 py-3 rounded-xl font-bold text-xs flex items-center gap-2.5 transition-all cursor-pointer ${
             platform === 'launchgood'
-              ? 'bg-gradient-to-r from-teal-600 to-cyan-600 text-white shadow-md shadow-cyan-500/30 border border-teal-400 ring-2 ring-cyan-400/40'
+              ? 'bg-gradient-to-r from-teal-600 to-cyan-600 text-white shadow-md shadow-cyan-500/30 border border-cyan-400 ring-2 ring-cyan-400/40'
               : 'bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-900/60 dark:hover:bg-slate-800/80 dark:text-slate-300 border border-slate-300 dark:border-white/5'
           }`}
         >
@@ -490,8 +565,10 @@ export default function ClassificationView({ user }) {
             </div>
             <div className={`text-xs mt-0.5 ${bStyles.subtitle}`}>
               {platform === 'givebright'
-                ? 'Hierarchy: Campaign Name ➔ Code ➔ (Heading, Sub-Heading, Country, Zakat Eligibility) with Campaign URLs'
-                : 'Hierarchy: Campaign Name & Community Name ➔ Code ➔ (Heading, Sub-Heading, Country, Zakat Eligibility)'}
+                ? 'Hierarchy: Campaign Name & URL ➔ Code ➔ (Heading, Sub-Heading, Country, Zakat Eligibility)'
+                : platform === 'paysuite'
+                ? 'Hierarchy: Direct Debit Ref (Bank Ref) ➔ Code ➔ (Heading, Sub-Heading, Country, Zakat Eligibility)'
+                : 'Hierarchy: Campaign Name ➔ Code ➔ (Heading, Sub-Heading, Country, Zakat Eligibility)'}
             </div>
           </div>
         </div>
@@ -525,6 +602,82 @@ export default function ClassificationView({ user }) {
         </div>
       </div>
 
+      {/* 🚀 Search, Filter & Quick Pagination Controls Bar */}
+      <div className="glass-panel p-3.5 rounded-2xl border flex flex-wrap items-center justify-between gap-3 shadow-sm" style={{ borderColor: 'var(--border-glass)' }}>
+        {/* Search Box */}
+        <div className="relative flex-1 min-w-[260px] max-w-md">
+          <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+          <input 
+            type="text"
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            placeholder={`Search ${matrixData.total_campaigns?.toLocaleString() || 0} ${platform} rules (Name, Code, Country)...`}
+            className="w-full pl-9 pr-8 py-2 rounded-xl text-xs border focus:outline-none focus:border-cyan-500 transition-all font-medium"
+            style={{ backgroundColor: 'var(--input-bg)', color: 'var(--input-text)', borderColor: 'var(--input-border)' }}
+          />
+          {searchQuery && (
+            <button 
+              onClick={() => setSearchQuery('')}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 p-1 cursor-pointer"
+              title="Clear search"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+
+        {/* Status Filter Badges */}
+        <div className="flex items-center gap-1.5 p-1 rounded-xl bg-slate-100 dark:bg-slate-900/60 border border-slate-200 dark:border-white/5">
+          <button
+            onClick={() => setStatusFilter('ALL')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+              statusFilter === 'ALL'
+                ? 'bg-cyan-500 text-white shadow-sm'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+            }`}
+          >
+            All ({matrixData.total_campaigns?.toLocaleString() || 0})
+          </button>
+          <button
+            onClick={() => setStatusFilter('CLASSIFIED')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+              statusFilter === 'CLASSIFIED'
+                ? 'bg-emerald-600 text-white shadow-sm'
+                : 'text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10'
+            }`}
+          >
+            Classified ({matrixData.classified_campaigns?.toLocaleString() || 0})
+          </button>
+          <button
+            onClick={() => setStatusFilter('UNASSIGNED')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+              statusFilter === 'UNASSIGNED'
+                ? 'bg-amber-600 text-white shadow-sm'
+                : 'text-amber-600 dark:text-amber-400 hover:bg-amber-500/10'
+            }`}
+          >
+            Unassigned ({matrixData.unassigned_campaigns?.toLocaleString() || 0})
+          </button>
+        </div>
+
+        {/* Rows Per Page Selector */}
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-bold text-slate-500 dark:text-slate-400">Rows per page:</span>
+          <select
+            value={pageSize}
+            onChange={e => setPageSize(e.target.value === 'All' ? 'All' : Number(e.target.value))}
+            className="border rounded-xl px-2.5 py-1.5 text-xs font-bold focus:outline-none focus:border-cyan-500 transition-all cursor-pointer"
+            style={{ backgroundColor: 'var(--input-bg)', color: 'var(--input-text)', borderColor: 'var(--input-border)' }}
+          >
+            <option value={25}>25</option>
+            <option value={50}>50</option>
+            <option value={100}>100</option>
+            <option value={250}>250</option>
+            <option value="All">All ({filteredRules.length})</option>
+          </select>
+        </div>
+      </div>
+
       {/* Matrix Rules Grid */}
       {loading ? (
         <div className="py-24 text-center text-slate-500 dark:text-slate-400 font-semibold animate-pulse flex flex-col items-center gap-3">
@@ -543,8 +696,16 @@ export default function ClassificationView({ user }) {
                 <tr>
                   <th className="min-w-[200px] text-left">{platform === 'paysuite' ? 'Direct Debit Ref (Bank Ref)' : 'Campaign Name'}</th>
                   
-                  {/* GiveBright ONLY: Campaign URL Column */}
-                  {platform === 'givebright' && (
+                  {/* Paysuite: Donor Name and Email columns */}
+                  {platform === 'paysuite' && (
+                    <>
+                      <th className="min-w-[120px] text-left">Donor Name</th>
+                      <th className="min-w-[150px] text-left">Donor Email</th>
+                    </>
+                  )}
+
+                  {/* LaunchGood & GiveBright: Campaign URL Column */}
+                  {platform !== 'paysuite' && (
                     <th className="w-28 text-center">Campaign URL</th>
                   )}
 
@@ -562,129 +723,261 @@ export default function ClassificationView({ user }) {
                 </tr>
               </thead>
               <tbody>
-                {matrixData.rules?.map((r, idx) => (
-                  <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-cyan-500/5 transition-colors border-b border-slate-200 dark:border-white/5">
-                    {/* Campaign Name */}
-                    <td className="font-bold text-slate-800 dark:text-slate-100 text-xs py-2.5 px-3 min-w-[200px] max-w-[280px]" title={r['Campaign Name']}>
-                      <div className="truncate font-bold text-slate-900 dark:text-slate-100">{r['Campaign Name']}</div>
+                {paginatedRules.length === 0 ? (
+                  <tr>
+                    <td colSpan={platform === 'paysuite' ? 7 : 8} className="py-12 text-center text-slate-500 dark:text-slate-400 text-xs font-bold">
+                      No classification rules match the active search or status filter.
                     </td>
-
-                    {/* GiveBright ONLY: Clickable Campaign URL Cell */}
-                    {platform === 'givebright' && (
-                      <td className="py-2 px-2 text-center w-28">
-                        {r['Campaign URL'] && r['Campaign URL'] !== '' && r['Campaign URL'] !== 'Unassigned' && r['Campaign URL'] !== 'None' ? (
-                          <a 
-                            href={r['Campaign URL'].startsWith('http') ? r['Campaign URL'] : `https://${r['Campaign URL']}`} 
-                            target="_blank" 
-                            rel="noreferrer" 
-                            className="inline-flex items-center gap-1 px-2.5 py-1 bg-cyan-100 text-cyan-800 dark:bg-cyan-500/10 dark:text-cyan-400 hover:bg-cyan-200 dark:hover:bg-cyan-500/20 border border-cyan-300 dark:border-cyan-500/30 rounded-lg text-[11px] font-bold transition-all max-w-[110px] truncate shadow-sm"
-                            title={r['Campaign URL']}
-                          >
-                            <ExternalLink className="w-3 h-3 shrink-0" />
-                            <span className="truncate">Open Link</span>
-                          </a>
-                        ) : (
-                          <input
-                            type="text"
-                            disabled={!isSuperAdmin}
-                            value={r['Campaign URL'] || ''}
-                            onChange={e => handleCellChange(idx, 'Campaign URL', e.target.value)}
-                            placeholder="Paste URL..."
-                            className="bg-white dark:bg-slate-900/90 border border-slate-300 dark:border-white/10 rounded-lg px-2 py-1 text-[11px] text-slate-800 dark:text-slate-300 w-24 focus:outline-none focus:border-cyan-500 disabled:opacity-60 font-mono"
-                            title="Paste or edit campaign URL"
-                          />
-                        )}
-                      </td>
-                    )}
-
-                    {/* LaunchGood & Paysuite: Community Name Cell */}
-                    {platform !== 'givebright' && (
-                      <td className="text-slate-600 dark:text-slate-400 text-xs py-2.5 px-3 min-w-[160px] max-w-[220px]" title={r['Community Name']}>
-                        <div className="truncate font-medium">{r['Community Name']}</div>
-                      </td>
-                    )}
-
-                    {/* Editable Code with Datalist & Instant Auto-Fill */}
-                    <td className="py-2 px-2 w-36">
-                      <input 
-                        type="text" 
-                        list="known-codes-list"
-                        disabled={!isSuperAdmin}
-                        value={r['Code'] || ''} 
-                        onChange={e => handleCellChange(idx, 'Code', e.target.value)}
-                        placeholder="Type Code..."
-                        className="bg-white dark:bg-slate-900/90 border border-cyan-400 dark:border-cyan-500/40 rounded-lg px-2.5 py-1.5 text-xs font-mono text-cyan-800 dark:text-cyan-300 font-extrabold w-full focus:outline-none focus:border-cyan-500 disabled:opacity-60 uppercase shadow-sm"
-                        title="Changing Code automatically auto-fills Heading, Sub-Heading, Country, and Zakat!"
-                      />
-                    </td>
-
-                    {/* Editable Heading */}
-                    <td className="py-2 px-2 min-w-[170px]">
-                      <input 
-                        type="text" 
-                        disabled={!isSuperAdmin}
-                        value={r['Heading'] || ''} 
-                        onChange={e => handleCellChange(idx, 'Heading', e.target.value)}
-                        className="bg-white dark:bg-slate-900/90 border border-slate-300 dark:border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-slate-800 dark:text-slate-200 font-semibold w-full focus:outline-none focus:border-teal-500 dark:focus:border-cyan-400 disabled:opacity-60 shadow-sm"
-                        title={r['Heading']}
-                      />
-                    </td>
-
-                    {/* Editable Sub-Heading */}
-                    <td className="py-2 px-2 min-w-[190px]">
-                      <input 
-                        type="text" 
-                        disabled={!isSuperAdmin}
-                        value={r['Sub-Heading'] || ''} 
-                        onChange={e => handleCellChange(idx, 'Sub-Heading', e.target.value)}
-                        className="bg-white dark:bg-slate-900/90 border border-slate-300 dark:border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-purple-800 dark:text-purple-300 font-semibold w-full focus:outline-none focus:border-purple-500 dark:focus:border-purple-400 disabled:opacity-60 shadow-sm"
-                        title={r['Sub-Heading']}
-                      />
-                    </td>
-
-                    {/* Editable Country */}
-                    <td className="py-2 px-2 min-w-[150px]">
-                      <input 
-                        type="text" 
-                        disabled={!isSuperAdmin}
-                        value={r['Country'] || ''} 
-                        onChange={e => handleCellChange(idx, 'Country', e.target.value)}
-                        className="bg-white dark:bg-slate-900/90 border border-slate-300 dark:border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-emerald-800 dark:text-emerald-300 font-semibold w-full focus:outline-none focus:border-emerald-500 dark:focus:border-emerald-400 disabled:opacity-60 shadow-sm"
-                        title={r['Country']}
-                      />
-                    </td>
-
-                    {/* Editable Zakat Eligibility */}
-                    <td className="py-2 px-2 w-40">
-                      <select 
-                        disabled={!isSuperAdmin}
-                        value={r['Zakat Eligibility'] || 'Unassigned'} 
-                        onChange={e => handleCellChange(idx, 'Zakat Eligibility', e.target.value)}
-                        className="bg-white dark:bg-slate-900/90 border border-slate-300 dark:border-white/10 rounded-lg px-2 py-1.5 text-xs font-bold text-slate-800 dark:text-slate-200 w-full focus:outline-none focus:border-teal-500 dark:focus:border-cyan-400 disabled:opacity-60 cursor-pointer shadow-sm"
-                      >
-                        <option value="Unassigned">Unassigned</option>
-                        <option value="Zakat">Zakat</option>
-                        <option value="Zakat Eligible">Zakat Eligible</option>
-                        <option value="Non-Zakat">Non-Zakat</option>
-                      </select>
-                    </td>
-
-                    {/* Super Admin Delete Single Rule Action */}
-                    {isSuperAdmin && (
-                      <td className="text-center py-2 px-2 w-16">
-                        <button 
-                          onClick={() => handleDeleteRule(r)}
-                          className="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-500/10 rounded-lg transition-colors cursor-pointer"
-                          title="Delete this classification rule"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </td>
-                    )}
                   </tr>
-                ))}
+                ) : (
+                  paginatedRules.map((r, idx) => {
+                    const cKey = r['Campaign Name'] || r['campaign_name'];
+                    return (
+                      <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-cyan-500/5 transition-colors border-b border-slate-200 dark:border-white/5">
+                        {/* Campaign Name */}
+                        <td className="font-bold text-slate-800 dark:text-slate-100 text-xs py-2.5 px-3 min-w-[200px] max-w-[280px]" title={r['Campaign Name']}>
+                          <div className="truncate font-bold text-slate-900 dark:text-slate-100">{r['Campaign Name']}</div>
+                        </td>
+
+                        {/* Paysuite: Donor Name and Email */}
+                        {platform === 'paysuite' && (
+                          <>
+                            <td className="text-slate-600 dark:text-slate-400 text-xs py-2.5 px-3 min-w-[120px] max-w-[150px]" title={r['Donor Name']}>
+                              <div className="truncate font-medium">{r['Donor Name'] || 'N/A'}</div>
+                            </td>
+                            <td className="text-slate-600 dark:text-slate-400 text-xs py-2.5 px-3 min-w-[150px] max-w-[200px]" title={r['Donor Email']}>
+                              <div className="truncate font-medium">{r['Donor Email'] || 'N/A'}</div>
+                            </td>
+                          </>
+                        )}
+
+                        {/* LaunchGood & GiveBright: Clickable Campaign URL Cell */}
+                        {platform !== 'paysuite' && (
+                          <td className="py-2 px-2 text-center w-28">
+                            {r['Campaign URL'] && r['Campaign URL'] !== '' && r['Campaign URL'] !== 'Unassigned' && r['Campaign URL'] !== 'None' ? (
+                              <a 
+                                href={r['Campaign URL'].startsWith('http') ? r['Campaign URL'] : `https://${r['Campaign URL']}`} 
+                                target="_blank" 
+                                rel="noreferrer" 
+                                className="inline-flex items-center gap-1 px-2.5 py-1 bg-cyan-100 text-cyan-800 dark:bg-cyan-500/10 dark:text-cyan-400 hover:bg-cyan-200 dark:hover:bg-cyan-500/20 border border-cyan-300 dark:border-cyan-500/30 rounded-lg text-[11px] font-bold transition-all max-w-[110px] truncate shadow-sm"
+                                title={r['Campaign URL']}
+                              >
+                                <ExternalLink className="w-3 h-3 shrink-0" />
+                                <span className="truncate">Open Link</span>
+                              </a>
+                            ) : (
+                              <input
+                                type="text"
+                                disabled={!isSuperAdmin}
+                                value={r['Campaign URL'] || ''}
+                                onChange={e => handleCellChange(cKey, 'Campaign URL', e.target.value)}
+                                placeholder="Paste URL..."
+                                className="bg-white dark:bg-slate-900/90 border border-slate-300 dark:border-white/10 rounded-lg px-2 py-1 text-[11px] text-slate-800 dark:text-slate-300 w-24 focus:outline-none focus:border-cyan-500 disabled:opacity-60 font-mono"
+                                title="Paste or edit campaign URL"
+                              />
+                            )}
+                          </td>
+                        )}
+
+                        {/* LaunchGood & Paysuite: Community Name Cell */}
+                        {platform !== 'givebright' && (
+                          <td className="text-slate-600 dark:text-slate-400 text-xs py-2.5 px-3 min-w-[160px] max-w-[220px]" title={r['Community Name']}>
+                            <div className="truncate font-medium">{r['Community Name']}</div>
+                          </td>
+                        )}
+
+                        {/* Editable Code with Datalist & Instant Auto-Fill */}
+                        <td className="py-2 px-2 w-36">
+                          <input 
+                            type="text" 
+                            list="known-codes-list"
+                            disabled={!isSuperAdmin}
+                            value={r['Code'] || ''} 
+                            onChange={e => handleCellChange(cKey, 'Code', e.target.value)}
+                            placeholder="Type Code..."
+                            className="bg-white dark:bg-slate-900/90 border border-cyan-400 dark:border-cyan-500/40 rounded-lg px-2.5 py-1.5 text-xs font-mono text-cyan-800 dark:text-cyan-300 font-extrabold w-full focus:outline-none focus:border-cyan-500 disabled:opacity-60 uppercase shadow-sm"
+                            title="Changing Code automatically auto-fills Heading, Sub-Heading, Country, and Zakat!"
+                          />
+                        </td>
+
+                        {/* Editable Heading */}
+                        <td className="py-2 px-2 min-w-[170px]">
+                          <input 
+                            type="text" 
+                            disabled={!isSuperAdmin}
+                            value={r['Heading'] || ''} 
+                            onChange={e => handleCellChange(cKey, 'Heading', e.target.value)}
+                            className="bg-white dark:bg-slate-900/90 border border-slate-300 dark:border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-slate-800 dark:text-slate-200 font-semibold w-full focus:outline-none focus:border-teal-500 dark:focus:border-cyan-400 disabled:opacity-60 shadow-sm"
+                            title={r['Heading']}
+                          />
+                        </td>
+
+                        {/* Editable Sub-Heading */}
+                        <td className="py-2 px-2 min-w-[190px]">
+                          <input 
+                            type="text" 
+                            disabled={!isSuperAdmin}
+                            value={r['Sub-Heading'] || ''} 
+                            onChange={e => handleCellChange(cKey, 'Sub-Heading', e.target.value)}
+                            className="bg-white dark:bg-slate-900/90 border border-slate-300 dark:border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-purple-800 dark:text-purple-300 font-semibold w-full focus:outline-none focus:border-purple-500 dark:focus:border-purple-400 disabled:opacity-60 shadow-sm"
+                            title={r['Sub-Heading']}
+                          />
+                        </td>
+
+                        {/* Editable Country */}
+                        <td className="py-2 px-2 min-w-[150px]">
+                          <input 
+                            type="text" 
+                            disabled={!isSuperAdmin}
+                            value={r['Country'] || ''} 
+                            onChange={e => handleCellChange(cKey, 'Country', e.target.value)}
+                            className="bg-white dark:bg-slate-900/90 border border-slate-300 dark:border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-emerald-800 dark:text-emerald-300 font-semibold w-full focus:outline-none focus:border-emerald-500 dark:focus:border-emerald-400 disabled:opacity-60 shadow-sm"
+                            title={r['Country']}
+                          />
+                        </td>
+
+                        {/* Editable Zakat Eligibility */}
+                        <td className="py-2 px-2 w-40">
+                          <select 
+                            disabled={!isSuperAdmin}
+                            value={r['Zakat Eligibility'] || 'Unassigned'} 
+                            onChange={e => handleCellChange(cKey, 'Zakat Eligibility', e.target.value)}
+                            className="bg-white dark:bg-slate-900/90 border border-slate-300 dark:border-white/10 rounded-lg px-2 py-1.5 text-xs font-bold text-slate-800 dark:text-slate-200 w-full focus:outline-none focus:border-teal-500 dark:focus:border-cyan-400 disabled:opacity-60 cursor-pointer shadow-sm"
+                          >
+                            <option value="Unassigned">Unassigned</option>
+                            <option value="Zakat">Zakat</option>
+                            <option value="Non-Zakat">Non-Zakat</option>
+                          </select>
+                        </td>
+
+                        {/* Super Admin Delete Single Rule Action */}
+                        {isSuperAdmin && (
+                          <td className="text-center py-2 px-2 w-16">
+                            <button 
+                              onClick={() => handleDeleteRule(r)}
+                              className="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-500/10 rounded-lg transition-colors cursor-pointer"
+                              title="Delete this classification rule"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </td>
+                        )}
+                      </tr>
+                    );
+                  })
+                )}
               </tbody>
             </table>
+          </div>
+
+          {/* 📑 Bottom Pagination Footer */}
+          <div className="p-4 border-t border-slate-200 dark:border-white/10 flex flex-wrap items-center justify-between gap-4 bg-slate-50/50 dark:bg-slate-900/50">
+            <div className="text-xs font-bold text-slate-500 dark:text-slate-400">
+              {filteredRules.length === 0 ? (
+                'No matching campaigns found'
+              ) : (
+                <>
+                  Showing <span className="text-slate-900 dark:text-white font-black">{((safePage - 1) * effectivePageSize) + 1}</span> to <span className="text-slate-900 dark:text-white font-black">{Math.min(safePage * effectivePageSize, filteredRules.length)}</span> of <span className="text-cyan-600 dark:text-cyan-400 font-black">{filteredRules.length.toLocaleString()}</span> rules
+                  {searchQuery && <span className="ml-1 text-[11px] text-slate-400 font-normal">(filtered from {matrixData.total_campaigns?.toLocaleString()} total)</span>}
+                </>
+              )}
+            </div>
+
+            {pageSize !== 'All' && totalPages > 1 && (
+              <div className="flex items-center gap-2">
+                {/* First Page */}
+                <button
+                  onClick={() => setCurrentPage(1)}
+                  disabled={safePage === 1}
+                  className="p-2 rounded-xl border border-slate-200 dark:border-white/10 hover:bg-slate-200 dark:hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer text-slate-700 dark:text-slate-300"
+                  title="First Page"
+                >
+                  <ChevronsLeft className="w-3.5 h-3.5" />
+                </button>
+
+                {/* Previous Page */}
+                <button
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={safePage === 1}
+                  className="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-white/10 hover:bg-slate-200 dark:hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer text-xs font-bold flex items-center gap-1 text-slate-700 dark:text-slate-300"
+                >
+                  <ChevronLeft className="w-3.5 h-3.5" /> Prev
+                </button>
+
+                {/* Page Numbers */}
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                    let pNum;
+                    if (totalPages <= 5) {
+                      pNum = i + 1;
+                    } else if (safePage <= 3) {
+                      pNum = i + 1;
+                    } else if (safePage >= totalPages - 2) {
+                      pNum = totalPages - 4 + i;
+                    } else {
+                      pNum = safePage - 2 + i;
+                    }
+                    return (
+                      <button
+                        key={pNum}
+                        onClick={() => setCurrentPage(pNum)}
+                        className={`w-8 h-8 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                          safePage === pNum
+                            ? 'bg-gradient-to-r from-teal-500 to-cyan-500 text-white shadow-md shadow-cyan-500/20 ring-2 ring-cyan-400/50'
+                            : 'border border-slate-200 dark:border-white/10 hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300'
+                        }`}
+                      >
+                        {pNum}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Next Page */}
+                <button
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={safePage === totalPages}
+                  className="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-white/10 hover:bg-slate-200 dark:hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer text-xs font-bold flex items-center gap-1 text-slate-700 dark:text-slate-300"
+                >
+                  Next <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+
+                {/* Last Page */}
+                <button
+                  onClick={() => setCurrentPage(totalPages)}
+                  disabled={safePage === totalPages}
+                  className="p-2 rounded-xl border border-slate-200 dark:border-white/10 hover:bg-slate-200 dark:hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer text-slate-700 dark:text-slate-300"
+                  title="Last Page"
+                >
+                  <ChevronsRight className="w-3.5 h-3.5" />
+                </button>
+
+                {/* Jump To Page */}
+                <div className="flex items-center gap-1.5 ml-2 pl-2 border-l border-slate-200 dark:border-white/10">
+                  <span className="text-xs text-slate-400 font-semibold">Go to:</span>
+                  <input
+                    type="number"
+                    min={1}
+                    max={totalPages}
+                    value={jumpPage}
+                    onChange={e => setJumpPage(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') {
+                        const val = Number(jumpPage);
+                        if (val >= 1 && val <= totalPages) {
+                          setCurrentPage(val);
+                          setJumpPage('');
+                        }
+                      }
+                    }}
+                    placeholder={String(safePage)}
+                    className="w-12 border rounded-lg px-1.5 py-1 text-xs text-center font-bold focus:outline-none focus:border-cyan-500"
+                    style={{ backgroundColor: 'var(--input-bg)', color: 'var(--input-text)', borderColor: 'var(--input-border)' }}
+                  />
+                  <span className="text-xs text-slate-400">/ {totalPages}</span>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -697,99 +990,102 @@ export default function ClassificationView({ user }) {
               <div className="flex items-center gap-2">
                 <FileSpreadsheet className="w-5 h-5 text-purple-600 dark:text-purple-400" />
                 <h3 className="text-base font-extrabold text-slate-900 dark:text-white">
-                  Bulk Import {platform === 'givebright' ? 'GiveBright' : platform === 'paysuite' ? 'Paysuite' : 'LaunchGood'} Rules
+                  Bulk Import {platform.toUpperCase()} Rules
                 </h3>
               </div>
               <button 
-                onClick={() => { setShowImportModal(false); setImportFile(null); setImportMsg(''); }}
-                className="text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors cursor-pointer"
+                onClick={() => setShowImportModal(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleImportSubmit} className="flex flex-col gap-4 mt-4">
-              <p className="text-xs text-slate-600 dark:text-slate-300">
-                Upload a <strong>.csv</strong> or <strong>.xlsx</strong> spreadsheet. Column headers (<code className="text-cyan-700 dark:text-cyan-300 font-bold">Campaign Name</code>, <code className="text-cyan-700 dark:text-cyan-300 font-bold">Code</code>, <code className="text-cyan-700 dark:text-cyan-300 font-bold">Heading</code>, <code className="text-cyan-700 dark:text-cyan-300 font-bold">Sub-Heading</code>, <code className="text-cyan-700 dark:text-cyan-300 font-bold">Country</code>, <code className="text-cyan-700 dark:text-cyan-300 font-bold">Zakat Eligibility</code>) are automatically mapped.
-              </p>
-
-              {/* File Dropzone */}
-              <div 
-                onClick={() => fileInputRef.current?.click()}
-                className="border-2 border-dashed border-purple-500/40 hover:border-purple-500 bg-purple-500/5 hover:bg-purple-500/10 rounded-xl p-6 text-center cursor-pointer transition-all flex flex-col items-center gap-2"
-              >
-                <Upload className="w-8 h-8 text-purple-600 dark:text-purple-400" />
-                <div className="text-xs font-bold text-slate-900 dark:text-white">
-                  {importFile ? importFile.name : 'Click to select CSV or Excel file'}
+            <form onSubmit={handleImportSubmit} className="mt-4 flex flex-col gap-4">
+              <div className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+                Upload a CSV or Excel file containing classification rules. Required headers include:
+                <div className="mt-1.5 font-mono text-[11px] p-2 bg-slate-100 dark:bg-slate-800 rounded-lg text-slate-800 dark:text-slate-200">
+                  {platform === 'paysuite' 
+                    ? 'Direct Debit Ref (Bank Ref), Platform Source, Code, Heading, Sub-Heading, Country, Zakat Eligibility'
+                    : 'Campaign Name, Community Name, Campaign URL, Code, Heading, Sub-Heading, Country, Zakat Eligibility'}
                 </div>
-                <div className="text-[11px] text-slate-500 dark:text-slate-400">
-                  {importFile ? `${(importFile.size / 1024).toFixed(1)} KB` : 'Supports .csv, .xlsx, .xls'}
-                </div>
-                <input 
-                  type="file" 
-                  ref={fileInputRef} 
-                  onChange={e => setImportFile(e.target.files?.[0] || null)}
-                  accept=".csv,.xlsx,.xls" 
-                  className="hidden" 
-                />
               </div>
 
-              {/* Import Mode Options */}
-              <div className="flex flex-col gap-1.5 bg-slate-100 dark:bg-slate-900/60 p-3 rounded-xl border border-slate-200 dark:border-white/5">
-                <label className="text-xs font-bold text-slate-800 dark:text-slate-300">Import Mode:</label>
-                <div className="flex items-center gap-4">
-                  <label className="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-300 cursor-pointer">
+              {/* Import Mode Selection */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-bold text-slate-700 dark:text-slate-300">Import Strategy</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <label className={`flex items-center gap-2 p-2.5 rounded-xl border text-xs font-semibold cursor-pointer transition-all ${
+                    importMode === 'merge' 
+                      ? 'bg-purple-500/10 border-purple-500/40 text-purple-700 dark:text-purple-300 font-bold' 
+                      : 'border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-400'
+                  }`}>
                     <input 
                       type="radio" 
                       name="importMode" 
                       value="merge" 
                       checked={importMode === 'merge'} 
-                      onChange={() => setImportMode('merge')} 
+                      onChange={() => setImportMode('merge')}
+                      className="text-purple-600"
                     />
-                    Merge / Update Existing Rules
+                    <span>Merge / Upsert (Recommended)</span>
                   </label>
-                  <label className="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-300 cursor-pointer">
+
+                  <label className={`flex items-center gap-2 p-2.5 rounded-xl border text-xs font-semibold cursor-pointer transition-all ${
+                    importMode === 'replace' 
+                      ? 'bg-rose-500/10 border-rose-500/40 text-rose-700 dark:text-rose-300 font-bold' 
+                      : 'border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-400'
+                  }`}>
                     <input 
                       type="radio" 
                       name="importMode" 
                       value="replace" 
                       checked={importMode === 'replace'} 
-                      onChange={() => setImportMode('replace')} 
+                      onChange={() => setImportMode('replace')}
+                      className="text-rose-600"
                     />
-                    Replace Platform Matrix
+                    <span>Replace Entire Matrix</span>
                   </label>
                 </div>
               </div>
 
+              {/* File Input */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-bold text-slate-700 dark:text-slate-300">Choose File (.csv, .xlsx, .xls)</label>
+                <input 
+                  type="file" 
+                  ref={fileInputRef}
+                  accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel"
+                  onChange={e => setImportFile(e.target.files[0] || null)}
+                  className="text-xs border border-slate-300 dark:border-white/10 rounded-xl p-2 bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 file:mr-3 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-purple-600 file:text-white hover:file:bg-purple-700 cursor-pointer"
+                />
+              </div>
+
               {importMsg && (
-                <div className="text-xs font-bold text-rose-600 dark:text-rose-400 bg-rose-500/10 border border-rose-500/30 p-2.5 rounded-xl">
+                <div className={`p-3 rounded-xl text-xs font-bold ${
+                  importMsg.includes('✅') 
+                    ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30'
+                    : 'bg-rose-500/10 text-rose-700 dark:text-rose-300 border border-rose-500/30'
+                }`}>
                   {importMsg}
                 </div>
               )}
 
-              {/* Modal Buttons */}
-              <div className="flex items-center justify-end gap-3 pt-2">
-                <button 
-                  type="button" 
-                  onClick={() => { setShowImportModal(false); setImportFile(null); }}
-                  className="btn-secondary text-xs px-4 py-2 cursor-pointer"
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-200 dark:border-white/10">
+                <button
+                  type="button"
+                  onClick={() => setShowImportModal(false)}
+                  className="px-4 py-2 text-xs font-bold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors cursor-pointer"
                 >
                   Cancel
                 </button>
-                <button 
-                  type="submit" 
-                  disabled={!importFile || importing}
-                  className="btn-primary text-xs px-5 py-2 flex items-center gap-1.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 cursor-pointer text-white"
+                <button
+                  type="submit"
+                  disabled={importing || !importFile}
+                  className="px-4 py-2 text-xs font-bold bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl shadow-lg shadow-purple-500/20 hover:opacity-90 disabled:opacity-50 flex items-center gap-2 cursor-pointer"
                 >
-                  {importing ? (
-                    <>
-                      <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Importing...
-                    </>
-                  ) : (
-                    <>
-                      <Upload className="w-3.5 h-3.5" /> Import & Apply Rules
-                    </>
-                  )}
+                  {importing ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
+                  <span>{importing ? 'Importing...' : 'Upload & Process'}</span>
                 </button>
               </div>
             </form>
