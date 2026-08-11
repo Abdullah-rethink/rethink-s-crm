@@ -1,46 +1,91 @@
 import io
+import os
+import sqlite3
 from datetime import datetime
 from typing import List, Optional
 import pandas as pd
-from fastapi import APIRouter, HTTPException, Query, Response, status
+from fastapi import APIRouter, File, Form, HTTPException, Query, Response, UploadFile, status
 from pydantic import BaseModel
 
+from config.settings import LOCAL_DB_PATH, PARQUET_PATH
 from core.data_processor import (
     get_classification_matrix,
     load_data,
     save_classification_matrix,
     get_paysuite_classification_matrix,
     save_paysuite_classification_matrix,
+    get_code_to_classification_map,
+    sync_matrix_classifications_to_donors,
 )
 from views.classification_view import (
     get_givebright_classification_matrix,
     save_givebright_classification_matrix,
+    normalize_classification_import_df,
 )
 
 router = APIRouter(prefix="/api/classifications", tags=["Campaign Classifications"])
 
 
-class RuleRow(BaseModel):
-    campaign_name: str
-    community_name: Optional[str] = "Unassigned"
-    heading: Optional[str] = "Unassigned"
-    sub_heading: Optional[str] = "Unassigned"
-    country: Optional[str] = "Unassigned"
-    code: Optional[str] = "Unassigned"
-    zakat_eligibility: Optional[str] = "Unassigned"
+def sanitize_text(val):
+    """Repairs common UTF-8 mojibake and strips zero-width/soft-hyphen characters."""
+    if not isinstance(val, str) or pd.isna(val):
+        return val
+    s = str(val).strip()
+    try:
+        if any(c in s for c in ["Ä", "Ã", "â", "\xad"]):
+            s = s.encode("latin1").decode("utf-8")
+    except Exception:
+        pass
+    s = s.replace("\xad", "").replace("\u200b", "").replace("\ufeff", "")
+    return s
+
+
+def sanitize_matrix_df(df: pd.DataFrame) -> pd.DataFrame:
+    clean_df = df.copy()
+    for col in clean_df.columns:
+        clean_df[col] = clean_df[col].apply(sanitize_text)
+    return clean_df
 
 
 class SaveRulesRequest(BaseModel):
     user_role: str
-    platform: str  # "launchgood" or "givebright"
+    platform: str  # "launchgood", "givebright", or "paysuite"
     rules: List[dict]
     can_edit_matrix: Optional[bool] = False
+
+
+class DeleteRuleRequest(BaseModel):
+    user_role: str
+    platform: str
+    campaign_name: str
+    community_name: Optional[str] = None
+
+
+class ClearPlatformRequest(BaseModel):
+    user_role: str
+    platform: str
+
+
+@router.get("/code-map")
+def get_code_map():
+    """Returns the central mapping of Code -> {Heading, Sub-Heading, Country, Zakat Eligibility}."""
+    raw_map = get_code_to_classification_map()
+    clean_map = {}
+    for code, info in raw_map.items():
+        clean_map[code.strip().lower()] = {
+            "Heading": sanitize_text(info.get("Heading", "Unassigned")),
+            "Sub-Heading": sanitize_text(info.get("Sub-Heading", "Unassigned")),
+            "Country": sanitize_text(info.get("Country", "Unassigned")),
+            "Zakat Eligibility": sanitize_text(info.get("Zakat Eligibility", "Unassigned"))
+        }
+    return clean_map
 
 
 @router.get("/launchgood")
 def get_launchgood_matrix():
     df_raw = load_data()
     matrix_df = get_classification_matrix(df_raw).fillna("Unassigned")
+    matrix_df = sanitize_matrix_df(matrix_df)
     unassigned_count = (matrix_df["Heading"] == "Unassigned").sum() if "Heading" in matrix_df.columns else 0
     return {
         "platform": "LaunchGood",
@@ -55,6 +100,23 @@ def get_launchgood_matrix():
 def get_givebright_matrix():
     df_raw = load_data()
     matrix_df = get_givebright_classification_matrix(df_raw).fillna("Unassigned")
+    if "Community Name" in matrix_df.columns:
+        matrix_df = matrix_df.drop(columns=["Community Name"])
+    
+    # 1. Deduplicate by Campaign Name strictly for GiveBright
+    matrix_df = matrix_df.drop_duplicates(subset=["Campaign Name"], keep="last").reset_index(drop=True)
+
+    # 2. Strict mapping: Code -> Heading, Sub-Heading, Country, Zakat Eligibility
+    code_map = get_code_to_classification_map()
+    for idx, row in matrix_df.iterrows():
+        code = str(row.get("Code") or "").strip().lower()
+        if code and code not in ["unassigned", "nan", "none", "n/a", ""]:
+            if code in code_map:
+                c_info = code_map[code]
+                for tc in ["Heading", "Sub-Heading", "Country", "Zakat Eligibility"]:
+                    matrix_df.at[idx, tc] = c_info[tc]
+
+    matrix_df = sanitize_matrix_df(matrix_df)
     unassigned_count = (matrix_df["Heading"] == "Unassigned").sum() if "Heading" in matrix_df.columns else 0
     return {
         "platform": "GiveBright",
@@ -69,6 +131,7 @@ def get_givebright_matrix():
 def get_paysuite_matrix():
     df_raw = load_data()
     matrix_df = get_paysuite_classification_matrix(df_raw).fillna("Unassigned")
+    matrix_df = sanitize_matrix_df(matrix_df)
     unassigned_count = (matrix_df["Heading"] == "Unassigned").sum() if "Heading" in matrix_df.columns else 0
     return {
         "platform": "Paysuite",
@@ -88,11 +151,15 @@ def export_classifications(
     df_raw = load_data()
     if platform.lower() == "givebright":
         matrix_df = get_givebright_classification_matrix(df_raw).fillna("Unassigned")
+        if "Community Name" in matrix_df.columns:
+            matrix_df = matrix_df.drop(columns=["Community Name"])
+        matrix_df = matrix_df.drop_duplicates(subset=["Campaign Name"], keep="last").reset_index(drop=True)
     elif platform.lower() == "paysuite":
         matrix_df = get_paysuite_classification_matrix(df_raw).fillna("Unassigned")
     else:
         matrix_df = get_classification_matrix(df_raw).fillna("Unassigned")
 
+    matrix_df = sanitize_matrix_df(matrix_df)
     date_str = datetime.now().strftime("%Y%m%d_%H%M%S")
 
     if format.lower() == "xlsx":
@@ -118,37 +185,215 @@ def export_classifications(
 
 @router.post("/save")
 def save_matrix_rules(payload: SaveRulesRequest):
-    if payload.user_role != "super_admin" and not payload.can_edit_matrix:
+    if payload.user_role != "super_admin":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Modifying campaign classification matrix rules is restricted to authorized accounts."
+            detail="Modifying campaign classification matrix rules is restricted to Super Admin accounts."
         )
 
     rules_dict = []
     for r in payload.rules:
         rules_dict.append({
-            "Campaign Name": r.get("Campaign Name") or r.get("campaign_name", "N/A"),
-            "Community Name": r.get("Community Name") or r.get("community_name", "N/A"),
-            "Heading": r.get("Heading") or r.get("heading", "Unassigned"),
-            "Sub-Heading": r.get("Sub-Heading") or r.get("sub_heading", "Unassigned"),
-            "Country": r.get("Country") or r.get("country", "Unassigned"),
-            "Code": r.get("Code") or r.get("code", "N/A"),
-            "Zakat Eligibility": r.get("Zakat Eligibility") or r.get("zakat_eligibility", "Unassigned")
+            "Campaign Name": sanitize_text(r.get("Campaign Name") or r.get("campaign_name", "N/A")),
+            "Campaign URL": sanitize_text(r.get("Campaign URL") or r.get("campaign_url", "")),
+            "Community Name": sanitize_text(r.get("Community Name") or r.get("community_name", "Unassigned")),
+            "Heading": sanitize_text(r.get("Heading") or r.get("heading", "Unassigned")),
+            "Sub-Heading": sanitize_text(r.get("Sub-Heading") or r.get("sub_heading", "Unassigned")),
+            "Country": sanitize_text(r.get("Country") or r.get("country", "Unassigned")),
+            "Code": sanitize_text(r.get("Code") or r.get("code", "N/A")),
+            "Zakat Eligibility": sanitize_text(r.get("Zakat Eligibility") or r.get("zakat_eligibility", "Unassigned"))
         })
     matrix_df = pd.DataFrame(rules_dict)
 
     if payload.platform.lower() == "givebright":
+        # Strict mapping: Code -> Heading, Sub-Heading, Country, Zakat
+        code_map = get_code_to_classification_map()
+        for idx, row in matrix_df.iterrows():
+            code = str(row.get("Code") or "").strip().lower()
+            if code and code not in ["unassigned", "nan", "none", "n/a", ""]:
+                if code in code_map:
+                    c_info = code_map[code]
+                    for tc in ["Heading", "Sub-Heading", "Country", "Zakat Eligibility"]:
+                        matrix_df.at[idx, tc] = sanitize_text(c_info[tc])
+        
+        matrix_df = matrix_df.drop_duplicates(subset=["Campaign Name"], keep="last")
         n_saved = save_givebright_classification_matrix(matrix_df)
     elif payload.platform.lower() == "paysuite":
         n_saved = save_paysuite_classification_matrix(matrix_df)
+        sync_matrix_classifications_to_donors(matrix_df)
     else:
         n_saved = save_classification_matrix(matrix_df)
-
-    # Automatically sync classification rules to update all donor data!
-    from core.data_processor import sync_matrix_classifications_to_donors
-    donors_updated = sync_matrix_classifications_to_donors(matrix_df)
+        sync_matrix_classifications_to_donors(matrix_df)
 
     return {
         "status": "success",
-        "message": f"Successfully saved {n_saved:,} {payload.platform} classification rules and updated {donors_updated:,} matching donor records!"
+        "message": f"Successfully saved {n_saved:,} {payload.platform} classification rules and updated matching donor records!"
+    }
+
+
+@router.post("/delete-rule")
+def delete_single_rule(payload: DeleteRuleRequest):
+    """Deletes a single classification rule (Super Admin only)."""
+    if payload.user_role != "super_admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Deleting classification rules is restricted to Super Admin accounts."
+        )
+
+    cname = sanitize_text(payload.campaign_name.strip())
+    platform = payload.platform.lower()
+
+    conn = sqlite3.connect(LOCAL_DB_PATH, timeout=30.0)
+    try:
+        if platform == "givebright":
+            conn.execute("DELETE FROM givebright_classifications WHERE campaign_name = ?", (cname,))
+        elif platform == "paysuite":
+            conn.execute("DELETE FROM paysuite_classifications WHERE campaign_name = ?", (cname,))
+        else:
+            if payload.community_name:
+                conn.execute("DELETE FROM campaign_classifications WHERE campaign_name = ? AND community_name = ?", (cname, sanitize_text(payload.community_name)))
+            else:
+                conn.execute("DELETE FROM campaign_classifications WHERE campaign_name = ?", (cname,))
+        conn.commit()
+    finally:
+        conn.close()
+
+    # Reset donor records matching this rule to Unassigned
+    if os.path.exists(PARQUET_PATH):
+        try:
+            df = pd.read_parquet(PARQUET_PATH)
+            if not df.empty and "Campaign Name" in df.columns:
+                mask = df["Campaign Name"].astype(str).str.strip().str.lower() == cname.lower()
+                if payload.community_name and "Community Name" in df.columns:
+                    mask = mask & (df["Community Name"].astype(str).str.strip().str.lower() == payload.community_name.strip().lower())
+                
+                for f in ["Heading", "Sub-Heading", "Country", "Code", "Zakat Eligibility"]:
+                    if f in df.columns:
+                        df.loc[mask, f] = "Unassigned"
+                
+                df.to_parquet(PARQUET_PATH, index=False)
+                conn = sqlite3.connect(LOCAL_DB_PATH, timeout=30.0)
+                df.to_sql("donations", con=conn, if_exists="replace", index=False)
+                conn.close()
+        except Exception as e:
+            print(f"Error updating donors on delete: {e}")
+
+    return {
+        "status": "success",
+        "message": f"Successfully deleted rule for '{cname}'!"
+    }
+
+
+@router.post("/clear-platform")
+def clear_platform_rules(payload: ClearPlatformRequest):
+    """Completely wipes classification rules for a platform (Super Admin only)."""
+    if payload.user_role != "super_admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Wiping classification rules is restricted to Super Admin accounts."
+        )
+
+    platform = payload.platform.lower()
+    conn = sqlite3.connect(LOCAL_DB_PATH, timeout=30.0)
+    try:
+        if platform == "givebright":
+            conn.execute("DELETE FROM givebright_classifications;")
+        elif platform == "paysuite":
+            conn.execute("DELETE FROM paysuite_classifications;")
+        else:
+            conn.execute("DELETE FROM campaign_classifications;")
+        conn.commit()
+    finally:
+        conn.close()
+
+    # Reset platform donor records to Unassigned
+    if os.path.exists(PARQUET_PATH):
+        try:
+            df = pd.read_parquet(PARQUET_PATH)
+            if not df.empty and "Platform" in df.columns:
+                p_mask = df["Platform"].astype(str).str.lower() == platform
+                if platform == "launchgood":
+                    p_mask = p_mask | (df["Platform"].astype(str).str.lower().isin(["", "none", "nan"]))
+                
+                for f in ["Heading", "Sub-Heading", "Country", "Code", "Zakat Eligibility"]:
+                    if f in df.columns:
+                        df.loc[p_mask, f] = "Unassigned"
+                
+                df.to_parquet(PARQUET_PATH, index=False)
+                conn = sqlite3.connect(LOCAL_DB_PATH, timeout=30.0)
+                df.to_sql("donations", con=conn, if_exists="replace", index=False)
+                conn.close()
+        except Exception as e:
+            print(f"Error resetting donors on clear: {e}")
+
+    return {
+        "status": "success",
+        "message": f"Successfully cleared all classification rules for {platform.capitalize()}!"
+    }
+
+
+@router.post("/import")
+async def import_classification_file(
+    file: UploadFile = File(...),
+    platform: str = Form("launchgood"),
+    user_role: str = Form("admin"),
+    mode: str = Form("merge")
+):
+    """Bulk uploads and applies a classification file (.csv or .xlsx) (Super Admin only)."""
+    if user_role != "super_admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Bulk uploading classification files is restricted to Super Admin accounts."
+        )
+
+    contents = await file.read()
+    try:
+        if file.filename.lower().endswith(".csv"):
+            raw_df = pd.read_csv(io.BytesIO(contents))
+        else:
+            raw_df = pd.read_excel(io.BytesIO(contents))
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Failed to parse uploaded file: {str(e)}")
+
+    norm_df = normalize_classification_import_df(raw_df)
+    norm_df = sanitize_matrix_df(norm_df)
+    platform_clean = platform.lower()
+
+    if mode == "merge":
+        if platform_clean == "givebright":
+            existing = get_givebright_classification_matrix().fillna("Unassigned")
+            merged = pd.concat([existing, norm_df], ignore_index=True).drop_duplicates(subset=["Campaign Name"], keep="last")
+        elif platform_clean == "paysuite":
+            existing = get_paysuite_classification_matrix().fillna("Unassigned")
+            merged = pd.concat([existing, norm_df], ignore_index=True).drop_duplicates(subset=["Campaign Name", "Community Name"], keep="last")
+        else:
+            existing = get_classification_matrix().fillna("Unassigned")
+            merged = pd.concat([existing, norm_df], ignore_index=True).drop_duplicates(subset=["Campaign Name", "Community Name"], keep="last")
+    else:
+        merged = norm_df
+
+    if platform_clean == "givebright":
+        # Strict mapping: Code -> Heading, Sub-Heading, Country, Zakat
+        code_map = get_code_to_classification_map()
+        for idx, row in merged.iterrows():
+            code = str(row.get("Code") or "").strip().lower()
+            if code and code not in ["unassigned", "nan", "none", "n/a", ""]:
+                if code in code_map:
+                    c_info = code_map[code]
+                    for tc in ["Heading", "Sub-Heading", "Country", "Zakat Eligibility"]:
+                        merged.at[idx, tc] = sanitize_text(c_info[tc])
+
+        merged = merged.drop_duplicates(subset=["Campaign Name"], keep="last")
+        n_saved = save_givebright_classification_matrix(merged)
+    elif platform_clean == "paysuite":
+        n_saved = save_paysuite_classification_matrix(merged)
+        sync_matrix_classifications_to_donors(merged)
+    else:
+        n_saved = save_classification_matrix(merged)
+        sync_matrix_classifications_to_donors(merged)
+
+    return {
+        "status": "success",
+        "count": n_saved,
+        "message": f"Successfully imported and applied {n_saved:,} {platform.capitalize()} classification rules!"
     }

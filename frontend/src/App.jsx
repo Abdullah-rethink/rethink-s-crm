@@ -172,7 +172,7 @@ export default function App() {
   return (
     <div className="min-h-screen flex flex-col pb-12">
       {/* Top Navbar */}
-      <Navbar user={user} metrics={metrics} theme={theme} onToggleTheme={handleToggleTheme} onSignOut={handleSignOut} />
+      <Navbar user={user} theme={theme} onToggleTheme={handleToggleTheme} onSignOut={handleSignOut} />
 
       {/* Main Container with Left Sidebar Layout */}
       <main className="px-6 max-w-7xl mx-auto w-full flex flex-col gap-6 pt-4">
