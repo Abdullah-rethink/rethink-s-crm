@@ -63,12 +63,42 @@ if os.path.exists(frontend_dist):
 
 @app.on_event("startup")
 def startup_event():
-    print("Crowdfunding Enterprise CRM API initialized.")
+    print("Crowdfunding Enterprise CRM API initializing...")
+    try:
+        from core.database import ensure_database_indexes
+        ensure_database_indexes()
+    except Exception as e:
+        print(f"[DB Index Init Notice]: {e}")
+
     if not os.environ.get("VERCEL"):
-        load_data()
+        # Pre-warm in-memory dataset cache
+        try:
+            df = load_data()
+            print(f"In-memory dataset cache pre-warmed: {len(df):,} donor records.")
+        except Exception as e:
+            print(f"[Cache Pre-warm Notice]: {e}")
+
+        # Pre-warm DuckDB engine
+        try:
+            from core.analytics_engine import get_duckdb_connection, get_executive_kpis
+            get_duckdb_connection()
+            get_executive_kpis()
+            print("DuckDB high-speed analytics engine initialized.")
+        except Exception as e:
+            print(f"[DuckDB Pre-warm Notice]: {e}")
+
+        try:
+            from core.data_processor import sync_donors_to_classification_matrix
+            synced = sync_donors_to_classification_matrix()
+            print(f"Donor classifications synchronized to matrix tables ({synced:,} rules).")
+        except Exception as e:
+            print(f"[Classification Matrix Sync Notice]: {e}")
+
         try:
             from backend.api.tracker import get_tracker_stats
             get_tracker_stats()
             print("Sponsorship Tracker pre-computation complete.")
         except Exception as e:
             print(f"Tracker pre-compute notice: {e}")
+
+

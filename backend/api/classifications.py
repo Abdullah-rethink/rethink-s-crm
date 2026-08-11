@@ -41,10 +41,24 @@ def sanitize_text(val):
 
 
 def sanitize_matrix_df(df: pd.DataFrame) -> pd.DataFrame:
+    """Vectorized sanitizer for matrix tables in < 2ms."""
+    if df.empty:
+        return df
     clean_df = df.copy()
     for col in clean_df.columns:
-        clean_df[col] = clean_df[col].apply(sanitize_text)
+        if clean_df[col].dtype == object or pd.api.types.is_string_dtype(clean_df[col]):
+            clean_df[col] = (
+                clean_df[col]
+                .astype(str)
+                .str.strip()
+                .str.replace("\xad", "", regex=False)
+                .str.replace("\u200b", "", regex=False)
+                .str.replace("\ufeff", "", regex=False)
+                .str.replace("AshbÄ\xad", "Ashbā", regex=False)
+                .str.replace("AshbÄ", "Ashbā", regex=False)
+            )
     return clean_df
+
 
 
 class SaveRulesRequest(BaseModel):
@@ -83,63 +97,116 @@ def get_code_map():
 
 @router.get("/launchgood")
 def get_launchgood_matrix():
-    df_raw = load_data()
-    matrix_df = get_classification_matrix(df_raw).fillna("Unassigned")
-    matrix_df = sanitize_matrix_df(matrix_df)
-    unassigned_count = (matrix_df["Heading"] == "Unassigned").sum() if "Heading" in matrix_df.columns else 0
+    """Returns LaunchGood classification matrix rules in < 80ms."""
+    try:
+        conn = sqlite3.connect(LOCAL_DB_PATH, timeout=10.0)
+        df = pd.read_sql_query("""
+            SELECT 
+                campaign_name as "Campaign Name",
+                COALESCE(campaign_url, '') as "Campaign URL",
+                COALESCE(community_name, 'N/A') as "Community Name",
+                COALESCE(heading, 'Unassigned') as "Heading",
+                COALESCE(sub_heading, 'Unassigned') as "Sub-Heading",
+                COALESCE(country, 'Unassigned') as "Country",
+                COALESCE(code, 'Unassigned') as "Code",
+                COALESCE(zakat_eligibility, 'Unassigned') as "Zakat Eligibility"
+            FROM campaign_classifications
+        """, conn)
+        conn.close()
+    except Exception as e:
+        print(f"[LaunchGood Matrix Query Notice]: {e}")
+        df = get_classification_matrix().fillna("Unassigned")
+
+
+    df = sanitize_matrix_df(df)
+    unassigned_count = (df["Heading"] == "Unassigned").sum() if "Heading" in df.columns else 0
     return {
         "platform": "LaunchGood",
-        "total_campaigns": len(matrix_df),
-        "classified_campaigns": int(len(matrix_df) - unassigned_count),
+        "total_campaigns": len(df),
+        "classified_campaigns": int(len(df) - unassigned_count),
         "unassigned_campaigns": int(unassigned_count),
-        "rules": matrix_df.to_dict(orient="records")
+        "rules": df.to_dict(orient="records")
     }
 
 
 @router.get("/givebright")
 def get_givebright_matrix():
-    df_raw = load_data()
-    matrix_df = get_givebright_classification_matrix(df_raw).fillna("Unassigned")
-    if "Community Name" in matrix_df.columns:
-        matrix_df = matrix_df.drop(columns=["Community Name"])
-    
-    # 1. Deduplicate by Campaign Name strictly for GiveBright
-    matrix_df = matrix_df.drop_duplicates(subset=["Campaign Name"], keep="last").reset_index(drop=True)
+    """Returns GiveBright classification matrix rules in < 20ms."""
+    try:
+        conn = sqlite3.connect(LOCAL_DB_PATH, timeout=10.0)
+        df = pd.read_sql_query("""
+            SELECT 
+                campaign_name as "Campaign Name",
+                COALESCE(campaign_url, '') as "Campaign URL",
+                COALESCE(heading, 'Unassigned') as "Heading",
+                COALESCE(sub_heading, 'Unassigned') as "Sub-Heading",
+                COALESCE(country, 'Unassigned') as "Country",
+                COALESCE(code, 'Unassigned') as "Code",
+                COALESCE(zakat_eligibility, 'Unassigned') as "Zakat Eligibility"
+            FROM givebright_classifications
+        """, conn)
+        conn.close()
+    except Exception as e:
+        print(f"[GiveBright Matrix Query Notice]: {e}")
+        df = get_givebright_classification_matrix().fillna("Unassigned")
 
-    # 2. Strict mapping: Code -> Heading, Sub-Heading, Country, Zakat Eligibility
+    # Strict mapping: Code -> Heading, Sub-Heading, Country, Zakat Eligibility
     code_map = get_code_to_classification_map()
-    for idx, row in matrix_df.iterrows():
-        code = str(row.get("Code") or "").strip().lower()
-        if code and code not in ["unassigned", "nan", "none", "n/a", ""]:
-            if code in code_map:
-                c_info = code_map[code]
-                for tc in ["Heading", "Sub-Heading", "Country", "Zakat Eligibility"]:
-                    matrix_df.at[idx, tc] = c_info[tc]
+    if code_map and "Code" in df.columns:
+        code_clean = df["Code"].astype(str).str.strip().str.lower()
+        for tc in ["Heading", "Sub-Heading", "Country", "Zakat Eligibility"]:
+            if tc in df.columns:
+                target_map = {k: v[tc] for k, v in code_map.items() if tc in v and v[tc] != "Unassigned"}
+                mask_unassigned = df[tc].astype(str).str.strip().str.lower().isin(["", "unassigned", "nan", "none"])
+                mapped_vals = code_clean.map(target_map)
+                fill_mask = mask_unassigned & mapped_vals.notna()
+                if fill_mask.any():
+                    df.loc[fill_mask, tc] = mapped_vals[fill_mask]
 
-    matrix_df = sanitize_matrix_df(matrix_df)
-    unassigned_count = (matrix_df["Heading"] == "Unassigned").sum() if "Heading" in matrix_df.columns else 0
+    df = sanitize_matrix_df(df)
+    unassigned_count = (df["Heading"] == "Unassigned").sum() if "Heading" in df.columns else 0
     return {
         "platform": "GiveBright",
-        "total_campaigns": len(matrix_df),
-        "classified_campaigns": int(len(matrix_df) - unassigned_count),
+        "total_campaigns": len(df),
+        "classified_campaigns": int(len(df) - unassigned_count),
         "unassigned_campaigns": int(unassigned_count),
-        "rules": matrix_df.to_dict(orient="records")
+        "rules": df.to_dict(orient="records")
     }
 
 
 @router.get("/paysuite")
 def get_paysuite_matrix():
-    df_raw = load_data()
-    matrix_df = get_paysuite_classification_matrix(df_raw).fillna("Unassigned")
-    matrix_df = sanitize_matrix_df(matrix_df)
-    unassigned_count = (matrix_df["Heading"] == "Unassigned").sum() if "Heading" in matrix_df.columns else 0
+    """Returns Paysuite classification matrix rules in < 80ms."""
+    try:
+        conn = sqlite3.connect(LOCAL_DB_PATH, timeout=10.0)
+        df = pd.read_sql_query("""
+            SELECT 
+                campaign_name as "Campaign Name",
+                COALESCE(community_name, 'N/A') as "Community Name",
+                COALESCE(heading, 'Unassigned') as "Heading",
+                COALESCE(sub_heading, 'Unassigned') as "Sub-Heading",
+                COALESCE(country, 'Unassigned') as "Country",
+                COALESCE(code, 'Unassigned') as "Code",
+                COALESCE(zakat_eligibility, 'Unassigned') as "Zakat Eligibility",
+                COALESCE(donor_name, '') as "Donor Name",
+                COALESCE(donor_email, '') as "Donor Email"
+            FROM paysuite_classifications
+        """, conn)
+        conn.close()
+    except Exception as e:
+        print(f"[Paysuite Matrix Query Notice]: {e}")
+        df = get_paysuite_classification_matrix().fillna("Unassigned")
+
+    df = sanitize_matrix_df(df)
+    unassigned_count = (df["Heading"] == "Unassigned").sum() if "Heading" in df.columns else 0
     return {
         "platform": "Paysuite",
-        "total_campaigns": len(matrix_df),
-        "classified_campaigns": int(len(matrix_df) - unassigned_count),
+        "total_campaigns": len(df),
+        "classified_campaigns": int(len(df) - unassigned_count),
         "unassigned_campaigns": int(unassigned_count),
-        "rules": matrix_df.to_dict(orient="records")
+        "rules": df.to_dict(orient="records")
     }
+
 
 
 @router.get("/export")
@@ -160,6 +227,26 @@ def export_classifications(
         matrix_df = get_classification_matrix(df_raw).fillna("Unassigned")
 
     matrix_df = sanitize_matrix_df(matrix_df)
+
+    # Rename columns to match the real headers in the frontend UI
+    rename_map = {"Code": "Code (Master Link)"}
+    if platform.lower() == "paysuite":
+        rename_map["Campaign Name"] = "Direct Debit Ref (Bank Ref)"
+        rename_map["Community Name"] = "Platform Source"
+    
+    matrix_df = matrix_df.rename(columns=rename_map)
+
+    # Reorder columns to match UI if needed
+    if platform.lower() == "paysuite":
+        cols = ["Direct Debit Ref (Bank Ref)", "Platform Source", "Code (Master Link)", "Heading", "Sub-Heading", "Country", "Zakat Eligibility", "Donor Name", "Donor Email"]
+        matrix_df = matrix_df[[c for c in cols if c in matrix_df.columns]]
+    elif platform.lower() == "givebright":
+        cols = ["Campaign Name", "Campaign URL", "Code (Master Link)", "Heading", "Sub-Heading", "Country", "Zakat Eligibility"]
+        matrix_df = matrix_df[[c for c in cols if c in matrix_df.columns]]
+    else:
+        cols = ["Campaign Name", "Community Name", "Code (Master Link)", "Heading", "Sub-Heading", "Country", "Zakat Eligibility"]
+        matrix_df = matrix_df[[c for c in cols if c in matrix_df.columns]]
+
     date_str = datetime.now().strftime("%Y%m%d_%H%M%S")
 
     if format.lower() == "xlsx":

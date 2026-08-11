@@ -1,8 +1,10 @@
 import sqlite3
 import threading
 import time
+import pandas as pd
 
 from sqlalchemy import create_engine
+
 
 from config.settings import DATABASE_URL, LOCAL_DB_PATH, LOCAL_DB_URL
 
@@ -30,6 +32,26 @@ except Exception as e:
 
 # Main engine defaults to local_engine for ultra-fast query performance
 engine = local_engine if local_engine else cloud_engine
+
+
+def ensure_database_indexes():
+    """Builds B-Tree indexes on SQLite donations table for high-speed lookups."""
+    try:
+        conn = sqlite3.connect(LOCAL_DB_PATH, timeout=20.0)
+        cursor = conn.cursor()
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='donations'")
+        if cursor.fetchone():
+            cursor.execute('CREATE INDEX IF NOT EXISTS idx_donations_donor_id ON donations("Donor ID");')
+            cursor.execute('CREATE INDEX IF NOT EXISTS idx_donations_email ON donations("Email");')
+            cursor.execute('CREATE INDEX IF NOT EXISTS idx_donations_platform ON donations("Platform");')
+            cursor.execute('CREATE INDEX IF NOT EXISTS idx_donations_tier ON donations("Lifetime Donor Classification");')
+            cursor.execute('CREATE INDEX IF NOT EXISTS idx_donations_heading ON donations("Heading");')
+            cursor.execute('CREATE INDEX IF NOT EXISTS idx_donations_created_date ON donations("Created Date (UTC)");')
+            conn.commit()
+        conn.close()
+    except Exception as e:
+        print(f"[DB Indexing Notice]: {e}")
+
 
 def _write_sync_status(success: bool, op_type: str, err: str = ""):
     """Helper to record cloud DB background sync status in SQLite."""
@@ -109,20 +131,28 @@ def sync_to_cloud_async(data_df, mode="append", max_retries=3):
                         col_defs.append(f'"{col}" TEXT')
                 
                 cols_def = ', '.join(col_defs)
-                cur.execute(f'CREATE TABLE IF NOT EXISTS "donations" ({cols_def});')
-                
+                if m == "replace":
+                    cur.execute('DROP TABLE IF EXISTS "donations";')
+                    cur.execute(f'CREATE TABLE "donations" ({cols_def});')
+                else:
+                    cur.execute(f'CREATE TABLE IF NOT EXISTS "donations" ({cols_def});')
+                    for cdef in col_defs:
+                        try:
+                            cur.execute(f'ALTER TABLE "donations" ADD COLUMN IF NOT EXISTS {cdef};')
+                        except Exception:
+                            pass
+
                 # Enable PostgreSQL TOAST tuple compression for compact storage without data loss
                 try:
                     cur.execute('ALTER TABLE "donations" SET (toast_tuple_target = 128);')
                 except Exception:
                     pass
 
-                if m == "replace":
-                    cur.execute('TRUNCATE TABLE "donations";')
                 conn.commit()
                 
                 target_cols = ', '.join([f'"{c}"' for c in sync_df.columns])
                 copy_sql = f'COPY "donations" ({target_cols}) FROM STDIN WITH (FORMAT csv, DELIMITER \'\t\', NULL \'\');'
+
                 
                 # Low-RAM 5,000-row Chunked Stream to prevent Supabase RAM Commitment spikes
                 chunk_size = 5000

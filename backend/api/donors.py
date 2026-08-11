@@ -82,13 +82,19 @@ def bulk_edit_donors(payload: BulkEditDonorsRequest):
     df_raw.to_sql("donations", con=conn, if_exists="replace", index=False)
     conn.close()
 
+    # Synchronize classifications bidirectionally to classification matrix tables
+    from core.data_processor import invalidate_data_cache, sync_donors_to_classification_matrix
+    invalidate_data_cache()
+    sync_donors_to_classification_matrix(df_raw)
+
     from core.database import sync_to_cloud_async
     sync_to_cloud_async(df_raw, mode="replace")
 
     return {
         "status": "success",
-        "message": f"Successfully updated {len(matching_indices):,} donor record(s)."
+        "message": f"Successfully updated {len(matching_indices):,} donor record(s) and synchronized classification matrix."
     }
+
 
 
 def _apply_filters(df, payment_type=None, tier=None, source=None, heading=None, subheading=None, country=None, code=None, zakat=None, donor_country=None, campaign_search=None, gift_aid=None, start_date=None, end_date=None):
