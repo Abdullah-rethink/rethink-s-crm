@@ -20,6 +20,9 @@ export default function LtvView({ filters }) {
       if (filters.zakat) params.append('zakat', filters.zakat);
       if (filters.donor_country) params.append('donor_country', filters.donor_country);
       if (filters.campaign_search) params.append('campaign_search', filters.campaign_search);
+      if (filters.gift_aid) params.append('gift_aid', filters.gift_aid);
+      if (filters.start_date) params.append('start_date', filters.start_date);
+      if (filters.end_date) params.append('end_date', filters.end_date);
     }
 
     fetch(`${API_BASE_URL}/api/ltv/summary?${params.toString()}`)

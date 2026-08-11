@@ -1073,7 +1073,7 @@ def process_and_upload_excel(file_buffer, source_name=None, upload_mode="replace
     if str(platform).lower() == "givebright":
         is_givebright = True
     elif str(platform).lower() in ["auto", "none", ""]:
-        gb_sig = {"donation_id", "campaign_name", "fundraiser_by", "charge_id", "payment_method_type"}
+        gb_sig = {"donation_id", "campaign_name", "fundraiser_name", "charge_id", "payment_method_type"}
         if len(gb_sig.intersection(set(df.columns))) >= 2:
             is_givebright = True
 
@@ -1082,7 +1082,7 @@ def process_and_upload_excel(file_buffer, source_name=None, upload_mode="replace
         col_map = {
             "donation_id": "Donation ID",
             "campaign_name": "Campaign Name",
-            "fundraiser_by": "Community Name",
+            "fundraiser_name": "Community Name",
             "amount": "Donation Amount in Project Currency (May be approx.)",
             "currency": "Donation Currency (DC)",
             "is_anonymous": "Anonymous or Public",

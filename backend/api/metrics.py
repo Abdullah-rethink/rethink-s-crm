@@ -19,10 +19,12 @@ def get_metrics_summary(
     zakat: Optional[str] = None,
     donor_country: Optional[str] = None,
     campaign_search: Optional[str] = None,
-    gift_aid: Optional[str] = None
+    gift_aid: Optional[str] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None
 ):
     df_raw = load_data()
-    df = _apply_filters(df_raw, payment_type, tier, source, heading, subheading, country, code, zakat, donor_country, campaign_search, gift_aid)
+    df = _apply_filters(df_raw, payment_type, tier, source, heading, subheading, country, code, zakat, donor_country, campaign_search, gift_aid, start_date, end_date)
 
     if df.empty:
         return {

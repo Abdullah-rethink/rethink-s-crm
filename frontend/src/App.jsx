@@ -27,7 +27,9 @@ const INITIAL_FILTERS = {
   zakat: 'All Zakat Status',
   donor_country: 'All Donor Countries',
   campaign_search: '',
-  gift_aid: 'All Gift Aid Status'
+  gift_aid: 'All Gift Aid Status',
+  start_date: '',
+  end_date: ''
 };
 
 export default function App() {
@@ -43,14 +45,57 @@ export default function App() {
     return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
   });
 
+  const handleSignOut = () => {
+    setUser(null);
+    localStorage.removeItem('analytics_user');
+  };
+
   // Auto-restore session from localStorage
   useEffect(() => {
     const savedUser = localStorage.getItem('analytics_user');
     if (savedUser) {
       try {
-        setUser(JSON.parse(savedUser));
+        const parsed = JSON.parse(savedUser);
+        
+        // 1. Check Session Expiry (24 hours = 86400000 ms)
+        const EXPIRY_MS = 24 * 60 * 60 * 1000;
+        if (parsed.login_timestamp && (Date.now() - parsed.login_timestamp > EXPIRY_MS)) {
+          console.warn("Session expired after 24 hours.");
+          handleSignOut();
+          return;
+        }
+
+        // Set user immediately for offline responsiveness
+        setUser(parsed);
+
+        // 2. Real-time verification & permission sync with backend
+        fetch(`${API_BASE_URL}/api/auth/me?user_identity=${parsed.email || parsed.username}`)
+          .then(res => {
+            if (res.status === 401 || res.status === 404) {
+              throw new Error('Invalid user session');
+            }
+            return res.json();
+          })
+          .then(data => {
+            if (data.status === 'success' && data.user) {
+              const updatedUser = {
+                ...data.user,
+                login_timestamp: parsed.login_timestamp || Date.now()
+              };
+              setUser(updatedUser);
+              localStorage.setItem('analytics_user', JSON.stringify(updatedUser));
+            } else {
+              handleSignOut();
+            }
+          })
+          .catch(err => {
+            if (err.message === 'Invalid user session') {
+              handleSignOut();
+            }
+          });
       } catch (e) {
-        console.error(e);
+        console.error("Error restoring session:", e);
+        handleSignOut();
       }
     }
   }, []);
@@ -83,6 +128,8 @@ export default function App() {
       if (filters.donor_country) params.append('donor_country', filters.donor_country);
       if (filters.campaign_search) params.append('campaign_search', filters.campaign_search);
       if (filters.gift_aid) params.append('gift_aid', filters.gift_aid);
+      if (filters.start_date) params.append('start_date', filters.start_date);
+      if (filters.end_date) params.append('end_date', filters.end_date);
     }
     fetch(`${API_BASE_URL}/api/metrics/summary?${params.toString()}`)
       .then(res => res.json())
@@ -99,13 +146,12 @@ export default function App() {
   };
 
   const handleLoginSuccess = (userData) => {
-    setUser(userData);
-    localStorage.setItem('analytics_user', JSON.stringify(userData));
-  };
-
-  const handleSignOut = () => {
-    setUser(null);
-    localStorage.removeItem('analytics_user');
+    const sessionData = {
+      ...userData,
+      login_timestamp: Date.now()
+    };
+    setUser(sessionData);
+    localStorage.setItem('analytics_user', JSON.stringify(sessionData));
   };
 
   if (!user) {

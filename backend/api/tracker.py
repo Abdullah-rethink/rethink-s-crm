@@ -70,7 +70,9 @@ def get_tracker_stats(
     zakat: Optional[str] = Query(None),
     donor_country: Optional[str] = Query(None),
     campaign_search: Optional[str] = Query(None),
-    gift_aid: Optional[str] = Query(None)
+    gift_aid: Optional[str] = Query(None),
+    start_date: Optional[str] = Query(None),
+    end_date: Optional[str] = Query(None)
 ):
     """Computes real-time donor target progress stats filtered by sidebar criteria."""
     has_filters = any([
@@ -84,7 +86,9 @@ def get_tracker_stats(
         zakat and zakat != "All Zakat Status",
         donor_country and donor_country != "All Donor Countries",
         campaign_search and campaign_search.strip(),
-        gift_aid and gift_aid != "All Gift Aid Status"
+        gift_aid and gift_aid != "All Gift Aid Status",
+        start_date and start_date.strip(),
+        end_date and end_date.strip()
     ])
 
     global _TRACKER_CACHE
@@ -124,7 +128,9 @@ def get_tracker_stats(
         zakat=zakat,
         donor_country=donor_country,
         campaign_search=campaign_search,
-        gift_aid=gift_aid
+        gift_aid=gift_aid,
+        start_date=start_date,
+        end_date=end_date
     )
 
     col_amount = "Total Online Donations Net Amount in Settled Currency"
