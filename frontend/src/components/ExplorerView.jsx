@@ -198,11 +198,11 @@ export default function ExplorerView({ user, filters, onSelectDonor }) {
 
   const getTierBadgeClass = (tier) => {
     switch (tier) {
-      case 'Super High': return 'badge-purple';
-      case 'High': return 'badge-pink';
-      case 'Medium': return 'badge-cyan';
-      case 'Medium Low': return 'badge-emerald';
-      default: return 'badge-amber';
+      case 'Super High': return 'badge-pink';
+      case 'High': return 'badge-amber';
+      case 'Medium': return 'badge-emerald';
+      case 'Medium Low': return 'badge-cyan';
+      default: return 'badge-slate';
     }
   };
 

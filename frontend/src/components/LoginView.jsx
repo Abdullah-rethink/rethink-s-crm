@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { ShieldCheck, Lock, User, KeyRound } from 'lucide-react';
+import { ShieldCheck, Lock, User, KeyRound, Sun, Moon } from 'lucide-react';
 import { API_BASE_URL } from '../config';
 
-export default function LoginView({ onLoginSuccess }) {
+export default function LoginView({ theme, onToggleTheme, onLoginSuccess }) {
   const [identity, setIdentity] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -40,42 +40,66 @@ export default function LoginView({ onLoginSuccess }) {
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4">
-      <div className="glass-panel p-8 w-full max-w-md border-l-4 border-cyan-400 flex flex-col gap-6 shadow-2xl">
+      <div className="glass-panel p-8 w-full max-w-md border-l-4 border-cyan-400 flex flex-col gap-6 shadow-2xl relative">
+        <button
+          type="button"
+          onClick={onToggleTheme}
+          title={`Switch to ${theme === 'dark' ? 'Light Mode' : 'Dark Mode'}`}
+          className="absolute top-4 right-4 p-2 rounded-xl border transition-all"
+          style={{
+            backgroundColor: 'var(--input-bg)',
+            color: 'var(--text-main)',
+            borderColor: 'var(--border-glass)'
+          }}
+        >
+          {theme === 'dark' ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-indigo-400" />}
+        </button>
+
         <div className="text-center flex flex-col items-center gap-2">
           <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center text-slate-950 font-black shadow-xl shadow-cyan-500/20">
             <ShieldCheck className="w-8 h-8 fill-current" />
           </div>
-          <h2 className="text-2xl font-black text-white">Secure Access Control</h2>
-          <p className="text-xs text-slate-400">Please log in to access the Crowdfunding Analytics Platform.</p>
+          <h2 className="text-2xl font-black" style={{ color: 'var(--text-main)' }}>Secure Access Control</h2>
+          <p className="text-xs" style={{ color: 'var(--text-sub)' }}>Please log in to access the Crowdfunding Analytics Platform.</p>
         </div>
 
         {error && <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-xs font-bold text-rose-400 text-center">{error}</div>}
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <div>
-            <label className="text-xs text-slate-400 font-bold mb-1.5 block">Email or Username</label>
+            <label className="text-xs font-bold mb-1.5 block" style={{ color: 'var(--text-sub)' }}>Email or Username</label>
             <div className="relative">
-              <User className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+              <User className="w-4 h-4 absolute left-3 top-3" style={{ color: 'var(--text-sub)' }} />
               <input 
                 type="text"
                 placeholder="e.g. superadmin@analytics.com"
                 value={identity}
                 onChange={e => setIdentity(e.target.value)}
-                className="w-full bg-slate-900/90 border border-white/10 rounded-xl pl-9 pr-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+                className="w-full rounded-xl pl-9 pr-4 py-2.5 text-xs placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+                style={{
+                  backgroundColor: 'var(--input-bg)',
+                  color: 'var(--input-text)',
+                  border: '1px solid var(--input-border)'
+                }}
               />
             </div>
           </div>
 
           <div>
-            <label className="text-xs text-slate-400 font-bold mb-1.5 block">Password</label>
+            <label className="text-xs font-bold mb-1.5 block" style={{ color: 'var(--text-sub)' }}>Password</label>
             <div className="relative">
-              <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+              <Lock className="w-4 h-4 absolute left-3 top-3" style={{ color: 'var(--text-sub)' }} />
               <input 
                 type="password"
                 placeholder="Enter your password..."
                 value={password}
                 onChange={e => setPassword(e.target.value)}
-                className="w-full bg-slate-900/90 border border-white/10 rounded-xl pl-9 pr-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+                className="w-full rounded-xl pl-9 pr-4 py-2.5 text-xs placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+                style={{
+                  backgroundColor: 'var(--input-bg)',
+                  color: 'var(--input-text)',
+                  border: '1px solid var(--input-border)'
+                }}
               />
             </div>
           </div>
@@ -89,8 +113,8 @@ export default function LoginView({ onLoginSuccess }) {
           </button>
         </form>
 
-        <div className="text-center text-[11px] text-slate-500 border-t border-white/5 pt-4">
-          Default Super Admin: <code className="text-cyan-400 font-bold">superadmin@analytics.com</code> / <code className="text-cyan-400 font-bold">SuperAdmin@123</code>
+        <div className="text-center text-[11px] border-t pt-4" style={{ color: 'var(--text-sub)', borderColor: 'var(--border-glass)' }}>
+          Contact your administrator for access.
         </div>
       </div>
     </div>

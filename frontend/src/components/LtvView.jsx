@@ -45,20 +45,20 @@ export default function LtvView({ filters }) {
   const maxTierRaised = summary.length > 0 ? Math.max(...summary.map(s => s.total_raised)) : 1;
 
   const tierBadges = {
-    'Super High': 'badge-purple',
-    'High': 'badge-pink',
-    'Medium': 'badge-cyan',
-    'Medium Low': 'badge-emerald',
-    'Low End': 'badge-amber'
+    'Super High': 'badge-pink',
+    'High': 'badge-amber',
+    'Medium': 'badge-emerald',
+    'Medium Low': 'badge-cyan',
+    'Low End': 'badge-slate'
   };
 
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h2 className="text-xl font-extrabold text-white flex items-center gap-2">
+        <h2 className="text-xl font-extrabold flex items-center gap-2" style={{ color: 'var(--text-main)' }}>
           <Crown className="w-5 h-5 text-purple-400" /> Lifetime Donor Value (LTV) & Segmentation
         </h2>
-        <p className="text-xs text-slate-400">Donors are classified into tiers based on their cumulative Total Lifetime Raised across all campaigns.</p>
+        <p className="text-xs" style={{ color: 'var(--text-sub)' }}>Donors are classified into tiers based on their cumulative Total Lifetime Raised across all campaigns.</p>
       </div>
 
       {/* Tier Visual Breakdown */}
@@ -71,8 +71,8 @@ export default function LtvView({ filters }) {
           {summary.map((item, idx) => (
             <div key={idx} className="glass-panel p-4 flex flex-col gap-2 border-t-2 border-cyan-400">
               <span className={`badge ${tierBadges[item.tier] || 'badge-cyan'} w-fit`}>{item.tier}</span>
-              <div className="text-xl font-black text-white mt-1">£{item.total_raised?.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
-              <div className="text-xs text-slate-400 font-semibold flex items-center justify-between">
+              <div className="text-xl font-black mt-1" style={{ color: 'var(--text-main)' }}>£{item.total_raised?.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
+              <div className="text-xs font-semibold flex items-center justify-between" style={{ color: 'var(--text-sub)' }}>
                 <span>{item.donation_count} donations</span>
                 <span className="text-emerald-400">Avg £{item.avg_donation?.toFixed(2)}</span>
               </div>
@@ -89,7 +89,7 @@ export default function LtvView({ filters }) {
 
       {/* Detailed Table */}
       <div className="glass-panel p-5 flex flex-col gap-4">
-        <h3 className="text-sm font-bold text-slate-200 flex items-center gap-2">
+          <h3 className="text-sm font-bold flex items-center gap-2" style={{ color: 'var(--text-main)' }}>
           <Award className="w-4 h-4 text-cyan-400" /> Detailed LTV Tier Breakdown Table
         </h3>
 

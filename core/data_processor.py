@@ -857,12 +857,21 @@ def delete_single_dataset(source_tag):
 
     return deleted_count
 
+_DATA_CACHE = None
+_DATA_CACHE_MTIME = 0
+
 def load_data():
-    """Reads from local Parquet binary cache or SQLite database."""
+    """Reads from local Parquet binary cache or SQLite database with fast in-memory caching."""
+    global _DATA_CACHE, _DATA_CACHE_MTIME
     if os.path.exists(PARQUET_PATH):
         try:
+            mtime = os.path.getmtime(PARQUET_PATH)
+            if _DATA_CACHE is not None and _DATA_CACHE_MTIME == mtime:
+                return _DATA_CACHE
             df = pd.read_parquet(PARQUET_PATH)
             if not df.empty:
+                _DATA_CACHE = df
+                _DATA_CACHE_MTIME = mtime
                 return df
         except Exception:
             pass
@@ -873,6 +882,8 @@ def load_data():
         conn.close()
         if not df.empty:
             df.to_parquet(PARQUET_PATH, index=False)
+            _DATA_CACHE = df
+            _DATA_CACHE_MTIME = os.path.getmtime(PARQUET_PATH) if os.path.exists(PARQUET_PATH) else 0
             return df
     except Exception:
         pass

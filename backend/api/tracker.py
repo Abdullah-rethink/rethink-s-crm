@@ -9,6 +9,12 @@ from core.data_processor import load_data, LOCAL_DB_PATH
 
 router = APIRouter(prefix="/api/tracker", tags=["Sponsorship Target Tracker"])
 
+_TRACKER_CACHE = None
+
+def clear_tracker_cache():
+    global _TRACKER_CACHE
+    _TRACKER_CACHE = None
+
 class UpdateTargetsRequest(BaseModel):
     user_role: str
     targets: Dict[str, float]
@@ -45,6 +51,7 @@ def update_targets(payload: UpdateTargetsRequest):
                 VALUES (?, ?)
             """, (s_type, float(val)))
         conn.commit()
+        clear_tracker_cache()
         return {"status": "success", "message": "Successfully updated targets!"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -52,9 +59,38 @@ def update_targets(payload: UpdateTargetsRequest):
         conn.close()
 
 @router.get("/stats")
-def get_tracker_stats():
-    """Computes real-time donor target progress stats."""
-    # 1. Fetch current targets from SQLite
+def get_tracker_stats(
+    payment_type: Optional[str] = Query(None),
+    tier: Optional[str] = Query(None),
+    source: Optional[str] = Query(None),
+    heading: Optional[str] = Query(None),
+    subheading: Optional[str] = Query(None),
+    country: Optional[str] = Query(None),
+    code: Optional[str] = Query(None),
+    zakat: Optional[str] = Query(None),
+    donor_country: Optional[str] = Query(None),
+    campaign_search: Optional[str] = Query(None),
+    gift_aid: Optional[str] = Query(None)
+):
+    """Computes real-time donor target progress stats filtered by sidebar criteria."""
+    has_filters = any([
+        payment_type and payment_type != "All Payment Types",
+        tier and tier != "All Classifications",
+        source and source != "All Sources (Combined)",
+        heading and heading != "All Headings",
+        subheading and subheading != "All Sub-Headings",
+        country and country != "All Project Countries",
+        code and code != "All Codes",
+        zakat and zakat != "All Zakat Status",
+        donor_country and donor_country != "All Donor Countries",
+        campaign_search and campaign_search.strip(),
+        gift_aid and gift_aid != "All Gift Aid Status"
+    ])
+
+    global _TRACKER_CACHE
+    if not has_filters and _TRACKER_CACHE is not None:
+        return _TRACKER_CACHE
+
     targets = {"Hafiz": 240.0, "Orphan": 480.0, "Widow": 1080.0, "Ex-Prisoner": 1080.0}
     conn = sqlite3.connect(LOCAL_DB_PATH, timeout=10.0)
     try:
@@ -67,10 +103,29 @@ def get_tracker_stats():
     finally:
         conn.close()
 
-    # 2. Load active dataset
     df = load_data()
     if df.empty:
-        return {s: {"target": t, "total_raised": 0.0, "above": [], "near": []} for s, t in targets.items()}
+        res = {s: {"target": t, "total_raised": 0.0, "above_count": 0, "near_count": 0, "above": [], "near": []} for s, t in targets.items()}
+        if not has_filters:
+            _TRACKER_CACHE = res
+        return res
+
+    # Apply Sidebar Filters
+    from backend.api.donors import _apply_filters
+    df = _apply_filters(
+        df,
+        payment_type=payment_type,
+        tier=tier,
+        source=source,
+        heading=heading,
+        subheading=subheading,
+        country=country,
+        code=code,
+        zakat=zakat,
+        donor_country=donor_country,
+        campaign_search=campaign_search,
+        gift_aid=gift_aid
+    )
 
     col_amount = "Total Online Donations Net Amount in Settled Currency"
     if col_amount not in df.columns:
@@ -78,80 +133,85 @@ def get_tracker_stats():
     if col_amount not in df.columns:
         col_amount = "Donation Amount (in Donation Currency)"
 
-    if col_amount not in df.columns or "Donor ID" not in df.columns:
-        return {s: {"target": t, "total_raised": 0.0, "above": [], "near": []} for s, t in targets.items()}
+    if col_amount not in df.columns or "Donor ID" not in df.columns or df.empty:
+        res = {s: {"target": t, "total_raised": 0.0, "above_count": 0, "near_count": 0, "above": [], "near": []} for s, t in targets.items()}
+        if not has_filters:
+            _TRACKER_CACHE = res
+        return res
 
     # Ensure amount column is numeric
     df[col_amount] = pd.to_numeric(df[col_amount], errors="coerce").fillna(0.0)
+    df["_d_id_str"] = df["Donor ID"].astype(str)
 
-    # 3. Categorize transactions based on Code
-    df["sponsorship_type"] = None
-    if "Code" in df.columns:
-        code_series = df["Code"].astype(str).str.strip().str.upper()
-        df.loc[code_series.str.contains("HUF", na=False), "sponsorship_type"] = "Hafiz"
-        df.loc[code_series.str.contains("ORP", na=False), "sponsorship_type"] = "Orphan"
-        df.loc[code_series.str.contains("WID", na=False), "sponsorship_type"] = "Widow"
-        df.loc[code_series.str.contains("SUR", na=False) | code_series.str.contains("EX-PRISONER", na=False), "sponsorship_type"] = "Ex-Prisoner"
+    # Index by Donor ID string for O(1) instant lookup
+    indexed_df = df.set_index("_d_id_str", drop=False)
 
-    # Pre-build donor profiles to retrieve display name and email quickly
-    donor_info = {}
-    
-    for donor_id, sub_df in df.groupby("Donor ID"):
-        first_row = sub_df.iloc[0]
-        best_name = "Anonymous Donor"
-        for _, row in sub_df.iterrows():
-            disp = str(row.get("Display Name", "")).strip()
-            disp_lower = disp.lower()
-            if disp and disp_lower not in ["nan", "none", "null", "anonymous", "anonymous kind soul", "kind soul"]:
-                best_name = disp
-                break
-        else:
-            for _, row in sub_df.iterrows():
-                fn = str(row.get("First Name", "")).strip()
-                ln = str(row.get("Last Name", "")).strip()
-                if fn or ln:
-                    combined = f"{fn} {ln}".strip()
-                    if combined.lower() not in ["nan", "none", "null", "anonymous", "anonymous kind soul", "kind soul", ""]:
-                        best_name = combined
-                        break
-            else:
-                best_name = str(first_row.get("Display Name", "Anonymous Donor"))
+    # Vectorized Code Masking
+    code_series = df["Code"].astype(str).str.strip().str.upper() if "Code" in df.columns else pd.Series("", index=df.index)
 
-        donor_info[donor_id] = {
-            "name": best_name,
-            "email": str(first_row.get("Email", "N/A"))
-        }
+    masks = {
+        "Hafiz": code_series.str.contains("HUF", na=False),
+        "Orphan": code_series.str.contains("ORP", na=False),
+        "Widow": code_series.str.contains("WID", na=False),
+        "Ex-Prisoner": code_series.str.contains("SUR", na=False) | code_series.str.contains("EX-PRISONER", na=False)
+    }
 
-    # 4. Compute statistics for each sponsorship type
     results = {}
     for s_type, target in targets.items():
-        s_df = df[df["sponsorship_type"] == s_type]
-        total_raised = float(s_df[col_amount].sum())
+        mask = masks[s_type]
+        s_df = df[mask]
+        total_raised = float(s_df[col_amount].sum()) if not s_df.empty else 0.0
 
         above_list = []
         near_list = []
 
         if not s_df.empty:
-            donor_sums = s_df.groupby("Donor ID")[col_amount].sum()
-            
-            for d_id, total in donor_sums.items():
-                total = float(total)
-                progress = round((total / target) * 100.0, 1)
+            sums = s_df.groupby("_d_id_str")[col_amount].sum()
+            relevant = sums[sums >= (0.8 * target)]
+
+            for str_id, total in relevant.items():
+                total_val = float(total)
+                progress = round((total_val / target) * 100.0, 1)
                 
-                info = donor_info.get(d_id, {"name": "Anonymous Donor", "email": "N/A"})
-                donor_record = {
-                    "donor_id": str(d_id),
-                    "name": info["name"],
-                    "email": info["email"],
-                    "total_donated": round(total, 2),
+                if str_id not in indexed_df.index:
+                    continue
+                d_rows = indexed_df.loc[[str_id]]
+                first_row = d_rows.iloc[0]
+                
+                best_name = "Anonymous Donor"
+                for _, r in d_rows.iterrows():
+                    disp = str(r.get("Display Name", "")).strip()
+                    disp_lower = disp.lower()
+                    if disp and disp_lower not in ["nan", "none", "null", "anonymous", "anonymous kind soul", "kind soul"]:
+                        best_name = disp
+                        break
+                else:
+                    for _, r in d_rows.iterrows():
+                        fn = str(r.get("First Name", "")).strip()
+                        ln = str(r.get("Last Name", "")).strip()
+                        if fn or ln:
+                            comb = f"{fn} {ln}".strip()
+                            if comb.lower() not in ["nan", "none", "null", "anonymous", "anonymous kind soul", "kind soul", ""]:
+                                best_name = comb
+                                break
+                    else:
+                        best_name = str(first_row.get("Display Name", "Anonymous Donor"))
+
+                email = str(first_row.get("Email", "N/A"))
+
+                rec = {
+                    "donor_id": str_id,
+                    "name": best_name,
+                    "email": email,
+                    "total_donated": round(total_val, 2),
                     "target": target,
                     "progress": progress
                 }
 
-                if total >= target:
-                    above_list.append(donor_record)
-                elif total >= (0.8 * target):
-                    near_list.append(donor_record)
+                if total_val >= target:
+                    above_list.append(rec)
+                else:
+                    near_list.append(rec)
 
         above_list.sort(key=lambda x: x["total_donated"], reverse=True)
         near_list.sort(key=lambda x: x["total_donated"], reverse=True)
@@ -165,4 +225,6 @@ def get_tracker_stats():
             "near": near_list
         }
 
+    if not has_filters:
+        _TRACKER_CACHE = results
     return results

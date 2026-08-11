@@ -8,10 +8,11 @@ import ExplorerView from './components/ExplorerView';
 import ClassificationView from './components/ClassificationView';
 import ExpenseView from './components/ExpenseView';
 import AdminView from './components/AdminView';
+import TrackerView from './components/TrackerView';
 import DonorDrawer from './components/DonorDrawer';
 import LoginView from './components/LoginView';
 
-import { TrendingUp, Crown, Columns, Table, Shield, CreditCard, Database } from 'lucide-react';
+import { TrendingUp, Crown, Columns, Table, Shield, CreditCard, Database, Target, Gift, Layers, DollarSign } from 'lucide-react';
 
 import { API_BASE_URL } from './config';
 
@@ -36,7 +37,11 @@ export default function App() {
   const [metrics, setMetrics] = useState(null);
   const [filters, setFilters] = useState(INITIAL_FILTERS);
 
-  const [theme, setTheme] = useState(() => localStorage.getItem('crm_theme') || 'dark');
+  const [theme, setTheme] = useState(() => {
+    const savedTheme = localStorage.getItem('crm_theme');
+    if (savedTheme === 'light' || savedTheme === 'dark') return savedTheme;
+    return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+  });
 
   // Auto-restore session from localStorage
   useEffect(() => {
@@ -52,7 +57,9 @@ export default function App() {
 
   // Update theme class on HTML root element
   useEffect(() => {
-    document.documentElement.className = theme === 'light' ? 'theme-light' : 'theme-dark';
+    document.documentElement.classList.remove('theme-light', 'theme-dark');
+    document.documentElement.classList.add(theme === 'light' ? 'theme-light' : 'theme-dark');
+    document.documentElement.style.colorScheme = theme;
     localStorage.setItem('crm_theme', theme);
   }, [theme]);
 
@@ -102,17 +109,18 @@ export default function App() {
   };
 
   if (!user) {
-    return <LoginView onLoginSuccess={handleLoginSuccess} />;
+    return <LoginView theme={theme} onToggleTheme={handleToggleTheme} onLoginSuccess={handleLoginSuccess} />;
   }
 
   const tabs = [
-    { id: 'overview', label: '📈 Overview', icon: TrendingUp },
-    { id: 'ltv', label: '👑 Lifetime LTV', icon: Crown },
-    { id: 'kanban', label: '📋 Kanban Pipeline', icon: Columns },
-    { id: 'explorer', label: '📊 Data Explorer', icon: Table },
-    { id: 'classifications', label: '🏷️ Classifications', icon: Shield },
-    { id: 'expenses', label: '💳 Expenses', icon: CreditCard },
-    { id: 'admin', label: '⚙️ Admin & Data', icon: Database },
+    { id: 'overview', label: 'Overview', icon: TrendingUp },
+    { id: 'ltv', label: 'Lifetime LTV', icon: Crown },
+    { id: 'kanban', label: 'Kanban Pipeline', icon: Columns },
+    { id: 'explorer', label: 'Data Explorer', icon: Table },
+    { id: 'tracker', label: 'Sponsorship Tracker', icon: Target },
+    { id: 'classifications', label: 'Classifications', icon: Shield },
+    { id: 'expenses', label: 'Expenses', icon: CreditCard },
+    { id: 'admin', label: 'Admin & Data', icon: Database },
   ];
 
   return (
@@ -121,7 +129,55 @@ export default function App() {
       <Navbar user={user} metrics={metrics} theme={theme} onToggleTheme={handleToggleTheme} onSignOut={handleSignOut} />
 
       {/* Main Container with Left Sidebar Layout */}
-      <main className="px-6 max-w-7xl mx-auto w-full flex flex-col gap-6">
+      <main className="px-6 max-w-7xl mx-auto w-full flex flex-col gap-6 pt-4">
+        {/* Executive Summary Metrics Header Cards Bar - ALWAYS VISIBLE */}
+        {metrics && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* Total Raised */}
+            <div className="glass-panel p-4 border-l-4 border-cyan-400 flex flex-col gap-1 relative overflow-hidden group hover:border-cyan-300 transition-all shadow-lg">
+              <div className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400">Total Raised</div>
+              <div className="text-2xl font-black text-cyan-400 font-mono tracking-tight">
+                £{Number(metrics.total_raised || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </div>
+              <div className="absolute right-3 top-3 opacity-10 group-hover:opacity-20 transition-opacity">
+                <TrendingUp className="w-10 h-10 text-cyan-400" />
+              </div>
+            </div>
+
+            {/* Gift Aid Estimate */}
+            <div className="glass-panel p-4 border-l-4 border-amber-400 flex flex-col gap-1 relative overflow-hidden group hover:border-amber-300 transition-all shadow-lg">
+              <div className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400">Gift Aid Estimate</div>
+              <div className="text-2xl font-black text-amber-400 font-mono tracking-tight">
+                £{Number(metrics.gift_aid_estimate || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </div>
+              <div className="absolute right-3 top-3 opacity-10 group-hover:opacity-20 transition-opacity">
+                <Gift className="w-10 h-10 text-amber-400" />
+              </div>
+            </div>
+
+            {/* Donations Count */}
+            <div className="glass-panel p-4 border-l-4 border-purple-400 flex flex-col gap-1 relative overflow-hidden group hover:border-purple-300 transition-all shadow-lg">
+              <div className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400">Donations</div>
+              <div className="text-2xl font-black text-purple-400 font-mono tracking-tight">
+                {Number(metrics.total_txns || 0).toLocaleString()}
+              </div>
+              <div className="absolute right-3 top-3 opacity-10 group-hover:opacity-20 transition-opacity">
+                <Layers className="w-10 h-10 text-purple-400" />
+              </div>
+            </div>
+
+            {/* Avg Donation */}
+            <div className="glass-panel p-4 border-l-4 border-emerald-400 flex flex-col gap-1 relative overflow-hidden group hover:border-emerald-300 transition-all shadow-lg">
+              <div className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400">Avg Donation</div>
+              <div className="text-2xl font-black text-emerald-400 font-mono tracking-tight">
+                £{Number(metrics.avg_donation || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </div>
+              <div className="absolute right-3 top-3 opacity-10 group-hover:opacity-20 transition-opacity">
+                <DollarSign className="w-10 h-10 text-emerald-400" />
+              </div>
+            </div>
+          </div>
+        )}
         {/* Navigation Tabs Bar */}
         <div className="glass-panel p-2 flex items-center gap-2 overflow-x-auto">
           {tabs.map(t => {
@@ -158,6 +214,7 @@ export default function App() {
             {activeTab === 'ltv' && <LtvView filters={filters} />}
             {activeTab === 'kanban' && <KanbanBoard filters={filters} onSelectDonor={setSelectedDonor} />}
             {activeTab === 'explorer' && <ExplorerView user={user} filters={filters} onSelectDonor={setSelectedDonor} />}
+            {activeTab === 'tracker' && <TrackerView user={user} filters={filters} onSelectDonor={setSelectedDonor} />}
             {activeTab === 'classifications' && <ClassificationView user={user} />}
             {activeTab === 'expenses' && <ExpenseView user={user} />}
             {activeTab === 'admin' && <AdminView user={user} />}

@@ -242,44 +242,70 @@ def dispatch_approval_email(expense_id: str, title: str, amount: float, code: st
     return dest_email, approve_url, reject_url, email_sent, send_error
 
 
+_CODES_CACHE = None
+
+def clear_expenses_cache():
+    global _CODES_CACHE
+    _CODES_CACHE = None
+
 @router.get("/codes")
 def get_project_codes():
-    """Returns unique list of project codes with real-time Gross Raised, Approved Expenses, and Net Balance."""
-    df_raw = load_data()
-    matrix_df = get_classification_matrix(df_raw).fillna("Unassigned")
+    """Returns unique list of project codes with gross raised, approved expenses, and net balance instantly via caching."""
+    global _CODES_CACHE
+    if _CODES_CACHE is not None:
+        return _CODES_CACHE
 
     init_expense_db()
     conn = sqlite3.connect(LOCAL_DB_PATH, timeout=10.0)
-    cursor = conn.cursor()
-    cursor.execute("SELECT code, SUM(amount) FROM expense_requests WHERE status = 'APPROVED' GROUP BY code")
-    approved_expense_map = {row[0]: row[1] for row in cursor.fetchall() if row[0]}
-    conn.close()
+    try:
+        cur = conn.cursor()
+        
+        # 1. Fetch approved expenses per code
+        cur.execute("SELECT code, SUM(amount) FROM expense_requests WHERE status = 'APPROVED' GROUP BY code")
+        approved_expense_map = {row[0]: row[1] for row in cur.fetchall() if row[0]}
+        
+        # 2. Fetch gross raised and first metadata row per code directly from donations SQL table!
+        cur.execute("""
+            SELECT 
+                Code, 
+                Heading, 
+                [Sub-Heading], 
+                Country, 
+                [Campaign Name], 
+                SUM([Total Online Donations Net Amount in Settled Currency]) 
+            FROM donations 
+            WHERE Code IS NOT NULL AND Code != '' AND Code NOT IN ('N/A', 'Unassigned', 'nan', 'None')
+            GROUP BY Code
+        """)
+        rows = cur.fetchall()
+    except Exception as e:
+        print(f"Error fetching codes from DB: {e}")
+        return []
+    finally:
+        conn.close()
 
-    col_amount = "Total Online Donations Net Amount in Settled Currency"
-    if col_amount not in df_raw.columns:
-        col_amount = "Donation Amount in Project Currency (May be approx.)"
+    # Get matrix to fill in missing metadata
+    df_raw = load_data()
+    matrix_df = get_classification_matrix(df_raw).fillna("Unassigned")
 
     code_map = {}
+    for code_val, heading, sub_heading, country, campaign_name, gross in rows:
+        code_str = str(code_val).strip()
+        gross_raised = float(gross or 0.0)
+        app_expense = approved_expense_map.get(code_str, 0.0)
+        
+        code_map[code_str] = {
+            "code": code_str,
+            "heading": str(heading or "Unassigned"),
+            "sub_heading": str(sub_heading or "Unassigned"),
+            "country": str(country or "Unassigned"),
+            "campaign_name": str(campaign_name or "N/A"),
+            "gross_raised": round(gross_raised, 2),
+            "approved_expenses": round(app_expense, 2),
+            "net_balance": round(gross_raised - app_expense, 2)
+        }
 
-    if not df_raw.empty and "Code" in df_raw.columns:
-        for code_val, group in df_raw.groupby("Code", dropna=True):
-            code_str = str(code_val).strip()
-            if code_str and code_str not in ["N/A", "Unassigned", "nan", "None"]:
-                first_row = group.iloc[0]
-                gross_raised = float(group[col_amount].sum()) if col_amount in group.columns else 0.0
-                app_expense = approved_expense_map.get(code_str, 0.0)
-                
-                code_map[code_str] = {
-                    "code": code_str,
-                    "heading": str(first_row.get("Heading", "Unassigned")),
-                    "sub_heading": str(first_row.get("Sub-Heading", "Unassigned")),
-                    "country": str(first_row.get("Country", "Unassigned")),
-                    "campaign_name": str(first_row.get("Campaign Name", "N/A")),
-                    "gross_raised": round(gross_raised, 2),
-                    "approved_expenses": round(app_expense, 2),
-                    "net_balance": round(gross_raised - app_expense, 2)
-                }
-
+    # Overlay Matrix mappings
     if not matrix_df.empty and "Code" in matrix_df.columns:
         for _, r in matrix_df.iterrows():
             code_str = str(r.get("Code", "")).strip()
@@ -292,6 +318,7 @@ def get_project_codes():
                     code_map[code_str]["country"] = str(r.get("Country"))
 
     sorted_codes = sorted(list(code_map.values()), key=lambda x: x["code"])
+    _CODES_CACHE = sorted_codes
     return sorted_codes
 
 
@@ -419,6 +446,7 @@ def submit_expense(payload: SubmitExpenseRequest):
     ))
     conn.commit()
     conn.close()
+    clear_expenses_cache()
 
     dest_email, approve_url, reject_url, email_sent, send_error = dispatch_approval_email(
         expense_id, payload.title.strip(), payload.amount, payload.code.strip(), payload.requested_by, token
@@ -466,6 +494,7 @@ def review_expense(payload: ReviewExpenseRequest):
     rows_affected = cursor.rowcount
     conn.commit()
     conn.close()
+    clear_expenses_cache()
 
     if rows_affected == 0:
         raise HTTPException(status_code=404, detail="Expense request ID not found.")
@@ -504,6 +533,7 @@ def delete_expense(payload: DeleteExpenseRequest):
     cursor.execute("DELETE FROM expense_requests WHERE id = ?", (payload.expense_id,))
     conn.commit()
     conn.close()
+    clear_expenses_cache()
 
     broadcast_event_sync("EXPENSE_DELETED", {"id": payload.expense_id, "code": exp_code})
 
@@ -539,6 +569,7 @@ def handle_email_approval(id: str, token: str, action: str):
     rows_affected = cursor.rowcount
     conn.commit()
     conn.close()
+    clear_expenses_cache()
 
     if rows_affected == 0:
         return {"status": "error", "message": "Invalid link or token expired."}

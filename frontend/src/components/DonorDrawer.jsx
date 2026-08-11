@@ -5,10 +5,12 @@ import { API_BASE_URL } from '../config';
 export default function DonorDrawer({ donorId, onClose }) {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     if (!donorId) return;
     setLoading(true);
+    setError('');
     fetch(`${API_BASE_URL}/api/donors/profile/${encodeURIComponent(donorId)}`)
       .then(res => res.json())
       .then(data => {
@@ -17,19 +19,32 @@ export default function DonorDrawer({ donorId, onClose }) {
       })
       .catch(err => {
         console.error('Error fetching donor profile:', err);
+        setError('Unable to load donor profile. Please try again.');
         setLoading(false);
       });
   }, [donorId]);
+
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') onClose();
+    };
+
+    if (donorId) {
+      window.addEventListener('keydown', handleKeyDown);
+    }
+
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [donorId, onClose]);
 
   if (!donorId) return null;
 
   const getTierBadge = (tier) => {
     switch (tier) {
-      case 'Super High': return 'badge-purple';
-      case 'High': return 'badge-pink';
-      case 'Medium': return 'badge-cyan';
-      case 'Medium Low': return 'badge-emerald';
-      default: return 'badge-amber';
+      case 'Super High': return 'badge-pink';
+      case 'High': return 'badge-amber';
+      case 'Medium': return 'badge-emerald';
+      case 'Medium Low': return 'badge-cyan';
+      default: return 'badge-slate';
     }
   };
 
@@ -39,15 +54,15 @@ export default function DonorDrawer({ donorId, onClose }) {
       <div className="drawer-backdrop" onClick={onClose} />
 
       {/* Drawer Panel */}
-      <div className="drawer-content p-6 flex flex-col gap-6 w-full max-w-2xl">
+      <div className="drawer-content p-6 flex flex-col gap-6 w-full max-w-2xl panel-pop" role="dialog" aria-modal="true" aria-label="Donor profile drawer">
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-white/10 pb-4">
+        <div className="flex items-center justify-between pb-4" style={{ borderBottom: '1px solid var(--border-glass)' }}>
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-cyan-400/20 to-purple-500/20 border border-cyan-500/30 flex items-center justify-center text-cyan-400 font-extrabold text-lg">
               <User className="w-6 h-6" />
             </div>
             <div>
-              <h2 className="text-xl font-extrabold text-white">{profile?.display_name || donorId}</h2>
+              <h2 className="text-xl font-extrabold" style={{ color: 'var(--text-main)' }}>{profile?.display_name || donorId}</h2>
               <div className="flex flex-wrap items-center gap-2 mt-1">
                 <span className={`badge ${getTierBadge(profile?.lifetime_tier)}`}>Lifetime: {profile?.lifetime_tier}</span>
                 <span className={`badge ${getTierBadge(profile?.transaction_tier)}`}>Transaction: {profile?.transaction_tier}</span>
@@ -57,43 +72,52 @@ export default function DonorDrawer({ donorId, onClose }) {
 
           <button 
             onClick={onClose}
-            className="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center text-slate-400 hover:text-white transition-all"
+            className="w-8 h-8 rounded-full flex items-center justify-center transition-all"
+            style={{ backgroundColor: 'var(--input-bg)', color: 'var(--text-sub)' }}
+            aria-label="Close donor drawer"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
         {loading ? (
-          <div className="py-20 text-center text-slate-400 font-semibold animate-pulse">
-            ⚡ Loading Complete Donor 360° Profile...
+          <div className="glass-panel p-6 animate-pulse">
+            <div className="h-6 w-56 rounded-full bg-slate-700/30 mb-4" />
+            <div className="grid grid-cols-3 gap-3">
+              <div className="h-24 rounded-xl bg-slate-700/25" />
+              <div className="h-24 rounded-xl bg-slate-700/25" />
+              <div className="h-24 rounded-xl bg-slate-700/25" />
+            </div>
           </div>
+        ) : error ? (
+          <div className="glass-panel p-5 border border-rose-500/20 text-sm font-semibold text-rose-400">{error}</div>
         ) : (
           <div className="flex flex-col gap-6 overflow-y-auto pr-1">
             {/* Key Metrics Cards */}
             <div className="grid grid-cols-3 gap-3">
               <div className="glass-panel p-3.5 border-l-4 border-cyan-400">
-                <div className="text-[10px] font-bold text-slate-400 uppercase">Total Lifetime Raised</div>
+                <div className="text-[10px] font-bold uppercase" style={{ color: 'var(--text-sub)' }}>Total Lifetime Raised</div>
                 <div className="text-xl font-black text-cyan-400 mt-1">£{profile?.total_ltv?.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
-                <div className="text-[10px] text-slate-400 mt-0.5">{profile?.total_donations_count} total donations</div>
+                <div className="text-[10px] mt-0.5" style={{ color: 'var(--text-sub)' }}>{profile?.total_donations_count} total donations</div>
               </div>
 
               <div className="glass-panel p-3.5 border-l-4 border-emerald-400">
-                <div className="text-[10px] font-bold text-slate-400 uppercase">Average Donation</div>
+                <div className="text-[10px] font-bold uppercase" style={{ color: 'var(--text-sub)' }}>Average Donation</div>
                 <div className="text-xl font-black text-emerald-400 mt-1">£{profile?.avg_donation?.toFixed(2)}</div>
-                <div className="text-[10px] text-slate-400 mt-0.5">Per transaction</div>
+                <div className="text-[10px] mt-0.5" style={{ color: 'var(--text-sub)' }}>Per transaction</div>
               </div>
 
               <div className="glass-panel p-3.5 border-l-4 border-purple-400">
-                <div className="text-[10px] font-bold text-slate-400 uppercase">Payment Frequency</div>
+                <div className="text-[10px] font-bold uppercase" style={{ color: 'var(--text-sub)' }}>Payment Frequency</div>
                 <div className="text-sm font-extrabold text-purple-300 mt-1.5">{profile?.payment_frequency}</div>
-                <div className="text-[10px] text-slate-400 mt-0.5">{profile?.settlement_currency || 'GBP'}</div>
+                <div className="text-[10px] mt-0.5" style={{ color: 'var(--text-sub)' }}>{profile?.settlement_currency || 'GBP'}</div>
               </div>
             </div>
 
             {/* Category & Sub-Heading Payment Breakdown Card */}
             {profile?.category_breakdown?.length > 0 && (
               <div className="glass-panel p-4 flex flex-col gap-3 border-l-4 border-purple-400">
-                <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                <h3 className="text-xs font-bold uppercase tracking-wider flex items-center gap-1.5" style={{ color: 'var(--text-main)' }}>
                   <PieChart className="w-3.5 h-3.5 text-purple-400" /> Payment Breakdown by Heading & Sub-Heading
                 </h3>
 
@@ -131,7 +155,7 @@ export default function DonorDrawer({ donorId, onClose }) {
 
             {/* Complete Contact & Billing Information */}
             <div className="glass-panel p-4 flex flex-col gap-3">
-              <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+              <h3 className="text-xs font-bold uppercase tracking-wider flex items-center gap-1.5" style={{ color: 'var(--text-main)' }}>
                 <User className="w-3.5 h-3.5 text-cyan-400" /> Contact & Billing Profile
               </h3>
 
@@ -165,7 +189,7 @@ export default function DonorDrawer({ donorId, onClose }) {
 
             {/* Compliance, Tax & Marketing Flags */}
             <div className="glass-panel p-4 flex flex-col gap-3">
-              <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+              <h3 className="text-xs font-bold uppercase tracking-wider flex items-center gap-1.5" style={{ color: 'var(--text-main)' }}>
                 <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" /> Compliance & Tax Declarations
               </h3>
 
