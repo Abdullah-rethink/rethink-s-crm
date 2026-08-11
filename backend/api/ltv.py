@@ -57,10 +57,32 @@ def get_ltv_summary(
     source: Optional[str] = None,
     heading: Optional[str] = None,
     subheading: Optional[str] = None,
-    country: Optional[str] = None
+    country: Optional[str] = None,
+    code: Optional[str] = None,
+    zakat: Optional[str] = None,
+    donor_country: Optional[str] = None,
+    campaign_search: Optional[str] = None,
+    gift_aid: Optional[str] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None
 ):
     df_raw = load_data()
-    df = _apply_filters(df_raw, payment_type, tier, source, heading, subheading, country)
+    df = _apply_filters(
+        df_raw,
+        payment_type=payment_type,
+        tier=tier,
+        source=source,
+        heading=heading,
+        subheading=subheading,
+        country=country,
+        code=code,
+        zakat=zakat,
+        donor_country=donor_country,
+        campaign_search=campaign_search,
+        gift_aid=gift_aid,
+        start_date=start_date,
+        end_date=end_date
+    )
     col_amount = _get_amount_column(df)
 
     if df.empty or not col_amount or "Lifetime Donor Classification" not in df.columns:

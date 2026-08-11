@@ -91,7 +91,7 @@ def bulk_edit_donors(payload: BulkEditDonorsRequest):
     }
 
 
-def _apply_filters(df, payment_type=None, tier=None, source=None, heading=None, subheading=None, country=None, code=None, zakat=None, donor_country=None, campaign_search=None, gift_aid=None):
+def _apply_filters(df, payment_type=None, tier=None, source=None, heading=None, subheading=None, country=None, code=None, zakat=None, donor_country=None, campaign_search=None, gift_aid=None, start_date=None, end_date=None):
     if df.empty:
         return df
     filtered_df = df.copy()
@@ -150,6 +150,12 @@ def _apply_filters(df, payment_type=None, tier=None, source=None, heading=None, 
             elif val_str in ["no", "0", "false"]:
                 filtered_df = filtered_df[filtered_df[ga_col].astype(str).str.lower().isin(["no", "0", "0.0", "false"])]
 
+    if start_date and str(start_date).strip() and "Created Date (UTC)" in filtered_df.columns:
+        filtered_df = filtered_df[pd.to_datetime(filtered_df["Created Date (UTC)"]).dt.date >= pd.to_datetime(start_date).date()]
+
+    if end_date and str(end_date).strip() and "Created Date (UTC)" in filtered_df.columns:
+        filtered_df = filtered_df[pd.to_datetime(filtered_df["Created Date (UTC)"]).dt.date <= pd.to_datetime(end_date).date()]
+
     return filtered_df
 
 
@@ -168,7 +174,9 @@ def get_donors_paginated(
     zakat: Optional[str] = None,
     donor_country: Optional[str] = None,
     campaign_search: Optional[str] = None,
-    gift_aid: Optional[str] = None
+    gift_aid: Optional[str] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None
 ):
     """Returns paginated donor records using direct SQL queries on SQLite for maximum performance and low RAM usage."""
     try:
@@ -230,6 +238,14 @@ def get_donors_paginated(
                 where_clauses.append('("Gift Aid (yes or no)" LIKE ? OR "is_giftaid" = ?)')
                 params.extend([f"%{gift_aid}%", 1 if gift_aid.lower() == "yes" else 0])
 
+            if start_date and str(start_date).strip():
+                where_clauses.append('date("Created Date (UTC)") >= date(?)')
+                params.append(start_date)
+
+            if end_date and str(end_date).strip():
+                where_clauses.append('date("Created Date (UTC)") <= date(?)')
+                params.append(end_date)
+
             if search and search.strip():
                 term = f"%{search.strip()}%"
                 search_parts = ['"First Name" LIKE ?', '"Last Name" LIKE ?', '"Display Name" LIKE ?', '"Email" LIKE ?', '"Campaign Name" LIKE ?', '"Community Name" LIKE ?']
@@ -285,7 +301,7 @@ def get_donors_paginated(
             "donors": []
         }
 
-    filtered_df = _apply_filters(df_raw, payment_type, tier, source, heading, subheading, country, code, zakat, donor_country, campaign_search)
+    filtered_df = _apply_filters(df_raw, payment_type, tier, source, heading, subheading, country, code, zakat, donor_country, campaign_search, gift_aid, start_date, end_date)
     display_df = filtered_df
 
     if search and search.strip():

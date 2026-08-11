@@ -18,7 +18,9 @@ def get_filter_options(
     zakat: Optional[str] = None,
     donor_country: Optional[str] = None,
     campaign_search: Optional[str] = None,
-    gift_aid: Optional[str] = None
+    gift_aid: Optional[str] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None
 ):
     df_raw = load_data()
     if df_raw.empty:
@@ -41,31 +43,31 @@ def get_filter_options(
         sources = ["LaunchGood", "GiveBright", "Paysuite"]
 
     # 1. Headings: filter by all active criteria EXCEPT heading itself
-    h_df = _apply_filters(df_raw, payment_type, tier, source, None, subheading, country, code, zakat, donor_country, campaign_search, gift_aid)
+    h_df = _apply_filters(df_raw, payment_type, tier, source, None, subheading, country, code, zakat, donor_country, campaign_search, gift_aid, start_date, end_date)
     headings = []
     if "Heading" in h_df.columns:
         headings = sorted([str(h).strip() for h in h_df["Heading"].dropna().unique() if str(h).strip() not in ["", "nan", "None"]])
 
     # 2. Sub-headings: filter by all active criteria (including heading) EXCEPT subheading
-    sub_df = _apply_filters(df_raw, payment_type, tier, source, heading, None, country, code, zakat, donor_country, campaign_search, gift_aid)
+    sub_df = _apply_filters(df_raw, payment_type, tier, source, heading, None, country, code, zakat, donor_country, campaign_search, gift_aid, start_date, end_date)
     subheadings = []
     if "Sub-Heading" in sub_df.columns:
         subheadings = sorted([str(sh).strip() for sh in sub_df["Sub-Heading"].dropna().unique() if str(sh).strip() not in ["", "nan", "None"]])
 
     # 3. Countries: filter by all active criteria EXCEPT country
-    c_df = _apply_filters(df_raw, payment_type, tier, source, heading, subheading, None, code, zakat, donor_country, campaign_search, gift_aid)
+    c_df = _apply_filters(df_raw, payment_type, tier, source, heading, subheading, None, code, zakat, donor_country, campaign_search, gift_aid, start_date, end_date)
     countries = []
     if "Country" in c_df.columns:
         countries = sorted([str(c).strip() for c in c_df["Country"].dropna().unique() if str(c).strip() not in ["", "nan", "None"]])
 
     # 4. Codes: filter by all active criteria EXCEPT code
-    cd_df = _apply_filters(df_raw, payment_type, tier, source, heading, subheading, country, None, zakat, donor_country, campaign_search, gift_aid)
+    cd_df = _apply_filters(df_raw, payment_type, tier, source, heading, subheading, country, None, zakat, donor_country, campaign_search, gift_aid, start_date, end_date)
     codes = []
     if "Code" in cd_df.columns:
         codes = sorted([str(cd).strip() for cd in cd_df["Code"].dropna().unique() if str(cd).strip() not in ["", "N/A", "nan", "None", "Unassigned"]])
 
     # 5. Donor Countries: filter by all active criteria EXCEPT donor_country
-    dc_df = _apply_filters(df_raw, payment_type, tier, source, heading, subheading, country, code, zakat, None, campaign_search, gift_aid)
+    dc_df = _apply_filters(df_raw, payment_type, tier, source, heading, subheading, country, code, zakat, None, campaign_search, gift_aid, start_date, end_date)
     donor_countries = []
     for dc_col in ["Donor Country", "Billing Country", "Country Code"]:
         if dc_col in dc_df.columns:

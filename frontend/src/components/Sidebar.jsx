@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Filter, RotateCcw, CreditCard, Crown, Tag, Globe, Folder, ChevronDown, Check, CheckSquare, Square, Shield, Search, Gift } from 'lucide-react';
+import { Filter, RotateCcw, CreditCard, Crown, Tag, Globe, Folder, ChevronDown, Check, CheckSquare, Square, Shield, Search, Gift, Calendar } from 'lucide-react';
 import { API_BASE_URL } from '../config';
 
 export default function Sidebar({ filters, onFilterChange, onResetFilters }) {
@@ -30,6 +30,8 @@ export default function Sidebar({ filters, onFilterChange, onResetFilters }) {
       if (filters.donor_country) params.append('donor_country', filters.donor_country);
       if (filters.campaign_search) params.append('campaign_search', filters.campaign_search);
       if (filters.gift_aid) params.append('gift_aid', filters.gift_aid);
+      if (filters.start_date) params.append('start_date', filters.start_date);
+      if (filters.end_date) params.append('end_date', filters.end_date);
     }
 
     fetch(`${API_BASE_URL}/api/filters/options?${params.toString()}`)
@@ -54,6 +56,8 @@ export default function Sidebar({ filters, onFilterChange, onResetFilters }) {
     filters.zakat && filters.zakat !== 'All Zakat Status' ? { label: 'Zakat', value: filters.zakat } : null,
     filters.campaign_search ? { label: 'Search', value: filters.campaign_search } : null,
     filters.gift_aid && filters.gift_aid !== 'All Gift Aid Status' ? { label: 'Gift Aid', value: filters.gift_aid } : null,
+    filters.start_date ? { label: 'Start', value: filters.start_date } : null,
+    filters.end_date ? { label: 'End', value: filters.end_date } : null,
   ].filter(Boolean);
 
   const handleToggleSource = (sourceName) => {
@@ -100,6 +104,38 @@ export default function Sidebar({ filters, onFilterChange, onResetFilters }) {
           ))}
         </div>
       )}
+
+      <details open className="glass-panel p-3 rounded-2xl" style={{ borderColor: 'var(--border-glass)' }}>
+        <summary className="cursor-pointer list-none text-[11px] font-black uppercase tracking-wider flex items-center gap-1.5" style={{ color: 'var(--text-main)' }}>
+          <Calendar className="w-3.5 h-3.5 text-orange-400" /> Date Range Filter
+        </summary>
+        <div className="pt-3 flex flex-col gap-3">
+          <div className="flex flex-col gap-1.5">
+            <label className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+              Start Date
+            </label>
+            <input 
+              type="date"
+              value={filters.start_date || ''}
+              onChange={e => onFilterChange('start_date', e.target.value)}
+              className="w-full border rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-cyan-500 transition-all"
+              style={{ backgroundColor: 'var(--input-bg)', color: 'var(--input-text)', borderColor: 'var(--input-border)' }}
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <label className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+              End Date
+            </label>
+            <input 
+              type="date"
+              value={filters.end_date || ''}
+              onChange={e => onFilterChange('end_date', e.target.value)}
+              className="w-full border rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-cyan-500 transition-all"
+              style={{ backgroundColor: 'var(--input-bg)', color: 'var(--input-text)', borderColor: 'var(--input-border)' }}
+            />
+          </div>
+        </div>
+      </details>
 
       <details open className="glass-panel p-3 rounded-2xl" style={{ borderColor: 'var(--border-glass)' }}>
         <summary className="cursor-pointer list-none text-[11px] font-black uppercase tracking-wider flex items-center gap-1.5" style={{ color: 'var(--text-main)' }}>
