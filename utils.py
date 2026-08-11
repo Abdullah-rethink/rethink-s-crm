@@ -1368,7 +1368,6 @@ def apply_custom_css():
 
         .metric-card:hover {
             transform: translateY(-4px);
-            border-color: var(--metric-border-hover) !important;
             box-shadow: var(--metric-card-hover-shadow), 0 0 20px 0 var(--metric-card-glow) !important;
         }
         
@@ -1473,10 +1472,10 @@ def apply_custom_css():
         .tier-card:hover {
             transform: translateX(4px);
         }
-        .tier-card.tier-low { border-left-color: #3B82F6; }
-        .tier-card.tier-medlow { border-left-color: #10B981; }
-        .tier-card.tier-med { border-left-color: #F59E0B; }
-        .tier-card.tier-high { border-left-color: #F97316; }
+        .tier-card.tier-low { border-left-color: #94A3B8; }
+        .tier-card.tier-medlow { border-left-color: #38BDF8; }
+        .tier-card.tier-med { border-left-color: #10B981; }
+        .tier-card.tier-high { border-left-color: #F59E0B; }
         .tier-card.tier-super { border-left-color: #EC4899; }
         
         /* Streamlit Input Enhancements */

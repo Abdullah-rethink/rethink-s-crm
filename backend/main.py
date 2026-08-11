@@ -7,7 +7,7 @@ from fastapi.staticfiles import StaticFiles
 # Add project root to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from backend.api import admin, auth, classifications, donors, events, expenses, filters, ltv, metrics, overview
+from backend.api import admin, auth, classifications, donors, events, expenses, filters, ltv, metrics, overview, tracker
 from core.auth import init_user_db
 from core.data_processor import load_data
 
@@ -43,6 +43,7 @@ app.include_router(admin.router)
 app.include_router(expenses.router)
 app.include_router(filters.router)
 app.include_router(events.router)
+app.include_router(tracker.router)
 
 
 @app.get("/api/health", tags=["Health"])
@@ -65,3 +66,9 @@ def startup_event():
     print("Crowdfunding Enterprise CRM API initialized.")
     if not os.environ.get("VERCEL"):
         load_data()
+        try:
+            from backend.api.tracker import get_tracker_stats
+            get_tracker_stats()
+            print("Sponsorship Tracker pre-computation complete.")
+        except Exception as e:
+            print(f"Tracker pre-compute notice: {e}")

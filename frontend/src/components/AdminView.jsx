@@ -22,22 +22,36 @@ export default function AdminView({ user }) {
 
   const loadAdminData = () => {
     setLoading(true);
-    Promise.all([
-      fetch(`${API_BASE_URL}/api/admin/status`).then(r => r.json()),
-      fetch(`${API_BASE_URL}/api/admin/tags`).then(r => r.json()),
-      fetch(`${API_BASE_URL}/api/admin/users`).then(r => r.json()),
-      fetch(`${API_BASE_URL}/api/expenses/settings`).then(r => r.json()),
-    ]).then(([stData, tagData, uData, expSettings]) => {
-      setStatus(stData);
-      setTags(tagData);
-      setUsersList(uData || []);
-      if (expSettings?.approval_email) setApprovalEmail(expSettings.approval_email);
-      if (tagData.length > 0) setOldTag(tagData[0].source_tag);
-      setLoading(false);
-    }).catch(err => {
-      console.error('Error loading admin status:', err);
-      setLoading(false);
-    });
+
+    fetch(`${API_BASE_URL}/api/admin/status`)
+      .then(r => r.ok ? r.json() : null)
+      .then(stData => { if (stData) setStatus(stData); })
+      .catch(err => console.error('Status fetch error:', err));
+
+    fetch(`${API_BASE_URL}/api/admin/tags`)
+      .then(r => r.ok ? r.json() : [])
+      .then(tagData => {
+        if (Array.isArray(tagData)) {
+          setTags(tagData);
+          if (tagData.length > 0) setOldTag(tagData[0].source_tag);
+        }
+      })
+      .catch(err => console.error('Tags fetch error:', err));
+
+    fetch(`${API_BASE_URL}/api/admin/users`)
+      .then(r => r.ok ? r.json() : [])
+      .then(uData => {
+        if (Array.isArray(uData)) setUsersList(uData);
+      })
+      .catch(err => console.error('Users fetch error:', err));
+
+    fetch(`${API_BASE_URL}/api/expenses/settings`)
+      .then(r => r.ok ? r.json() : null)
+      .then(expSettings => {
+        if (expSettings?.approval_email) setApprovalEmail(expSettings.approval_email);
+      })
+      .catch(err => console.error('Settings fetch error:', err))
+      .finally(() => setLoading(false));
   };
 
   useEffect(() => {

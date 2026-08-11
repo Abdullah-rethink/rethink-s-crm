@@ -44,7 +44,6 @@ def apply_custom_css():
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
         .glass-panel:hover {
-            border-color: rgba(56, 189, 248, 0.3);
             box-shadow: 0 14px 35px rgba(0, 0, 0, 0.4);
         }
         
@@ -71,7 +70,6 @@ def apply_custom_css():
         }
         .metric-card:hover {
             transform: translateY(-4px);
-            border-color: rgba(56, 189, 248, 0.4);
             box-shadow: 0 16px 32px rgba(56, 189, 248, 0.15);
         }
         .metric-label {

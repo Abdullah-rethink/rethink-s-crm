@@ -6,6 +6,24 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Crowdfunding Analytics Engine v2.0 CRM</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      (() => {
+        try {
+          const savedTheme = localStorage.getItem('crm_theme');
+          const prefersLight = window.matchMedia('(prefers-color-scheme: light)').matches;
+          const theme = savedTheme === 'light' || savedTheme === 'dark'
+            ? savedTheme
+            : (prefersLight ? 'light' : 'dark');
+
+          document.documentElement.classList.remove('theme-light', 'theme-dark');
+          document.documentElement.classList.add(theme === 'light' ? 'theme-light' : 'theme-dark');
+          document.documentElement.style.colorScheme = theme;
+        } catch (error) {
+          document.documentElement.classList.add('theme-dark');
+          document.documentElement.style.colorScheme = 'dark';
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

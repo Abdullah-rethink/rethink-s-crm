@@ -3,6 +3,30 @@ import { CreditCard, PlusCircle, Check, X, Mail, Filter, Wallet, Search, Chevron
 import { API_BASE_URL } from '../config';
 
 export default function ExpenseView({ user }) {
+  const formatDate = (val) => {
+    if (!val) return 'N/A';
+    try {
+      const d = new Date(val);
+      if (isNaN(d.getTime())) return val;
+      return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+    } catch (e) {
+      return val;
+    }
+  };
+
+  const getStatusBadge = (status) => {
+    switch (status) {
+      case 'APPROVED':
+        return <span className="badge badge-emerald text-[10px] font-bold">APPROVED</span>;
+      case 'REJECTED':
+        return <span className="badge badge-rose text-[10px] font-bold">REJECTED</span>;
+      case 'PENDING_APPROVAL':
+        return <span className="badge badge-amber text-[10px] font-bold animate-pulse">PENDING APPROVAL</span>;
+      default:
+        return <span className="badge badge-secondary text-[10px] font-bold">{status}</span>;
+    }
+  };
+
   const [codes, setCodes] = useState([]);
   const [expensesData, setExpensesData] = useState({ summary: {}, expenses: [] });
   const [loading, setLoading] = useState(true);
@@ -336,11 +360,15 @@ export default function ExpenseView({ user }) {
   const filteredCodes = codes.filter(c => {
     if (!codeSearch) return true;
     const term = codeSearch.toLowerCase();
+    const code = (c.code || '').toLowerCase();
+    const heading = (c.heading || '').toLowerCase();
+    const sub_heading = (c.sub_heading || '').toLowerCase();
+    const country = (c.country || '').toLowerCase();
     return (
-      c.code.toLowerCase().includes(term) ||
-      c.heading.toLowerCase().includes(term) ||
-      c.sub_heading.toLowerCase().includes(term) ||
-      c.country.toLowerCase().includes(term)
+      code.includes(term) ||
+      heading.includes(term) ||
+      sub_heading.includes(term) ||
+      country.includes(term)
     );
   });
 
@@ -858,7 +886,7 @@ export default function ExpenseView({ user }) {
       {/* Submit Expense Request Modal */}
       {showSubmitModal && (
         <div className="drawer-backdrop flex items-center justify-center p-4">
-          <div className="glass-panel p-6 w-full max-w-xl border-l-4 border-cyan-400 flex flex-col gap-5 shadow-2xl animate-in fade-in zoom-in duration-200">
+          <div className="glass-panel p-6 w-full max-w-xl border-l-4 border-cyan-400 flex flex-col gap-5 shadow-2xl panel-pop">
             <div className="flex items-center justify-between border-b pb-3" style={{ borderColor: 'var(--border-glass)' }}>
               <h3 className="text-base font-extrabold flex items-center gap-2" style={{ color: 'var(--text-main)' }}>
                 <PlusCircle className="w-5 h-5 text-cyan-400" /> New Category Expense Claim Request
@@ -1054,7 +1082,7 @@ export default function ExpenseView({ user }) {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fadeIn">
           <div 
             className="glass-panel p-6 rounded-2xl w-full max-w-4xl max-h-[90vh] flex flex-col gap-5 overflow-y-auto border-t-4 border-purple-500 shadow-2xl relative"
-            style={{ backgroundColor: 'var(--bg-panel)', borderColor: 'var(--border-glass)' }}
+            style={{ backgroundColor: 'var(--drawer-bg)', borderColor: 'var(--border-glass)' }}
           >
             {/* Header */}
             <div className="flex items-start justify-between border-b pb-4" style={{ borderColor: 'var(--border-glass)' }}>
