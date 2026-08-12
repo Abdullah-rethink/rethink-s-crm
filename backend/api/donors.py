@@ -419,6 +419,18 @@ def get_donors_kanban(
     if df.empty or "Lifetime Donor Classification" not in df.columns:
         return {}
 
+    df = df.copy()
+    
+    # Construct Real Name for UI Display
+    if "First Name" in df.columns and "Last Name" in df.columns:
+        df["_real_name"] = (df["First Name"].astype(str).replace('nan', '') + " " + df["Last Name"].astype(str).replace('nan', '')).str.strip()
+        df.loc[df["_real_name"] == "", "_real_name"] = df.get("Display Name", "")
+    elif "Billing Name" in df.columns:
+        df["_real_name"] = df["Billing Name"].astype(str).replace('nan', '').str.strip()
+        df.loc[df["_real_name"] == "", "_real_name"] = df.get("Display Name", "")
+    else:
+        df["_real_name"] = df.get("Display Name", "")
+
     # Pre-calculate true cumulative LTV & total transaction count for all donors across the entire dataset!
     col_amount = "Total Online Donations Net Amount in Settled Currency"
     if col_amount not in df_raw.columns:
@@ -442,7 +454,7 @@ def get_donors_kanban(
 
         if not t_df.empty:
             donor_summary = t_df.groupby(group_col).agg(
-                name=("Display Name", "first") if "Display Name" in t_df.columns else (group_col, "first"),
+                name=("_real_name", "first"),
                 email=("Email", "first") if "Email" in t_df.columns else (group_col, "first"),
                 tier=("Lifetime Donor Classification", "first"),
                 txn_tier=("Transaction Donor Classification", "first") if "Transaction Donor Classification" in t_df.columns else ("Lifetime Donor Classification", "first")
@@ -450,7 +462,8 @@ def get_donors_kanban(
 
             records = []
             for _, r in donor_summary.head(30).iterrows():
-                r_name = str(r["name"]) if (pd.notna(r["name"]) and str(r["name"]).strip().lower() not in ["nan", "none", "null"]) else "Anonymous Donor"
+                # Avoid overriding real names with "Anonymous Donor" if they are present
+                r_name = str(r["name"]).strip() if (pd.notna(r["name"]) and str(r["name"]).strip().lower() not in ["nan", "none", "null", ""]) else "Anonymous Donor"
                 r_email = str(r["email"]) if (pd.notna(r["email"]) and str(r["email"]).strip().lower() not in ["nan", "none", "null"]) else ""
                 r_tier = str(r["tier"]) if (pd.notna(r["tier"]) and str(r["tier"]).strip().lower() not in ["nan", "none", "null"]) else "Unassigned"
                 r_txntier = str(r["txn_tier"]) if (pd.notna(r["txn_tier"]) and str(r["txn_tier"]).strip().lower() not in ["nan", "none", "null"]) else "Unassigned"

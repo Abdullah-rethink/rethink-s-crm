@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { TrendingUp, PieChart, Award, Tag } from 'lucide-react';
+import { TrendingUp, PieChart, Award, Tag, Calendar, CheckCircle, Clock, FileText, Gift, Layers, DollarSign, MoreHorizontal } from 'lucide-react';
 import { API_BASE_URL } from '../config';
 
-export default function OverviewView({ filters }) {
+export default function OverviewView({ filters, user, metrics, accentColor }) {
   const [timeline, setTimeline] = useState([]);
   const [headings, setHeadings] = useState([]);
   const [campaigns, setCampaigns] = useState([]);
@@ -56,112 +56,144 @@ export default function OverviewView({ filters }) {
 
   const maxCampaignRaised = campaigns.length > 0 ? Math.max(...campaigns.map(c => c.total_raised)) : 1;
 
+  const colorMaps = {
+    cyan: { text: 'text-cyan-500', bg: 'bg-cyan-500', border: 'border-cyan-500' },
+    emerald: { text: 'text-emerald-500', bg: 'bg-emerald-500', border: 'border-emerald-500' },
+    purple: { text: 'text-purple-500', bg: 'bg-purple-500', border: 'border-purple-500' },
+    rose: { text: 'text-rose-500', bg: 'bg-rose-500', border: 'border-rose-500' }
+  };
+  const tColors = colorMaps[accentColor] || colorMaps.cyan;
+
+  // Format current date
+  const now = new Date();
+  const dateOptions = { weekday: 'long', day: 'numeric', month: 'long' };
+  const formattedDate = now.toLocaleDateString('en-US', dateOptions);
+  const hour = now.getHours();
+  const greeting = hour < 12 ? 'GOOD MORNING' : hour < 18 ? 'GOOD AFTERNOON' : 'GOOD EVENING';
+
+  const rawName = user?.username || user?.email?.split('@')[0] || 'Admin';
+  const displayName = rawName.charAt(0).toUpperCase() + rawName.slice(1);
+
   return (
-    <div className="flex flex-col gap-6">
-      {/* Section Header */}
-      <div>
-        <h2 className="text-xl font-extrabold text-white flex items-center gap-2">
-          <TrendingUp className="w-5 h-5 text-cyan-400" /> Executive Overview & Campaign Dynamics
+    <div className="flex flex-col gap-8 pb-10">
+      {/* 1. Minimalist Greeting Header */}
+      <div className="flex flex-col gap-1.5 pt-2">
+        <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">
+          {greeting}
+        </span>
+        <h2 className="text-2xl sm:text-3xl font-black text-slate-800 dark:text-white tracking-tight">
+          {displayName}, here is your overview
         </h2>
-        <p className="text-xs text-slate-400">High-level fundraising performance, category trends, and campaign leaderboards.</p>
+        <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mt-1">
+          {formattedDate} • {Number(metrics?.total_txns || 0).toLocaleString()} donations tracked
+        </p>
       </div>
 
-      {/* Row 1: Timeline & Category Distribution */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Timeline Panel */}
-        <div className="glass-panel p-5 border-l-4 border-cyan-400 lg:col-span-2 flex flex-col gap-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-bold text-slate-200 flex items-center gap-2">
-              <TrendingUp className="w-4 h-4 text-cyan-400" /> Fundraising Volume & Daily Timeline (UTC)
-            </h3>
-            <span className="badge badge-cyan">{timeline.length} Days Tracked</span>
+
+
+      {/* 3. Two Column Layout for Main Data */}
+      <div className="flex flex-col lg:flex-row gap-6 lg:gap-8 items-start">
+        
+        {/* LEFT COLUMN: Top Campaigns Table (Simulating "THIS MORNING" list) */}
+        <div className="w-full lg:flex-[2] bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-2xl shadow-[0_2px_10px_-3px_rgba(6,81,237,0.05)] overflow-hidden">
+          <div className="px-6 py-4 border-b border-slate-100 dark:border-white/5">
+            <h3 className="text-[11px] font-extrabold uppercase tracking-widest text-slate-500 dark:text-slate-400">Top Performing Campaigns</h3>
           </div>
-
-          <div className="flex flex-col gap-2 max-h-[300px] overflow-y-auto pr-1">
-            {timeline.slice(-10).reverse().map((item, idx) => (
-              <div key={idx} className="flex items-center justify-between text-xs py-2 px-3 rounded-lg bg-slate-800/40 border border-white/5">
-                <span className="text-slate-400 font-semibold">{item.date}</span>
-                <span className="text-slate-400">{item.donation_count} donations</span>
-                <span className="font-extrabold text-cyan-400">£{item.total_raised?.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Category Distribution Panel */}
-        <div className="glass-panel p-5 border-l-4 border-purple-400 flex flex-col gap-4">
-          <h3 className="text-sm font-bold text-slate-200 flex items-center gap-2">
-            <PieChart className="w-4 h-4 text-purple-400" /> Top Categories (Headings)
-          </h3>
-
-          <div className="flex flex-col gap-2.5">
-            {headings.map((cat, idx) => (
-              <div key={idx} className="flex flex-col gap-1">
-                <div className="flex items-center justify-between text-xs font-semibold">
-                  <span className="text-slate-300 truncate max-w-[160px]">{cat.category}</span>
-                  <span className="text-purple-400 font-bold">£{cat.total_raised?.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                </div>
-                <div className="w-full h-1.5 rounded-full bg-slate-800 overflow-hidden">
-                  <div 
-                    className="h-full bg-gradient-to-r from-purple-500 to-pink-500 rounded-full"
-                    style={{ width: `${(cat.total_raised / (headings[0]?.total_raised || 1)) * 100}%` }}
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Row 2: Top Campaigns & Sub-Headings */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Top Campaigns */}
-        <div className="glass-panel p-5 border-l-4 border-emerald-400 flex flex-col gap-4">
-          <h3 className="text-sm font-bold text-slate-200 flex items-center gap-2">
-            <Award className="w-4 h-4 text-emerald-400" /> Top 10 Campaigns by Total Raised
-          </h3>
-
-          <div className="flex flex-col gap-3">
-            {campaigns.map((camp, idx) => (
-              <div key={idx} className="flex flex-col gap-1">
-                <div className="flex items-center justify-between text-xs font-semibold">
-                  <span className="text-slate-200 truncate max-w-[280px]">{camp.campaign}</span>
-                  <span className="text-emerald-400 font-extrabold">£{camp.total_raised?.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                </div>
-                <div className="w-full h-2 rounded-full bg-slate-800 overflow-hidden">
-                  <div 
-                    className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 rounded-full"
-                    style={{ width: `${(camp.total_raised / maxCampaignRaised) * 100}%` }}
-                  />
-                </div>
-              </div>
-            ))}
+          
+          <div className="w-full overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="border-b border-slate-100 dark:border-white/5 bg-slate-50/50 dark:bg-slate-900/50">
+                  <th className="px-6 py-3 text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Campaign Name</th>
+                  <th className="px-6 py-3 text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Total Raised</th>
+                  <th className="px-6 py-3 text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Performance</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-white/5">
+                {campaigns.slice(0, 8).map((camp, idx) => (
+                  <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                    <td className="px-6 py-3.5">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-8 h-8 rounded-full ${tColors.bg}/10 flex items-center justify-center ${tColors.text} font-bold text-xs`}>
+                          {camp.campaign.substring(0, 1).toUpperCase()}
+                        </div>
+                        <div className="flex flex-col min-w-0">
+                          <span className="text-sm font-bold text-slate-800 dark:text-slate-200 truncate max-w-[250px]">{camp.campaign}</span>
+                          <span className="text-[10px] font-semibold text-slate-400 truncate max-w-[250px]">ID: {camp.campaign.substring(0, 8).toUpperCase()}...</span>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-3.5">
+                      <span className="text-sm font-black text-slate-800 dark:text-slate-200">
+                        £{camp.total_raised?.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                      </span>
+                    </td>
+                    <td className="px-6 py-3.5">
+                      <div className="flex items-center gap-2">
+                        <div className="w-24 h-1.5 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
+                          <div 
+                            className={`h-full ${tColors.bg} rounded-full`}
+                            style={{ width: `${(camp.total_raised / maxCampaignRaised) * 100}%` }}
+                          />
+                        </div>
+                        <span className={`text-[10px] font-bold ${tColors.text} px-2 py-0.5 rounded-full ${tColors.bg}/10`}>
+                          {Math.round((camp.total_raised / maxCampaignRaised) * 100)}%
+                        </span>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
 
-        {/* Sub-Heading Performance */}
-        <div className="glass-panel p-5 border-l-4 border-pink-400 flex flex-col gap-4">
-          <h3 className="text-sm font-bold text-slate-200 flex items-center gap-2">
-            <Tag className="w-4 h-4 text-pink-400" /> Sub-Heading Performance
-          </h3>
-
-          <div className="flex flex-col gap-3">
-            {subheadings.map((sub, idx) => (
-              <div key={idx} className="flex flex-col gap-1">
-                <div className="flex items-center justify-between text-xs font-semibold">
-                  <span className="text-slate-200 truncate max-w-[280px]">{sub.sub_heading}</span>
-                  <span className="text-pink-400 font-extrabold">£{sub.total_raised?.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+        {/* RIGHT COLUMN: Widgets */}
+        <div className="w-full lg:flex-[1] flex flex-col gap-6 lg:gap-8">
+          
+          {/* Categories Widget (Simulating "PATIENT ACTIVITY") */}
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-2xl p-6 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.05)] flex flex-col gap-6">
+            <h3 className="text-[11px] font-extrabold uppercase tracking-widest text-slate-500 dark:text-slate-400">Category Distribution</h3>
+            
+            <div className="flex flex-col gap-4">
+              {headings.slice(0, 5).map((cat, idx) => (
+                <div key={idx} className="flex flex-col gap-2">
+                  <div className="flex items-center justify-between text-xs font-semibold">
+                    <span className="text-slate-700 dark:text-slate-300 truncate">{cat.category}</span>
+                    <span className="text-slate-900 dark:text-white font-bold">£{cat.total_raised?.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+                  </div>
+                  <div className="w-full h-1.5 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
+                    <div 
+                      className="h-full bg-slate-800 dark:bg-slate-400 rounded-full"
+                      style={{ width: `${(cat.total_raised / (headings[0]?.total_raised || 1)) * 100}%` }}
+                    />
+                  </div>
                 </div>
-                <div className="w-full h-2 rounded-full bg-slate-800 overflow-hidden">
-                  <div 
-                    className="h-full bg-gradient-to-r from-pink-500 to-purple-500 rounded-full"
-                    style={{ width: `${(sub.total_raised / (subheadings[0]?.total_raised || 1)) * 100}%` }}
-                  />
-                </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
+
+          {/* Subheadings / Alerts Widget (Simulating "NEEDS YOUR ATTENTION") */}
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-2xl p-6 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.05)] flex flex-col gap-5">
+            <h3 className="text-[11px] font-extrabold uppercase tracking-widest text-slate-500 dark:text-slate-400">Top Sub-Categories</h3>
+            
+            <div className="flex flex-col gap-4 divide-y divide-slate-100 dark:divide-white/5">
+              {subheadings.slice(0, 4).map((sub, idx) => (
+                <div key={idx} className="pt-4 first:pt-0 flex flex-col gap-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-bold text-slate-800 dark:text-slate-200">{sub.sub_heading}</span>
+                    <span className="text-[10px] font-bold text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-md">
+                      £{sub.total_raised?.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                    </span>
+                  </div>
+                  <span className="text-xs text-slate-500 dark:text-slate-500">Highest performing sub-category grouping</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
         </div>
+
       </div>
     </div>
   );

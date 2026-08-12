@@ -123,12 +123,28 @@ def get_filter_options(
     # 10. Gift Aid
     ga_df = _apply_filters(df_raw, payment_type, tier, source, heading, subheading, country, code, zakat, donor_country, campaign_search, None, start_date, end_date)
     gift_aid_options = ["All Gift Aid Status"]
-    if "Gift Aid" in ga_df.columns:
-        ga_vals = set(str(g).strip().lower() for g in ga_df["Gift Aid"].dropna().unique())
+    has_yes = False
+    has_no = False
+    if "Gift Aid (yes or no)" in ga_df.columns:
+        ga_vals = set(str(g).strip().lower() for g in ga_df["Gift Aid (yes or no)"].dropna().unique())
         if "yes" in ga_vals or "true" in ga_vals:
-            gift_aid_options.append("Yes")
+            has_yes = True
         if "no" in ga_vals or "false" in ga_vals:
-            gift_aid_options.append("No")
+            has_no = True
+    if "is_giftaid" in ga_df.columns:
+        ga_vals_num = ga_df["is_giftaid"].dropna().unique()
+        if 1.0 in ga_vals_num or 1 in ga_vals_num or "1.0" in ga_vals_num or "1" in ga_vals_num:
+            has_yes = True
+        if 0.0 in ga_vals_num or 0 in ga_vals_num or "0.0" in ga_vals_num or "0" in ga_vals_num:
+            has_no = True
+            
+    if has_yes:
+        gift_aid_options.append("Yes")
+    if has_no:
+        gift_aid_options.append("No")
+        
+    if len(gift_aid_options) == 1:
+        gift_aid_options = ["All Gift Aid Status", "Yes", "No"]
 
     return {
         "sources": sources,

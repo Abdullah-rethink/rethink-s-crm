@@ -307,3 +307,33 @@ def change_user_password(email_or_username, current_password, new_password):
         return False, f"Database error: {e}"
     finally:
         conn.close()
+
+
+def edit_user_details(user_id: int, email: str, username: str, password: str = None):
+    """
+    Allows Super Admin to edit details of a member: email, username, and optionally reset their password.
+    """
+    init_user_db()
+    conn = sqlite3.connect(LOCAL_DB_PATH, timeout=30.0)
+    cursor = conn.cursor()
+    try:
+        if password and password.strip():
+            hashed = hashlib.sha256(password.strip().encode('utf-8')).hexdigest()
+            cursor.execute("""
+                UPDATE users SET email = ?, username = ?, password_hash = ?
+                WHERE id = ?
+            """, (email.strip(), username.strip(), hashed, user_id))
+        else:
+            cursor.execute("""
+                UPDATE users SET email = ?, username = ?
+                WHERE id = ?
+            """, (email.strip(), username.strip(), user_id))
+        conn.commit()
+        return True, "User details updated successfully."
+    except sqlite3.IntegrityError:
+        return False, "Error: Username or Email already exists."
+    except Exception as e:
+        return False, f"Database error: {str(e)}"
+    finally:
+        conn.close()
+

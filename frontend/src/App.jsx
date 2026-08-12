@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import Navbar from './components/Navbar';
-import Sidebar from './components/Sidebar';
+import HorizontalFilters from './components/HorizontalFilters';
+import NavigationSidebar from './components/NavigationSidebar';
 import OverviewView from './components/OverviewView';
 import LtvView from './components/LtvView';
 import KanbanBoard from './components/KanbanBoard';
@@ -12,7 +13,7 @@ import TrackerView from './components/TrackerView';
 import DonorDrawer from './components/DonorDrawer';
 import LoginView from './components/LoginView';
 
-import { TrendingUp, Crown, Columns, Table, Shield, CreditCard, Database, Target, Gift, Layers, DollarSign } from 'lucide-react';
+import { TrendingUp, Crown, Columns, Table, Shield, CreditCard, Database, Target, Gift, Layers, DollarSign, Filter, ChevronUp, ChevronDown } from 'lucide-react';
 
 import { API_BASE_URL } from './config';
 
@@ -38,6 +39,23 @@ export default function App() {
   const [selectedDonor, setSelectedDonor] = useState(null);
   const [metrics, setMetrics] = useState(null);
   const [filters, setFilters] = useState(INITIAL_FILTERS);
+  const [accentColor, setAccentColor] = useState(() => {
+    return localStorage.getItem('crm_accent') || 'cyan';
+  });
+
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [showFilters, setShowFilters] = useState(true);
+  const [metricsExpanded, setMetricsExpanded] = useState(true);
+  const [filtersHovered, setFiltersHovered] = useState(false);
+
+  // Auto-collapse sidebar after 3 seconds of switching tab
+  const handleSetActiveTab = (tabId) => {
+    setActiveTab(tabId);
+    // "also side panel must be collapsable after few seconds of clicking"
+    setTimeout(() => {
+      setSidebarCollapsed(true);
+    }, 3000);
+  };
 
   const [theme, setTheme] = useState(() => {
     const savedTheme = localStorage.getItem('crm_theme');
@@ -108,6 +126,10 @@ export default function App() {
     localStorage.setItem('crm_theme', theme);
   }, [theme]);
 
+  useEffect(() => {
+    localStorage.setItem('crm_accent', accentColor);
+  }, [accentColor]);
+
   const handleToggleTheme = () => {
     setTheme(prev => (prev === 'dark' ? 'light' : 'dark'));
   };
@@ -169,104 +191,64 @@ export default function App() {
     { id: 'admin', label: 'Admin & Data', icon: Database },
   ];
 
+  const showFiltersForTab = ['overview', 'ltv', 'kanban', 'explorer', 'tracker'].includes(activeTab);
+
   return (
-    <div className="min-h-screen flex flex-col pb-12">
-      {/* Top Navbar */}
-      <Navbar user={user} theme={theme} onToggleTheme={handleToggleTheme} onSignOut={handleSignOut} />
+    <div className="h-screen w-full flex overflow-hidden bg-slate-50 dark:bg-slate-900 transition-colors">
+      
+      {/* Left Navigation Sidebar */}
+      <NavigationSidebar 
+        activeTab={activeTab} 
+        setActiveTab={handleSetActiveTab} 
+        accentColor={accentColor}
+        setAccentColor={setAccentColor}
+      />
 
-      {/* Main Container with Left Sidebar Layout */}
-      <main className="px-6 max-w-7xl mx-auto w-full flex flex-col gap-6 pt-4">
-        {/* Executive Summary Metrics Header Cards Bar - ALWAYS VISIBLE */}
-        {metrics && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {/* Total Raised */}
-            <div className="glass-panel p-4 border-l-4 border-cyan-400 flex flex-col gap-1 relative overflow-hidden group hover:border-cyan-300 transition-all shadow-lg">
-              <div className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400">Total Raised</div>
-              <div className="text-2xl font-black text-cyan-400 font-mono tracking-tight">
-                £{Number(metrics.total_raised || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </div>
-              <div className="absolute right-3 top-3 opacity-10 group-hover:opacity-20 transition-opacity">
-                <TrendingUp className="w-10 h-10 text-cyan-400" />
-              </div>
+      {/* Main Right Area */}
+      <div className="flex-1 flex flex-col h-screen min-w-0 overflow-hidden relative">
+        {/* Top Navbar */}
+        <Navbar 
+          user={user} 
+          theme={theme} 
+          onToggleTheme={handleToggleTheme} 
+          onSignOut={handleSignOut} 
+          accentColor={accentColor}
+          setAccentColor={setAccentColor}
+          metrics={metrics}
+        />
+
+        {/* Scrollable Main Workspace */}
+        <main className="flex-1 overflow-y-auto px-6 py-6 pb-24 custom-scrollbar">
+          <div className="max-w-7xl mx-auto flex flex-col gap-6">
+            
+
+
+            {/* Horizontal Filter Pills Bar */}
+            {showFiltersForTab && (
+              <HorizontalFilters 
+                filters={filters} 
+                onFilterChange={handleFilterChange} 
+                onResetFilters={handleResetFilters} 
+                accentColor={accentColor}
+              />
+            )}
+
+            {/* Active Tab Main Content */}
+            <div className="w-full min-w-0">
+              {activeTab === 'overview' && <OverviewView filters={filters} user={user} metrics={metrics} accentColor={accentColor} />}
+              {activeTab === 'ltv' && <LtvView filters={filters} />}
+              {activeTab === 'kanban' && <KanbanBoard filters={filters} onSelectDonor={setSelectedDonor} />}
+              {activeTab === 'explorer' && <ExplorerView user={user} filters={filters} onSelectDonor={setSelectedDonor} />}
+              {activeTab === 'tracker' && <TrackerView user={user} filters={filters} onSelectDonor={setSelectedDonor} accentColor={accentColor} />}
+              {activeTab === 'classifications' && <ClassificationView user={user} />}
+              {activeTab === 'expenses' && <ExpenseView user={user} />}
+              {activeTab === 'admin' && <AdminView user={user} />}
             </div>
 
-            {/* Gift Aid Estimate */}
-            <div className="glass-panel p-4 border-l-4 border-amber-400 flex flex-col gap-1 relative overflow-hidden group hover:border-amber-300 transition-all shadow-lg">
-              <div className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400">Gift Aid Estimate</div>
-              <div className="text-2xl font-black text-amber-400 font-mono tracking-tight">
-                £{Number(metrics.gift_aid_estimate || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </div>
-              <div className="absolute right-3 top-3 opacity-10 group-hover:opacity-20 transition-opacity">
-                <Gift className="w-10 h-10 text-amber-400" />
-              </div>
-            </div>
 
-            {/* Donations Count */}
-            <div className="glass-panel p-4 border-l-4 border-purple-400 flex flex-col gap-1 relative overflow-hidden group hover:border-purple-300 transition-all shadow-lg">
-              <div className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400">Donations</div>
-              <div className="text-2xl font-black text-purple-400 font-mono tracking-tight">
-                {Number(metrics.total_txns || 0).toLocaleString()}
-              </div>
-              <div className="absolute right-3 top-3 opacity-10 group-hover:opacity-20 transition-opacity">
-                <Layers className="w-10 h-10 text-purple-400" />
-              </div>
-            </div>
-
-            {/* Avg Donation */}
-            <div className="glass-panel p-4 border-l-4 border-emerald-400 flex flex-col gap-1 relative overflow-hidden group hover:border-emerald-300 transition-all shadow-lg">
-              <div className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400">Avg Donation</div>
-              <div className="text-2xl font-black text-emerald-400 font-mono tracking-tight">
-                £{Number(metrics.avg_donation || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </div>
-              <div className="absolute right-3 top-3 opacity-10 group-hover:opacity-20 transition-opacity">
-                <DollarSign className="w-10 h-10 text-emerald-400" />
-              </div>
-            </div>
           </div>
-        )}
-        {/* Navigation Tabs Bar */}
-        <div className="glass-panel p-2 flex items-center gap-2 overflow-x-auto">
-          {tabs.map(t => {
-            const Icon = t.icon;
-            const isActive = activeTab === t.id;
-            return (
-              <button
-                key={t.id}
-                onClick={() => setActiveTab(t.id)}
-                className={`btn-secondary text-xs px-4 py-2.5 flex items-center gap-2 rounded-xl transition-all whitespace-nowrap ${
-                  isActive 
-                    ? 'border-cyan-400 text-cyan-400 bg-cyan-500/10 font-bold shadow-lg shadow-cyan-500/10' 
-                    : 'hover:text-white'
-                }`}
-              >
-                <Icon className="w-4 h-4" /> {t.label}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Workspace Grid with Left Sidebar */}
-        <div className="flex flex-col lg:flex-row gap-6 items-start">
-          {/* Left Panel Sidebar Filters */}
-          <Sidebar 
-            filters={filters} 
-            onFilterChange={handleFilterChange} 
-            onResetFilters={handleResetFilters} 
-          />
-
-          {/* Active Tab Main Content */}
-          <div className="flex-1 w-full min-w-0">
-            {activeTab === 'overview' && <OverviewView filters={filters} />}
-            {activeTab === 'ltv' && <LtvView filters={filters} />}
-            {activeTab === 'kanban' && <KanbanBoard filters={filters} onSelectDonor={setSelectedDonor} />}
-            {activeTab === 'explorer' && <ExplorerView user={user} filters={filters} onSelectDonor={setSelectedDonor} />}
-            {activeTab === 'tracker' && <TrackerView user={user} filters={filters} onSelectDonor={setSelectedDonor} />}
-            {activeTab === 'classifications' && <ClassificationView user={user} />}
-            {activeTab === 'expenses' && <ExpenseView user={user} />}
-            {activeTab === 'admin' && <AdminView user={user} />}
-          </div>
-        </div>
-      </main>
+        </main>
+      </div>
 
       {/* Donor 360° Profile Drawer Modal */}
       <DonorDrawer donorId={selectedDonor} onClose={() => setSelectedDonor(null)} />

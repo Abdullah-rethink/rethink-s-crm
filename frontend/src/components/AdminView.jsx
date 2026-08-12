@@ -15,6 +15,7 @@ export default function AdminView({ user }) {
 
   const [approvalEmail, setApprovalEmail] = useState('');
   const [emailSaveMsg, setEmailSaveMsg] = useState('');
+  const [editingUser, setEditingUser] = useState(null);
 
   const isSuperAdmin = user?.role === 'super_admin';
   const canManageTags = isSuperAdmin || user?.can_manage_tags === 1;
@@ -85,6 +86,36 @@ export default function AdminView({ user }) {
         } else {
           setUserMsg(`❌ ${res.detail || 'Failed to update user permissions.'}`);
         }
+      });
+  };
+
+  const handleSaveUserEdit = () => {
+    if (!isSuperAdmin || !editingUser) return;
+    setUserMsg('');
+
+    fetch(`${API_BASE_URL}/api/admin/users/edit`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        user_role: user?.role,
+        user_id: editingUser.id,
+        email: editingUser.email,
+        username: editingUser.username,
+        password: editingUser.password || null
+      })
+    })
+      .then(r => r.json())
+      .then(res => {
+        if (res?.status === 'success') {
+          setUserMsg(`✅ ${res.message}`);
+          setEditingUser(null);
+          loadAdminData();
+        } else {
+          setUserMsg(`❌ ${res.detail || 'Failed to update user details.'}`);
+        }
+      })
+      .catch(err => {
+        setUserMsg(`❌ Error: ${err.message}`);
       });
   };
 
@@ -240,34 +271,36 @@ export default function AdminView({ user }) {
       </div>
 
       {/* Expense Approval Notification Email Settings Card */}
-      <div className="glass-panel p-5 border-l-4 border-cyan-400 flex flex-col gap-4">
-        <div className="flex items-center justify-between flex-wrap gap-2">
-          <div>
-            <h3 className="text-sm font-bold text-slate-200 flex items-center gap-2">
-              <Mail className="w-4 h-4 text-cyan-400" /> Expense Approval Notification Email Settings
-            </h3>
-            <p className="text-xs text-slate-400">Configure the Super Admin email address that receives expense approval notification links.</p>
+      {isSuperAdmin && (
+        <div className="glass-panel p-5 border-l-4 border-cyan-400 flex flex-col gap-4">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div>
+              <h3 className="text-sm font-bold text-slate-200 flex items-center gap-2">
+                <Mail className="w-4 h-4 text-cyan-400" /> Expense Approval Notification Email Settings
+              </h3>
+              <p className="text-xs text-slate-400">Configure the Super Admin email address that receives expense approval notification links.</p>
+            </div>
+            {emailSaveMsg && <div className="text-xs font-bold text-emerald-400">{emailSaveMsg}</div>}
           </div>
-          {emailSaveMsg && <div className="text-xs font-bold text-emerald-400">{emailSaveMsg}</div>}
-        </div>
 
-        <form onSubmit={handleSaveApprovalEmail} className="flex items-center gap-3 max-w-lg">
-          <input 
-            type="email" 
-            required
-            disabled={!isSuperAdmin}
-            value={approvalEmail}
-            onChange={e => setApprovalEmail(e.target.value)}
-            className="bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-xs text-cyan-300 font-medium flex-1 focus:outline-none focus:border-cyan-400 disabled:opacity-50"
-            placeholder="superadmin@analytics.com"
-          />
-          {isSuperAdmin && (
-            <button type="submit" className="btn-primary text-xs flex items-center gap-1.5 whitespace-nowrap">
-              <Save className="w-4 h-4" /> Save Email Settings
-            </button>
-          )}
-        </form>
-      </div>
+          <form onSubmit={handleSaveApprovalEmail} className="flex items-center gap-3 max-w-lg">
+            <input 
+              type="email" 
+              required
+              disabled={!isSuperAdmin}
+              value={approvalEmail}
+              onChange={e => setApprovalEmail(e.target.value)}
+              className="bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-xs text-cyan-300 font-medium flex-1 focus:outline-none focus:border-cyan-400 disabled:opacity-50"
+              placeholder="superadmin@analytics.com"
+            />
+            {isSuperAdmin && (
+              <button type="submit" className="btn-primary text-xs flex items-center gap-1.5 whitespace-nowrap">
+                <Save className="w-4 h-4" /> Save Email Settings
+              </button>
+            )}
+          </form>
+        </div>
+      )}
 
       {/* Predefined RBAC Roles Matrix Table */}
       <div className="glass-panel p-5 border-l-4 border-purple-400 flex flex-col gap-4">
@@ -306,121 +339,189 @@ export default function AdminView({ user }) {
       </div>
 
       {/* User Accounts & Granular Permission Assign/Revoke Section */}
-      <div className="glass-panel p-5 border-l-4 border-cyan-400 flex flex-col gap-4">
-        <div className="flex items-center justify-between">
-          <h3 className="text-sm font-bold text-slate-200 flex items-center gap-2">
-            <Key className="w-4 h-4 text-cyan-400" /> User Accounts & Access Control Settings
-          </h3>
+      {isSuperAdmin && (
+        <div className="glass-panel p-5 border-l-4 border-cyan-400 flex flex-col gap-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-bold text-slate-200 flex items-center gap-2">
+              <Key className="w-4 h-4 text-cyan-400" /> User Accounts & Access Control Settings
+            </h3>
+          </div>
 
-          {!isSuperAdmin && (
-            <span className="badge badge-amber text-[10px]">🔒 Read-Only Access (Super Admin Only)</span>
-          )}
-        </div>
+          {userMsg && <div className="text-xs font-bold text-emerald-400">{userMsg}</div>}
 
-        {userMsg && <div className="text-xs font-bold text-emerald-400">{userMsg}</div>}
-
-        <div className="overflow-x-auto">
-          <table className="crm-table">
-            <thead>
-              <tr>
-                <th>User Identity</th>
-                <th>Role</th>
-                <th>Edit Donors</th>
-                <th>Edit Matrix</th>
-                <th>Manage Tags</th>
-                <th>Purge Data</th>
-                <th>Assign Predefined Role</th>
-              </tr>
-            </thead>
-            <tbody>
-              {usersList.map((u, idx) => (
-                <tr key={idx}>
-                  <td className="font-bold text-slate-200">
-                    <div>{u.email}</div>
-                    <div className="text-[10px] text-slate-500 font-normal">@{u.username}</div>
-                  </td>
-                  <td>
-                    <span className={`badge ${u.role === 'super_admin' ? 'badge-purple' : u.role === 'data_editor' ? 'badge-cyan' : 'badge-emerald'}`}>
-                      {u.role}
-                    </span>
-                  </td>
-
-                  {/* Toggle Granular Permissions */}
-                  <td className="text-center">
-                    <button 
-                      disabled={!isSuperAdmin || u.role === 'super_admin'}
-                      onClick={() => handleTogglePermission(u, 'can_edit_donors')}
-                      className={`btn-secondary text-[11px] px-2.5 py-1 ${u.can_edit_donors || u.role === 'super_admin' ? 'text-emerald-400 border-emerald-500/30' : 'text-slate-500'}`}
-                    >
-                      {u.can_edit_donors || u.role === 'super_admin' ? '✓ YES' : '✗ NO'}
-                    </button>
-                  </td>
-
-                  <td className="text-center">
-                    <button 
-                      disabled={!isSuperAdmin || u.role === 'super_admin'}
-                      onClick={() => handleTogglePermission(u, 'can_edit_matrix')}
-                      className={`btn-secondary text-[11px] px-2.5 py-1 ${u.can_edit_matrix || u.role === 'super_admin' ? 'text-emerald-400 border-emerald-500/30' : 'text-slate-500'}`}
-                    >
-                      {u.can_edit_matrix || u.role === 'super_admin' ? '✓ YES' : '✗ NO'}
-                    </button>
-                  </td>
-
-                  <td className="text-center">
-                    <button 
-                      disabled={!isSuperAdmin || u.role === 'super_admin'}
-                      onClick={() => handleTogglePermission(u, 'can_manage_tags')}
-                      className={`btn-secondary text-[11px] px-2.5 py-1 ${u.can_manage_tags || u.role === 'super_admin' ? 'text-emerald-400 border-emerald-500/30' : 'text-slate-500'}`}
-                    >
-                      {u.can_manage_tags || u.role === 'super_admin' ? '✓ YES' : '✗ NO'}
-                    </button>
-                  </td>
-
-                  <td className="text-center">
-                    <button 
-                      disabled={!isSuperAdmin || u.role === 'super_admin'}
-                      onClick={() => handleTogglePermission(u, 'can_purge_data')}
-                      className={`btn-secondary text-[11px] px-2.5 py-1 ${u.can_purge_data || u.role === 'super_admin' ? 'text-emerald-400 border-emerald-500/30' : 'text-slate-500'}`}
-                    >
-                      {u.can_purge_data || u.role === 'super_admin' ? '✓ YES' : '✗ NO'}
-                    </button>
-                  </td>
-
-                  {/* Quick Preset Assignment */}
-                  <td>
-                    <div className="flex gap-1">
-                      <button 
-                        disabled={!isSuperAdmin}
-                        onClick={() => handleAssignPreset(u.email, 'super_admin')}
-                        className="btn-secondary text-[10px] px-2 py-1 text-purple-400 hover:bg-purple-500/20"
-                      >
-                        Super Admin
-                      </button>
-                      <button 
-                        disabled={!isSuperAdmin}
-                        onClick={() => handleAssignPreset(u.email, 'data_editor')}
-                        className="btn-secondary text-[10px] px-2 py-1 text-cyan-400 hover:bg-cyan-500/20"
-                      >
-                        Data Editor
-                      </button>
-                      <button 
-                        disabled={!isSuperAdmin}
-                        onClick={() => handleAssignPreset(u.email, 'admin')}
-                        className="btn-secondary text-[10px] px-2 py-1 text-emerald-400 hover:bg-emerald-500/20"
-                      >
-                        Analyst
-                      </button>
-                    </div>
-                  </td>
+          <div className="overflow-x-auto">
+            <table className="crm-table">
+              <thead>
+                <tr>
+                  <th>User Identity</th>
+                  <th>Role</th>
+                  <th>Edit Donors</th>
+                  <th>Edit Matrix</th>
+                  <th>Manage Tags</th>
+                  <th>Purge Data</th>
+                  <th>Assign Predefined Role</th>
+                  {isSuperAdmin && <th>Edit Details</th>}
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {usersList.map((u, idx) => (
+                  <tr key={idx}>
+                    <td className="font-bold text-slate-200">
+                      {editingUser && editingUser.id === u.id ? (
+                        <div className="flex flex-col gap-2 max-w-[200px]">
+                          <div className="flex flex-col gap-0.5">
+                            <span className="text-[9px] text-slate-500 uppercase font-black">Email Address</span>
+                            <input 
+                              type="email" 
+                              value={editingUser.email}
+                              onChange={e => setEditingUser({ ...editingUser, email: e.target.value })}
+                              className="bg-slate-900 border border-white/10 rounded px-2.5 py-1 text-xs text-white focus:outline-none focus:border-cyan-400"
+                              placeholder="Email"
+                            />
+                          </div>
+                          <div className="flex flex-col gap-0.5">
+                            <span className="text-[9px] text-slate-500 uppercase font-black">Username</span>
+                            <input 
+                              type="text"
+                              value={editingUser.username}
+                              onChange={e => setEditingUser({ ...editingUser, username: e.target.value })}
+                              className="bg-slate-900 border border-white/10 rounded px-2.5 py-1 text-xs text-white focus:outline-none focus:border-cyan-400"
+                              placeholder="Username"
+                            />
+                          </div>
+                          <div className="flex flex-col gap-0.5">
+                            <span className="text-[9px] text-slate-500 uppercase font-black">Reset Password</span>
+                            <input 
+                              type="password"
+                              value={editingUser.password}
+                              onChange={e => setEditingUser({ ...editingUser, password: e.target.value })}
+                              className="bg-slate-900 border border-white/10 rounded px-2.5 py-1 text-[10px] text-white focus:outline-none focus:border-cyan-400"
+                              placeholder="Type new password (optional)"
+                            />
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <div>{u.email}</div>
+                          <div className="text-[10px] text-slate-500 font-normal">@{u.username}</div>
+                        </>
+                      )}
+                    </td>
+                    <td>
+                      <span className={`badge ${u.role === 'super_admin' ? 'badge-purple' : u.role === 'data_editor' ? 'badge-cyan' : 'badge-emerald'}`}>
+                        {u.role}
+                      </span>
+                    </td>
+
+                    {/* Toggle Granular Permissions */}
+                    <td className="text-center">
+                      <button 
+                        disabled={!isSuperAdmin || u.role === 'super_admin'}
+                        onClick={() => handleTogglePermission(u, 'can_edit_donors')}
+                        className={`btn-secondary text-[11px] px-2.5 py-1 ${u.can_edit_donors || u.role === 'super_admin' ? 'text-emerald-400 border-emerald-500/30' : 'text-slate-500'}`}
+                      >
+                        {u.can_edit_donors || u.role === 'super_admin' ? '✓ YES' : '✗ NO'}
+                      </button>
+                    </td>
+
+                    <td className="text-center">
+                      <button 
+                        disabled={!isSuperAdmin || u.role === 'super_admin'}
+                        onClick={() => handleTogglePermission(u, 'can_edit_matrix')}
+                        className={`btn-secondary text-[11px] px-2.5 py-1 ${u.can_edit_matrix || u.role === 'super_admin' ? 'text-emerald-400 border-emerald-500/30' : 'text-slate-500'}`}
+                      >
+                        {u.can_edit_matrix || u.role === 'super_admin' ? '✓ YES' : '✗ NO'}
+                      </button>
+                    </td>
+
+                    <td className="text-center">
+                      <button 
+                        disabled={!isSuperAdmin || u.role === 'super_admin'}
+                        onClick={() => handleTogglePermission(u, 'can_manage_tags')}
+                        className={`btn-secondary text-[11px] px-2.5 py-1 ${u.can_manage_tags || u.role === 'super_admin' ? 'text-emerald-400 border-emerald-500/30' : 'text-slate-500'}`}
+                      >
+                        {u.can_manage_tags || u.role === 'super_admin' ? '✓ YES' : '✗ NO'}
+                      </button>
+                    </td>
+
+                    <td className="text-center">
+                      <button 
+                        disabled={!isSuperAdmin || u.role === 'super_admin'}
+                        onClick={() => handleTogglePermission(u, 'can_purge_data')}
+                        className={`btn-secondary text-[11px] px-2.5 py-1 ${u.can_purge_data || u.role === 'super_admin' ? 'text-emerald-400 border-emerald-500/30' : 'text-slate-500'}`}
+                      >
+                        {u.can_purge_data || u.role === 'super_admin' ? '✓ YES' : '✗ NO'}
+                      </button>
+                    </td>
+
+                    {/* Quick Preset Assignment */}
+                    <td>
+                      <div className="flex gap-1">
+                        <button 
+                          disabled={!isSuperAdmin}
+                          onClick={() => handleAssignPreset(u.email, 'super_admin')}
+                          className="btn-secondary text-[10px] px-2 py-1 text-purple-400 hover:bg-purple-500/20"
+                        >
+                          Super Admin
+                        </button>
+                        <button 
+                          disabled={!isSuperAdmin}
+                          onClick={() => handleAssignPreset(u.email, 'data_editor')}
+                          className="btn-secondary text-[10px] px-2 py-1 text-cyan-400 hover:bg-cyan-500/20"
+                        >
+                          Data Editor
+                        </button>
+                        <button 
+                          disabled={!isSuperAdmin}
+                          onClick={() => handleAssignPreset(u.email, 'admin')}
+                          className="btn-secondary text-[10px] px-2 py-1 text-emerald-400 hover:bg-emerald-500/20"
+                        >
+                          Admin
+                        </button>
+                      </div>
+                    </td>
+
+                    {/* Actions Column */}
+                    {isSuperAdmin && (
+                      <td>
+                        {editingUser && editingUser.id === u.id ? (
+                          <div className="flex items-center gap-1.5">
+                            <button 
+                              onClick={handleSaveUserEdit}
+                              className="btn-primary text-[10px] px-2 py-1 text-emerald-400 hover:bg-emerald-500/10 flex items-center gap-0.5"
+                              title="Save"
+                            >
+                              <Check className="w-3.5 h-3.5" /> Save
+                            </button>
+                            <button 
+                              onClick={() => setEditingUser(null)}
+                              className="btn-secondary text-[10px] px-2 py-1 text-rose-400 hover:bg-rose-500/10 flex items-center gap-0.5"
+                              title="Cancel"
+                            >
+                              <X className="w-3.5 h-3.5" /> Cancel
+                            </button>
+                          </div>
+                        ) : (
+                          <button 
+                            onClick={() => setEditingUser({ id: u.id, email: u.email, username: u.username, password: '' })}
+                            className="btn-secondary text-[10px] px-2.5 py-1 text-cyan-400 hover:bg-cyan-500/10 flex items-center gap-1"
+                            title="Edit User Details"
+                          >
+                            <Edit className="w-3.5 h-3.5" /> Edit
+                          </button>
+                        )}
+                      </td>
+                    )}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Dataset Tag Manager */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className={`grid grid-cols-1 ${canManageTags ? 'lg:grid-cols-2' : ''} gap-6`}>
         <div className="glass-panel p-5 border-l-4 border-amber-400 flex flex-col gap-4">
           <h3 className="text-sm font-bold text-slate-200">🏷️ Active Dataset Source Tags ({tags.length})</h3>
 
@@ -445,14 +546,10 @@ export default function AdminView({ user }) {
         </div>
 
         {/* Tag Operations */}
-        <div className="glass-panel p-5 border-l-4 border-cyan-400 flex flex-col gap-4">
-          <h3 className="text-sm font-bold text-slate-200">✏️ Tag Operations & Batch Management</h3>
+        {canManageTags && (
+          <div className="glass-panel p-5 border-l-4 border-cyan-400 flex flex-col gap-4">
+            <h3 className="text-sm font-bold text-slate-200">✏️ Tag Operations & Batch Management</h3>
 
-          {!canManageTags ? (
-            <div className="p-4 rounded-xl bg-slate-900/60 border border-white/5 text-xs text-slate-400">
-              🔒 <b>Read-Only Access:</b> Dataset tag renaming and dataset batch deletions are restricted to authorized accounts with <b>Manage Tags</b> permission.
-            </div>
-          ) : (
             <form onSubmit={handleRenameTag} className="flex flex-col gap-3">
               <div>
                 <label className="text-xs text-slate-400 font-bold mb-1 block">Select Dataset Tag</label>
@@ -481,8 +578,8 @@ export default function AdminView({ user }) {
                 <button type="button" onClick={handleDeleteTag} className="btn-secondary text-xs hover:bg-rose-500/20 hover:text-rose-400">🗑️ Delete Batch</button>
               </div>
             </form>
-          )}
-        </div>
+          </div>
+        )}
       </div>
     </div>
   );
