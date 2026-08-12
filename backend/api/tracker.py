@@ -76,19 +76,19 @@ def get_tracker_stats(
 ):
     """Computes real-time donor target progress stats filtered by sidebar criteria."""
     has_filters = any([
-        payment_type and payment_type != "All Payment Types",
-        tier and tier != "All Classifications",
-        source and source != "All Sources (Combined)",
-        heading and heading != "All Headings",
-        subheading and subheading != "All Sub-Headings",
-        country and country != "All Project Countries",
-        code and code != "All Codes",
-        zakat and zakat != "All Zakat Status",
-        donor_country and donor_country != "All Donor Countries",
-        campaign_search and campaign_search.strip(),
-        gift_aid and gift_aid != "All Gift Aid Status",
-        start_date and start_date.strip(),
-        end_date and end_date.strip()
+        isinstance(payment_type, str) and payment_type != "All Payment Types",
+        isinstance(tier, str) and tier != "All Classifications",
+        isinstance(source, str) and source != "All Sources (Combined)",
+        isinstance(heading, str) and heading != "All Headings",
+        isinstance(subheading, str) and subheading != "All Sub-Headings",
+        isinstance(country, str) and country != "All Project Countries",
+        isinstance(code, str) and code != "All Codes",
+        isinstance(zakat, str) and zakat != "All Zakat Status",
+        isinstance(donor_country, str) and donor_country != "All Donor Countries",
+        isinstance(campaign_search, str) and campaign_search.strip(),
+        isinstance(gift_aid, str) and gift_aid != "All Gift Aid Status",
+        isinstance(start_date, str) and start_date.strip(),
+        isinstance(end_date, str) and end_date.strip()
     ])
 
     global _TRACKER_CACHE

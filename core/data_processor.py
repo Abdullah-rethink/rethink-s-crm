@@ -9,6 +9,26 @@ import streamlit as st
 from config.settings import LOCAL_DB_PATH, PARQUET_PATH
 from core.database import sync_to_cloud_async
 
+COUNTRY_ISO_MAP = {
+    "GB": "United Kingdom", "UK": "United Kingdom", "GBR": "United Kingdom",
+    "US": "United States", "USA": "United States",
+    "CA": "Canada", "CAN": "Canada",
+    "AU": "Australia", "AUS": "Australia",
+    "AE": "United Arab Emirates", "ARE": "United Arab Emirates", "UAE": "United Arab Emirates",
+    "SA": "Saudi Arabia", "SAU": "Saudi Arabia",
+    "PK": "Pakistan", "PAK": "Pakistan",
+    "IN": "India", "IND": "India",
+    "MY": "Malaysia", "MYS": "Malaysia",
+    "SG": "Singapore", "SGP": "Singapore",
+    "NZ": "New Zealand", "NZL": "New Zealand", "DE": "Germany", "DEU": "Germany",
+    "FR": "France", "FRA": "France", "NL": "Netherlands", "NLD": "Netherlands",
+    "TR": "Turkey", "TUR": "Turkey", "ZA": "South Africa", "ZAF": "South Africa",
+    "IE": "Ireland", "IRL": "Ireland", "QA": "Qatar", "QAT": "Qatar",
+    "KW": "Kuwait", "KWT": "Kuwait", "BH": "Bahrain", "BHR": "Bahrain",
+    "OM": "Oman", "OMN": "Oman", "JO": "Jordan", "JOR": "Jordan",
+    "EG": "Egypt", "EGY": "Egypt", "BD": "Bangladesh", "BGD": "Bangladesh"
+}
+
 # Global In-Memory Dataset Cache Singleton
 _CACHED_DF: Optional[pd.DataFrame] = None
 _CACHE_MTIME: float = 0.0
@@ -615,10 +635,21 @@ def save_paysuite_classification_matrix(matrix_df):
     conn.close()
     return len(matrix_df)
 
-def _enrich_dataframe(df):
-    """Pre-compute all derived columns (Donor ID, LTV, Classification, Payment Frequency)."""
-    # Check if this is a Paysuite file
-    if "Bank Ref" in df.columns and "Date of collection" in df.columns:
+def _enrich_dataframe(df, platform="auto"):
+    """Pre-compute all derived columns (Donor ID, LTV, Classification, Payment Frequency) and apply classifications."""
+    # 1. Platform Detection & Standardization
+    is_paysuite = "Bank Ref" in df.columns and "Date of collection" in df.columns
+    is_givebright = False
+    
+    if not is_paysuite:
+        if str(platform).lower() == "givebright":
+            is_givebright = True
+        elif str(platform).lower() in ["auto", "none", ""]:
+            gb_sig = {"donation_id", "campaign_name", "fundraiser_by", "fundraiser_name", "campaign_url", "charge_id", "payment_method_type"}
+            if len(gb_sig.intersection(set(df.columns))) >= 2:
+                is_givebright = True
+
+    if is_paysuite:
         # Classroom rethink village mapping
         if "Code" in df.columns:
             df["Code"] = df["Code"].astype(str).str.strip().replace({
@@ -750,7 +781,7 @@ def _enrich_dataframe(df):
                     "Unassigned",
                     "Unassigned",
                     "Unassigned",
-                    csv_code,
+                    "csv_code",
                     "Unassigned"
                 ))
 
@@ -766,6 +797,53 @@ def _enrich_dataframe(df):
                 print(f"Error seeding new rules: {e}")
             finally:
                 conn.close()
+
+    elif is_givebright:
+        df["Platform"] = "GiveBright"
+        col_map = {
+            "donation_id": "Donation ID",
+            "campaign_name": "Campaign Name",
+            "fundraiser_by": "Community Name",
+            "campaign_url": "Campaign URL",
+            "fundraiser_url": "Fundraiser URL",
+            "url": "Campaign URL",
+            "amount": "Donation Amount in Project Currency (May be approx.)",
+            "currency": "Donation Currency (DC)",
+            "is_anonymous": "Anonymous or Public",
+            "country": "Billing Country",
+            "first_name": "First Name",
+            "last_name": "Last Name",
+            "email": "Email"
+        }
+        df.rename(columns=col_map, inplace=True)
+
+        if "subscription_id" in df.columns:
+            df["Payment Frequency"] = df["subscription_id"].apply(
+                lambda s: "Recurring Payment" if pd.notna(s) and str(s).strip() not in ["", "nan", "None"] else "One-Time Payment"
+            )
+
+        if "Anonymous or Public" in df.columns:
+            df["Anonymous or Public"] = df["Anonymous or Public"].apply(
+                lambda a: "Anonymous" if pd.notna(a) and str(a).lower() in ["true", "1", "yes"] else "Public"
+            )
+
+        if "Billing Country" in df.columns:
+            def safe_country(c):
+                if pd.isna(c) or str(c).strip() in ["", "nan", "None", "NaN"]:
+                    return "Unknown"
+                c_str = str(c).strip()
+                return COUNTRY_ISO_MAP.get(c_str.upper(), c_str)
+
+            df["Billing Country"] = df["Billing Country"].apply(safe_country)
+
+        if "created_at" in df.columns:
+            df["Created Date (UTC)"] = pd.to_datetime(df["created_at"], errors="coerce")
+            df["Created Time (UTC)"] = df["Created Date (UTC)"].dt.time.astype(str)
+            df["Created Date (UTC)"] = df["Created Date (UTC)"].dt.date
+
+    else:
+        df["Platform"] = "LaunchGood"
+
     if "Total Online Donations Net Amount in Settled Currency" in df.columns and "Donation Amount in Project Currency (May be approx.)" in df.columns:
         df["Total Online Donations Net Amount in Settled Currency"] = df["Total Online Donations Net Amount in Settled Currency"].fillna(df["Donation Amount in Project Currency (May be approx.)"])
     elif "Total Online Donations Net Amount in Settled Currency" not in df.columns and "Donation Amount in Project Currency (May be approx.)" in df.columns:
@@ -777,10 +855,11 @@ def _enrich_dataframe(df):
     if col_amount not in df.columns:
         col_amount = "Donation Amount (in Donation Currency)"
 
-    df['email_clean'] = df['Email'].astype(str).str.strip().str.lower()
+    df['email_clean'] = df['Email'].astype(str).str.strip().str.lower() if 'Email' in df.columns else pd.Series("", index=df.index)
     df['email_clean'] = df['email_clean'].where(~df['email_clean'].isin(['nan', 'none', '']), None)
-    fname = df['First Name'].astype(str).str.strip().str.lower().replace({'nan': '', 'none': ''})
-    lname = df['Last Name'].astype(str).str.strip().str.lower().replace({'nan': '', 'none': ''})
+    
+    fname = df['First Name'].astype(str).str.strip().str.lower().replace({'nan': '', 'none': ''}) if 'First Name' in df.columns else pd.Series("", index=df.index)
+    lname = df['Last Name'].astype(str).str.strip().str.lower().replace({'nan': '', 'none': ''}) if 'Last Name' in df.columns else pd.Series("", index=df.index)
     df['full_name_clean'] = (fname + " " + lname).str.strip()
     df['full_name_clean'] = df['full_name_clean'].where(~df['full_name_clean'].isin(['', 'nan', 'none']), None)
 
@@ -789,10 +868,10 @@ def _enrich_dataframe(df):
     df['bname_clean'] = df['bname_clean'].where(~df['bname_clean'].isin(['nan', 'none', '']), None)
 
     valid = df.dropna(subset=['full_name_clean', 'email_clean'])
-    name_to_email_map = valid.groupby('full_name_clean')['email_clean'].first()
+    name_to_email_map = valid.groupby('full_name_clean')['email_clean'].first() if not valid.empty else pd.Series(dtype=str)
 
-    mapped_email_from_name = df['full_name_clean'].map(name_to_email_map)
-    mapped_email_from_billing = df['bname_clean'].map(name_to_email_map)
+    mapped_email_from_name = df['full_name_clean'].map(name_to_email_map) if not name_to_email_map.empty else pd.Series(None, index=df.index)
+    mapped_email_from_billing = df['bname_clean'].map(name_to_email_map) if not name_to_email_map.empty else pd.Series(None, index=df.index)
 
     df['Donor ID'] = df['email_clean'] \
         .combine_first(mapped_email_from_name) \
@@ -818,12 +897,56 @@ def _enrich_dataframe(df):
 
     df = deduplicate_dataframe_columns(df)
 
-    # Dynamic auto-assignment based on Code mapping for all rows (LaunchGood, GiveBright, Paysuite)
-    code_map = get_code_to_classification_map()
-    for col in ["Heading", "Sub-Heading", "Country", "Code", "Zakat Eligibility"]:
+    # --- CLASSIFICATIONS MATRIX LOOKUP BY CAMPAIGN NAME ---
+    target_cols = ["Heading", "Sub-Heading", "Country", "Code", "Zakat Eligibility"]
+    for col in target_cols:
         if col not in df.columns:
             df[col] = "Unassigned"
 
+    if not is_paysuite:
+        try:
+            conn = sqlite3.connect(LOCAL_DB_PATH, timeout=30.0)
+            
+            # Apply GiveBright classifications matrix for GiveBright records
+            if is_givebright:
+                db_matrix = pd.read_sql_query("SELECT * FROM givebright_classifications", conn)
+                if not db_matrix.empty and "campaign_name" in db_matrix.columns:
+                    gb_map = db_matrix.set_index("campaign_name")
+                    for idx, row in df.iterrows():
+                        camp = str(row.get("Campaign Name") or "").strip().lower()
+                        if camp in gb_map.index:
+                            r = gb_map.loc[camp]
+                            if isinstance(r, pd.DataFrame):
+                                r = r.iloc[-1]
+                            for f in target_cols:
+                                db_f = f.lower().replace("-", "_").replace(" ", "_")
+                                val = str(r.get(db_f) or "Unassigned").strip()
+                                if val and val.lower() not in ["", "nan", "none"]:
+                                    df.at[idx, f] = val
+
+            # Apply LaunchGood campaign classifications matrix for LaunchGood/default records
+            else:
+                db_matrix = pd.read_sql_query("SELECT * FROM campaign_classifications", conn)
+                if not db_matrix.empty and "campaign_name" in db_matrix.columns:
+                    lg_map = db_matrix.set_index("campaign_name")
+                    for idx, row in df.iterrows():
+                        camp = str(row.get("Campaign Name") or "").strip().lower()
+                        if camp in lg_map.index:
+                            r = lg_map.loc[camp]
+                            if isinstance(r, pd.DataFrame):
+                                r = r.iloc[-1]
+                            for f in target_cols:
+                                db_f = f.lower().replace("-", "_").replace(" ", "_")
+                                val = str(r.get(db_f) or "Unassigned").strip()
+                                if val and val.lower() not in ["", "nan", "none"]:
+                                    df.at[idx, f] = val
+                                    
+            conn.close()
+        except Exception as e:
+            print(f"Error mapping campaign classifications matrix: {e}")
+
+    # Second Pass: Dynamic auto-assignment based on Code mapping
+    code_map = get_code_to_classification_map()
     for idx, row in df.iterrows():
         code = str(row.get("Code") or "").strip()
         code_lower = code.lower()
@@ -839,6 +962,7 @@ def _enrich_dataframe(df):
         df[col] = df[col].astype(str).apply(fix_mojibake)
 
     return df
+
 
 def process_and_upload_excel(file_buffer, source_name=None, upload_mode="replace", platform="auto"):
     """Reads Excel/CSV, standardizes schema, enriches data, and saves to database."""
@@ -861,7 +985,7 @@ def process_and_upload_excel(file_buffer, source_name=None, upload_mode="replace
     batch_label = str(source_name).strip() if (source_name and str(source_name).strip()) else "Master Dataset"
     df["Source"] = batch_label
 
-    df = _enrich_dataframe(df)
+    df = _enrich_dataframe(df, platform=platform)
     df.to_parquet(PARQUET_PATH, index=False)
 
     conn = sqlite3.connect(LOCAL_DB_PATH, timeout=30.0)

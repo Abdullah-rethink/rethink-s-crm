@@ -29,6 +29,8 @@ class BulkEditDonorsRequest(BaseModel):
     filter_donor_country: Optional[str] = None
     filter_campaign_search: Optional[str] = None
     filter_gift_aid: Optional[str] = None
+    filter_start_date: Optional[str] = None
+    filter_end_date: Optional[str] = None
     can_edit_donors: Optional[bool] = False
 
 
@@ -57,7 +59,9 @@ def bulk_edit_donors(payload: BulkEditDonorsRequest):
         payload.filter_zakat,
         payload.filter_donor_country,
         payload.filter_campaign_search,
-        payload.filter_gift_aid
+        payload.filter_gift_aid,
+        payload.filter_start_date,
+        payload.filter_end_date
     )
 
     # 2. Apply search filter
@@ -103,7 +107,12 @@ def _apply_filters(df, payment_type=None, tier=None, source=None, heading=None, 
     filtered_df = df.copy()
 
     if payment_type and payment_type != "All Payment Types" and "Payment Frequency" in filtered_df.columns:
-        filtered_df = filtered_df[filtered_df["Payment Frequency"] == payment_type]
+        norm_type = payment_type
+        if payment_type.lower() in ["one-time", "one-time payment"]:
+            norm_type = "One-Time Payment"
+        elif payment_type.lower() in ["monthly", "recurring", "recurring payment"]:
+            norm_type = "Recurring Payment"
+        filtered_df = filtered_df[filtered_df["Payment Frequency"] == norm_type]
 
     if tier and tier != "All Classifications" and "Lifetime Donor Classification" in filtered_df.columns:
         filtered_df = filtered_df[filtered_df["Lifetime Donor Classification"] == tier]
@@ -182,9 +191,18 @@ def get_donors_paginated(
     campaign_search: Optional[str] = None,
     gift_aid: Optional[str] = None,
     start_date: Optional[str] = None,
-    end_date: Optional[str] = None
+    end_date: Optional[str] = None,
+    sort_by: Optional[str] = Query(None),
+    sort_order: Optional[str] = Query("asc")
 ):
     """Returns paginated donor records using direct SQL queries on SQLite for maximum performance and low RAM usage."""
+    # Normalize payment_type values (One-time, Monthly, Recurring) to standard DB frequency values
+    if payment_type and payment_type != "All Payment Types":
+        if payment_type.lower() in ["one-time", "one-time payment"]:
+            payment_type = "One-Time Payment"
+        elif payment_type.lower() in ["monthly", "recurring", "recurring payment"]:
+            payment_type = "Recurring Payment"
+
     try:
         conn = sqlite3.connect(LOCAL_DB_PATH, timeout=10.0)
         cursor = conn.cursor()
@@ -260,6 +278,15 @@ def get_donors_paginated(
 
             where_sql = (" WHERE " + " AND ".join(where_clauses)) if where_clauses else ""
 
+            # Get available columns to sanitize sort_by and prevent SQL injection
+            cursor.execute("PRAGMA table_info(donations)")
+            avail_cols = [col[1] for col in cursor.fetchall()]
+
+            order_sql = ""
+            if sort_by and sort_by in avail_cols:
+                order_dir = "DESC" if str(sort_order).lower() == "desc" else "ASC"
+                order_sql = f' ORDER BY "{sort_by}" {order_dir}'
+
             # Count matching records
             count_sql = f"SELECT COUNT(*) FROM donations{where_sql}"
             cursor.execute(count_sql, params)
@@ -270,12 +297,9 @@ def get_donors_paginated(
             offset = (page - 1) * page_size
 
             # Query requested page with LIMIT & OFFSET
-            query_sql = f"SELECT * FROM donations{where_sql} LIMIT ? OFFSET ?"
+            query_sql = f"SELECT * FROM donations{where_sql}{order_sql} LIMIT ? OFFSET ?"
             query_params = params + [page_size, offset]
             page_df = pd.read_sql_query(query_sql, conn, params=query_params)
-            
-            cursor.execute("PRAGMA table_info(donations)")
-            avail_cols = [col[1] for col in cursor.fetchall()]
             conn.close()
 
             float_cols = page_df.select_dtypes(include=['float', 'float64']).columns
@@ -636,7 +660,7 @@ def get_donor_360_profile(donor_id_or_email: str):
         "platform": str(first_row.get("Platform", "N/A"))
     }
 
-    # Format complete transaction timeline
+    # Format complete transaction timeline (sorted date DESC)
     timeline_cols = [c for c in [
         "Created Date (UTC)", "Campaign Name", "Heading", "Sub-Heading", 
         "Donation Currency (DC)", "Donation Amount (in Donation Currency)", 
@@ -644,11 +668,16 @@ def get_donor_360_profile(donor_id_or_email: str):
     ] if c in donor_txns.columns]
 
     timeline_df = donor_txns[timeline_cols].copy()
+    if "Created Date (UTC)" in timeline_df.columns:
+        timeline_df["Created Date (UTC)"] = pd.to_datetime(timeline_df["Created Date (UTC)"], errors="coerce")
+        timeline_df = timeline_df.sort_values(by="Created Date (UTC)", ascending=False)
+
     timeline_df = timeline_df.fillna("N/A")
     if col_amount in timeline_df.columns:
         timeline_df[col_amount] = pd.to_numeric(timeline_df[col_amount], errors='coerce').fillna(0.0).round(2)
 
-    history = timeline_df.to_dict(orient="records")
+    # Cap initial embedded history to recent 100 items to prevent DOM overflow crashes on 28k+ records
+    history = timeline_df.head(100).to_dict(orient="records")
 
     # Payment breakdown by Heading & Sub-Heading
     category_breakdown = []
@@ -668,3 +697,61 @@ def get_donor_360_profile(donor_id_or_email: str):
     details["history"] = history
     details["category_breakdown"] = category_breakdown
     return details
+
+
+@router.get("/history")
+def get_donor_history_paginated(
+    donor_id: str = Query(...),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=500)
+):
+    """Paginated transaction history for a donor to handle large transaction counts (e.g., 28,000+ transactions) smoothly."""
+    df = load_data()
+    if df.empty:
+        raise HTTPException(status_code=404, detail="Donor dataset is empty.")
+
+    identity = donor_id.strip().lower()
+    match_mask = pd.Series(False, index=df.index)
+    for col in ["Email", "Donor ID", "Display Name", "First Name", "Last Name"]:
+        if col in df.columns:
+            match_mask = match_mask | (df[col].astype(str).str.strip().str.lower() == identity)
+
+    donor_txns = df.loc[match_mask]
+    if donor_txns.empty:
+        return {"total_records": 0, "page": 1, "page_size": page_size, "total_pages": 1, "records": []}
+
+    col_amount = "Total Online Donations Net Amount in Settled Currency"
+    if col_amount not in df.columns:
+        col_amount = "Donation Amount in Project Currency (May be approx.)"
+
+    timeline_cols = [c for c in [
+        "Created Date (UTC)", "Campaign Name", "Heading", "Sub-Heading", 
+        "Donation Currency (DC)", "Donation Amount (in Donation Currency)", 
+        col_amount, "Payment Frequency", "Source"
+    ] if c in donor_txns.columns]
+
+    timeline_df = donor_txns[timeline_cols].copy()
+    if "Created Date (UTC)" in timeline_df.columns:
+        timeline_df["Created Date (UTC)"] = pd.to_datetime(timeline_df["Created Date (UTC)"], errors="coerce")
+        timeline_df = timeline_df.sort_values(by="Created Date (UTC)", ascending=False)
+
+    timeline_df = timeline_df.fillna("N/A")
+    if col_amount in timeline_df.columns:
+        timeline_df[col_amount] = pd.to_numeric(timeline_df[col_amount], errors='coerce').fillna(0.0).round(2)
+
+    total_records = len(timeline_df)
+    total_pages = max(1, math.ceil(total_records / page_size))
+    page = max(1, page)
+    page = min(page, total_pages)
+    offset = (page - 1) * page_size
+
+    sliced_df = timeline_df.iloc[offset:offset + page_size]
+    records = sliced_df.to_dict(orient="records")
+
+    return {
+        "total_records": total_records,
+        "page": page,
+        "page_size": page_size,
+        "total_pages": total_pages,
+        "records": records
+    }
