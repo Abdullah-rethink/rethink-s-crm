@@ -14,7 +14,7 @@ from core.database import get_cloud_sync_status
 router = APIRouter(prefix="/api/admin", tags=["Admin & Database Management"])
 
 
-from core.auth import get_all_users, update_user_permissions
+from core.auth import get_all_users, update_user_permissions, edit_user_details
 
 
 class UpdateUserPermissionRequest(BaseModel):
@@ -25,6 +25,14 @@ class UpdateUserPermissionRequest(BaseModel):
     can_edit_matrix: bool
     can_manage_tags: bool
     can_purge_data: bool
+
+
+class EditUserRequest(BaseModel):
+    user_role: str
+    user_id: int
+    email: str
+    username: str
+    password: str = None  # Optional reset password
 
 
 class AssignPresetRequest(BaseModel):
@@ -91,6 +99,34 @@ def assign_preset_endpoint(payload: AssignPresetRequest):
 
     update_user_permissions(payload.target_email, role, d, m, t, p)
     return {"status": "success", "message": f"Successfully assigned preset '{payload.preset_name}' to '{payload.target_email}'."}
+
+
+@router.post("/users/edit")
+def edit_user_endpoint(payload: EditUserRequest):
+    if payload.user_role != "super_admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Editing user details is restricted to Super Admin accounts."
+        )
+
+    if not payload.email.strip() or not payload.username.strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email and username are required."
+        )
+
+    ok, msg = edit_user_details(
+        payload.user_id,
+        payload.email,
+        payload.username,
+        payload.password
+    )
+    if not ok:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=msg
+        )
+    return {"status": "success", "message": msg}
 
 
 @router.get("/status")

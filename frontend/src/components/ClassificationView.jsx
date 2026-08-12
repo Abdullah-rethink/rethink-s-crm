@@ -673,7 +673,6 @@ export default function ClassificationView({ user }) {
             <option value={50}>50</option>
             <option value={100}>100</option>
             <option value={250}>250</option>
-            <option value="All">All ({filteredRules.length})</option>
           </select>
         </div>
       </div>
