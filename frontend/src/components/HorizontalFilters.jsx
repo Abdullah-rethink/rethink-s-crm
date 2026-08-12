@@ -124,7 +124,7 @@ export default function HorizontalFilters({ filters, onFilterChange, onResetFilt
           
           {activeDropdown === 'payment' && (
             <div className="absolute left-0 mt-2 w-52 bg-white dark:bg-slate-950 border border-slate-200 dark:border-white/10 rounded-xl shadow-xl z-50 py-1.5 animate-in fade-in slide-in-from-top-1 duration-150">
-              {['All Payment Types', 'One-time', 'Monthly', 'Recurring'].map(opt => (
+              {['All Payment Types', 'One-time', 'Recurring'].map(opt => (
                 <button
                   key={opt}
                   onClick={() => handleSelect('payment_type', opt)}

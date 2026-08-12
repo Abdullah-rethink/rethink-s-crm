@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Table, Search, Download, ChevronLeft, ChevronRight, Edit3, UserCheck, Eye, Columns, CheckSquare, Square, Save } from 'lucide-react';
+import { Table, Search, Download, ChevronLeft, ChevronRight, Edit3, UserCheck, Eye, Columns, CheckSquare, Square, Save, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { API_BASE_URL } from '../config';
 
 export default function ExplorerView({ user, filters, onSelectDonor }) {
@@ -13,6 +13,8 @@ export default function ExplorerView({ user, filters, onSelectDonor }) {
   const [currentPage, setCurrentPage] = useState(1);
   const [showColumnChooser, setShowColumnChooser] = useState(false);
   const [selectedColumns, setSelectedColumns] = useState([]);
+  const [sortBy, setSortBy] = useState(null);
+  const [sortOrder, setSortOrder] = useState('asc');
 
   // Inline Cell Editing State
   const [editingCell, setEditingCell] = useState(null); // { rowIdx, colName, value }
@@ -39,6 +41,11 @@ export default function ExplorerView({ user, filters, onSelectDonor }) {
       search: search
     });
 
+    if (sortBy) {
+      params.append('sort_by', sortBy);
+      params.append('sort_order', sortOrder);
+    }
+
     if (filters) {
       if (filters.payment_type) params.append('payment_type', filters.payment_type);
       if (filters.tier) params.append('tier', filters.tier);
@@ -50,6 +57,9 @@ export default function ExplorerView({ user, filters, onSelectDonor }) {
       if (filters.zakat) params.append('zakat', filters.zakat);
       if (filters.donor_country) params.append('donor_country', filters.donor_country);
       if (filters.campaign_search) params.append('campaign_search', filters.campaign_search);
+      if (filters.gift_aid) params.append('gift_aid', filters.gift_aid);
+      if (filters.start_date) params.append('start_date', filters.start_date);
+      if (filters.end_date) params.append('end_date', filters.end_date);
     }
 
     fetch(`${API_BASE_URL}/api/donors?${params.toString()}`)
@@ -60,16 +70,18 @@ export default function ExplorerView({ user, filters, onSelectDonor }) {
           const defaultCols = [
             'First Name',
             'Last Name',
-            'Total LTV',
-            'Lifetime Donor Classification',
+            'Total Online Donations Net Amount in Settled Currency',
             'Transaction Donor Classification',
+            'Lifetime Donor Classification',
+            'Total LTV',
             'Payment Frequency',
             'Heading',
             'Sub-Heading',
+            'Country',
             'Code',
             'Zakat Eligibility'
           ].filter(c => resData.available_columns.includes(c));
-          setSelectedColumns(defaultCols.length > 0 ? defaultCols : resData.available_columns.slice(0, 10));
+          setSelectedColumns(defaultCols.length > 0 ? defaultCols : resData.available_columns.slice(0, 12));
         }
         setLoading(false);
       })
@@ -81,7 +93,7 @@ export default function ExplorerView({ user, filters, onSelectDonor }) {
 
   useEffect(() => {
     loadDonors();
-  }, [currentPage, pageSize, search, filters]);
+  }, [currentPage, pageSize, search, filters, sortBy, sortOrder]);
 
   const handleToggleColumn = (col) => {
     if (selectedColumns.includes(col)) {
@@ -163,7 +175,10 @@ export default function ExplorerView({ user, filters, onSelectDonor }) {
         filter_code: filters?.code,
         filter_zakat: filters?.zakat,
         filter_donor_country: filters?.donor_country,
-        filter_campaign_search: filters?.campaign_search
+        filter_campaign_search: filters?.campaign_search,
+        filter_gift_aid: filters?.gift_aid,
+        filter_start_date: filters?.start_date,
+        filter_end_date: filters?.end_date
       })
     })
       .then(r => r.json())
@@ -229,6 +244,9 @@ export default function ExplorerView({ user, filters, onSelectDonor }) {
       if (filters.zakat) params.append('zakat', filters.zakat);
       if (filters.donor_country) params.append('donor_country', filters.donor_country);
       if (filters.campaign_search) params.append('campaign_search', filters.campaign_search);
+      if (filters.gift_aid) params.append('gift_aid', filters.gift_aid);
+      if (filters.start_date) params.append('start_date', filters.start_date);
+      if (filters.end_date) params.append('end_date', filters.end_date);
     }
 
     window.open(`${API_BASE_URL}/api/donors/export?${params.toString()}`, '_blank');
@@ -264,6 +282,44 @@ export default function ExplorerView({ user, filters, onSelectDonor }) {
               <Download className="w-3.5 h-3.5" /> Excel (.xlsx)
             </button>
           </div>
+
+          <select
+            value={preset}
+            onChange={e => {
+              const val = e.target.value;
+              setPreset(val);
+              if (val === 'default') {
+                setSelectedColumns([
+                  'First Name',
+                  'Last Name',
+                  'Total Online Donations Net Amount in Settled Currency',
+                  'Lifetime Donor Classification',
+                  'Total LTV',
+                  'Transaction Donor Classification',
+                  'Payment Frequency',
+                  'Heading',
+                  'Sub-Heading',
+                  'Country',
+                  'Code',
+                  'Zakat Eligibility'
+                ].filter(c => data.available_columns.includes(c)));
+              } else if (val === 'all') {
+                setSelectedColumns(data.available_columns);
+              } else if (val === 'minimal') {
+                setSelectedColumns([
+                  'First Name',
+                  'Last Name',
+                  'Total Online Donations Net Amount in Settled Currency',
+                  'Payment Frequency'
+                ].filter(c => data.available_columns.includes(c)));
+              }
+            }}
+            className="bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500 cursor-pointer"
+          >
+            <option value="default">📋 Default Preset</option>
+            <option value="minimal">🔍 Minimal View</option>
+            <option value="all">🌐 All Columns</option>
+          </select>
 
           <button 
             onClick={() => setShowColumnChooser(!showColumnChooser)}
@@ -495,11 +551,40 @@ export default function ExplorerView({ user, filters, onSelectDonor }) {
             <table className="crm-table">
               <thead className="sticky top-0 z-20 backdrop-blur-md bg-slate-900/90 border-b border-white/10">
                 <tr>
-                  {selectedColumns.map(c => (
-                    <th key={c} className="whitespace-nowrap font-extrabold tracking-wider">
-                      {COLUMN_ALIASES[c] || c}
-                    </th>
-                  ))}
+                  {selectedColumns.map(c => {
+                    const isSorted = sortBy === c;
+                    return (
+                      <th 
+                        key={c} 
+                        onClick={() => {
+                          if (sortBy === c) {
+                            if (sortOrder === 'asc') {
+                              setSortOrder('desc');
+                            } else {
+                              setSortBy(null);
+                              setSortOrder('asc');
+                            }
+                          } else {
+                            setSortBy(c);
+                            setSortOrder('asc');
+                          }
+                          setCurrentPage(1);
+                        }}
+                        className="whitespace-nowrap font-extrabold tracking-wider cursor-pointer hover:bg-white/5 select-none transition-colors group"
+                      >
+                        <div className="flex items-center gap-1.5 justify-between">
+                          <span>{COLUMN_ALIASES[c] || c}</span>
+                          <span className="text-slate-400 group-hover:text-white transition-colors">
+                            {isSorted ? (
+                              sortOrder === 'asc' ? <ArrowUp className="w-3.5 h-3.5 text-cyan-400" /> : <ArrowDown className="w-3.5 h-3.5 text-cyan-400" />
+                            ) : (
+                              <ArrowUpDown className="w-3 h-3 opacity-30 group-hover:opacity-100" />
+                            )}
+                          </span>
+                        </div>
+                      </th>
+                    );
+                  })}
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5">

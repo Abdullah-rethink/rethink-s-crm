@@ -7,14 +7,28 @@ export default function DonorDrawer({ donorId, onClose }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
+  // Pagination State for Transaction History
+  const [historyPage, setHistoryPage] = useState(1);
+  const [historyPageSize, setHistoryPageSize] = useState(20);
+  const [historyRecords, setHistoryRecords] = useState([]);
+  const [historyTotalRecords, setHistoryTotalRecords] = useState(0);
+  const [historyTotalPages, setHistoryTotalPages] = useState(1);
+  const [historyLoading, setHistoryLoading] = useState(false);
+
   useEffect(() => {
     if (!donorId) return;
     setLoading(true);
     setError('');
+    setHistoryPage(1);
     fetch(`${API_BASE_URL}/api/donors/profile/${encodeURIComponent(donorId)}`)
       .then(res => res.json())
       .then(data => {
         setProfile(data);
+        setHistoryTotalRecords(data.total_donations_count || 0);
+        if (data.history) {
+          setHistoryRecords(data.history.slice(0, 20));
+          setHistoryTotalPages(Math.ceil((data.total_donations_count || 0) / 20) || 1);
+        }
         setLoading(false);
       })
       .catch(err => {
@@ -23,6 +37,35 @@ export default function DonorDrawer({ donorId, onClose }) {
         setLoading(false);
       });
   }, [donorId]);
+
+  // Fetch specific history pages for massive donor accounts
+  const fetchHistoryPage = (p, ps) => {
+    if (!donorId) return;
+    setHistoryLoading(true);
+    fetch(`${API_BASE_URL}/api/donors/history?donor_id=${encodeURIComponent(donorId)}&page=${p}&page_size=${ps}`)
+      .then(res => res.json())
+      .then(data => {
+        setHistoryRecords(data.records || []);
+        setHistoryTotalRecords(data.total_records || 0);
+        setHistoryTotalPages(data.total_pages || 1);
+        setHistoryLoading(false);
+      })
+      .catch(err => {
+        console.error('Error fetching donor history page:', err);
+        setHistoryLoading(false);
+      });
+  };
+
+  const handlePageChange = (newPage) => {
+    setHistoryPage(newPage);
+    fetchHistoryPage(newPage, historyPageSize);
+  };
+
+  const handlePageSizeChange = (newSize) => {
+    setHistoryPageSize(newSize);
+    setHistoryPage(1);
+    fetchHistoryPage(1, newSize);
+  };
 
   useEffect(() => {
     const handleKeyDown = (event) => {
@@ -98,54 +141,38 @@ export default function DonorDrawer({ donorId, onClose }) {
               <div className="glass-panel p-3.5 border-l-4 border-cyan-400">
                 <div className="text-[10px] font-bold uppercase" style={{ color: 'var(--text-sub)' }}>Total Lifetime Raised</div>
                 <div className="text-xl font-black text-cyan-400 mt-1">£{profile?.total_ltv?.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
-                <div className="text-[10px] mt-0.5" style={{ color: 'var(--text-sub)' }}>{profile?.total_donations_count} total donations</div>
-              </div>
-
-              <div className="glass-panel p-3.5 border-l-4 border-emerald-400">
-                <div className="text-[10px] font-bold uppercase" style={{ color: 'var(--text-sub)' }}>Average Donation</div>
-                <div className="text-xl font-black text-emerald-400 mt-1">£{profile?.avg_donation?.toFixed(2)}</div>
-                <div className="text-[10px] mt-0.5" style={{ color: 'var(--text-sub)' }}>Per transaction</div>
+                <div className="text-[10px] mt-0.5" style={{ color: 'var(--text-sub)' }}>{profile?.total_donations_count?.toLocaleString()} total donations</div>
               </div>
 
               <div className="glass-panel p-3.5 border-l-4 border-purple-400">
+                <div className="text-[10px] font-bold uppercase" style={{ color: 'var(--text-sub)' }}>Average Donation</div>
+                <div className="text-xl font-black text-purple-400 mt-1">£{profile?.avg_donation?.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
+                <div className="text-[10px] mt-0.5" style={{ color: 'var(--text-sub)' }}>per transaction</div>
+              </div>
+
+              <div className="glass-panel p-3.5 border-l-4 border-emerald-400">
                 <div className="text-[10px] font-bold uppercase" style={{ color: 'var(--text-sub)' }}>Payment Frequency</div>
-                <div className="text-sm font-extrabold text-purple-300 mt-1.5">{profile?.payment_frequency}</div>
-                <div className="text-[10px] mt-0.5" style={{ color: 'var(--text-sub)' }}>{profile?.settlement_currency || 'GBP'}</div>
+                <div className="text-sm font-black text-emerald-400 mt-1 truncate">{profile?.payment_frequency}</div>
+                <div className="text-[10px] mt-0.5" style={{ color: 'var(--text-sub)' }}>{profile?.payment_type}</div>
               </div>
             </div>
 
-            {/* Category & Sub-Heading Payment Breakdown Card */}
+            {/* Category & Sub-Heading Breakdown */}
             {profile?.category_breakdown?.length > 0 && (
-              <div className="glass-panel p-4 flex flex-col gap-3 border-l-4 border-purple-400">
-                <h3 className="text-xs font-bold uppercase tracking-wider flex items-center gap-1.5" style={{ color: 'var(--text-main)' }}>
-                  <PieChart className="w-3.5 h-3.5 text-purple-400" /> Payment Breakdown by Heading & Sub-Heading
+              <div>
+                <h3 className="text-xs font-extrabold text-white mb-3 uppercase tracking-wider flex items-center gap-2">
+                  <PieChart className="w-4 h-4 text-purple-400" /> Category Breakdown
                 </h3>
-
-                <div className="flex flex-col gap-2.5 mt-1">
-                  {profile.category_breakdown.map((item, idx) => (
-                    <div key={idx} className="flex flex-col gap-1.5 p-2.5 rounded-xl bg-slate-900/60 border border-white/5">
-                      <div className="flex items-center justify-between text-xs">
-                        <div className="flex items-center gap-2">
-                          <span className="font-extrabold text-cyan-400">{item.heading}</span>
-                          <span className="text-slate-500">•</span>
-                          <span className="font-semibold text-purple-300">{item.subheading}</span>
-                        </div>
-
-                        <div className="flex items-center gap-2">
-                          <span className="text-[11px] text-slate-400 font-mono">({item.count} txns)</span>
-                          <span className="font-black text-emerald-400 text-xs">£{item.total_amount?.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                        </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  {profile.category_breakdown.map((cat, idx) => (
+                    <div key={idx} className="glass-panel p-3 flex items-center justify-between border-l-2 border-purple-500/50">
+                      <div>
+                        <div className="text-xs font-bold text-white truncate max-w-[170px]">{cat.subheading}</div>
+                        <div className="text-[10px] text-purple-300 font-medium">{cat.heading} • {cat.count} txns</div>
                       </div>
-
-                      {/* Percentage Progress Bar */}
-                      <div className="flex items-center gap-2">
-                        <div className="w-full h-1.5 rounded-full bg-slate-800 overflow-hidden">
-                          <div 
-                            className="h-full bg-gradient-to-r from-cyan-400 to-purple-500 rounded-full" 
-                            style={{ width: `${Math.min(100, item.percentage)}%` }}
-                          />
-                        </div>
-                        <span className="text-[10px] font-bold text-slate-400 shrink-0 w-9 text-right">{item.percentage}%</span>
+                      <div className="text-right">
+                        <div className="text-xs font-extrabold text-cyan-400">£{cat.total_amount?.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
+                        <div className="text-[10px] text-slate-400 font-bold">{cat.percentage}%</div>
                       </div>
                     </div>
                   ))}
@@ -153,50 +180,16 @@ export default function DonorDrawer({ donorId, onClose }) {
               </div>
             )}
 
-            {/* Complete Contact & Billing Information */}
+            {/* Compliance, Tax, & Address Details */}
             <div className="glass-panel p-4 flex flex-col gap-3">
-              <h3 className="text-xs font-bold uppercase tracking-wider flex items-center gap-1.5" style={{ color: 'var(--text-main)' }}>
-                <User className="w-3.5 h-3.5 text-cyan-400" /> Contact & Billing Profile
-              </h3>
-
-              <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-xs">
-                <div className="flex justify-between py-1 border-b border-white/5">
-                  <span className="text-slate-400">Donor ID</span>
-                  <span className="font-mono text-cyan-400 font-bold">{profile?.donor_id}</span>
-                </div>
-                <div className="flex justify-between py-1 border-b border-white/5">
-                  <span className="text-slate-400">Email</span>
-                  <span className="font-semibold text-slate-200">{profile?.email}</span>
-                </div>
-                <div className="flex justify-between py-1 border-b border-white/5">
-                  <span className="text-slate-400">Phone</span>
-                  <span className="font-semibold text-slate-200">{profile?.phone}</span>
-                </div>
-                <div className="flex justify-between py-1 border-b border-white/5">
-                  <span className="text-slate-400">Billing Address</span>
-                  <span className="font-semibold text-slate-200 truncate max-w-[180px]">{profile?.billing_address_1}</span>
-                </div>
-                <div className="flex justify-between py-1 border-b border-white/5">
-                  <span className="text-slate-400">City / Postcode</span>
-                  <span className="font-semibold text-slate-200">{profile?.billing_city !== 'N/A' ? `${profile?.billing_city}, ` : ''}{profile?.billing_postcode}</span>
-                </div>
-                <div className="flex justify-between py-1 border-b border-white/5">
-                  <span className="text-slate-400">Billing Country</span>
-                  <span className="font-semibold text-slate-200">{profile?.billing_country}</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Compliance, Tax & Marketing Flags */}
-            <div className="glass-panel p-4 flex flex-col gap-3">
-              <h3 className="text-xs font-bold uppercase tracking-wider flex items-center gap-1.5" style={{ color: 'var(--text-main)' }}>
-                <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" /> Compliance & Tax Declarations
+              <h3 className="text-xs font-extrabold text-white uppercase tracking-wider flex items-center gap-2 border-b border-white/10 pb-2">
+                <ShieldCheck className="w-4 h-4 text-emerald-400" /> Compliance & Tax Declarations
               </h3>
 
               <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-xs">
                 <div className="flex justify-between py-1 border-b border-white/5">
                   <span className="text-slate-400">Gift Aid Claimed</span>
-                  <span className={`font-bold ${profile?.gift_aid === 'Yes' ? 'text-emerald-400' : 'text-slate-400'}`}>{profile?.gift_aid}</span>
+                  <span className="font-semibold text-slate-200">{profile?.gift_aid}</span>
                 </div>
                 <div className="flex justify-between py-1 border-b border-white/5">
                   <span className="text-slate-400">Marketing Consent</span>
@@ -221,37 +214,82 @@ export default function DonorDrawer({ donorId, onClose }) {
               </div>
             </div>
 
-            {/* Complete Transaction History Table */}
+            {/* Complete Transaction History Table with High-Performance Pagination */}
             <div>
-              <h3 className="text-xs font-extrabold text-white mb-3 uppercase tracking-wider flex items-center gap-2">
-                <Calendar className="w-4 h-4 text-cyan-400" /> Complete Transaction History ({profile?.history?.length || 0})
-              </h3>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-xs font-extrabold text-white uppercase tracking-wider flex items-center gap-2">
+                  <Calendar className="w-4 h-4 text-cyan-400" /> Transaction History ({historyTotalRecords.toLocaleString()})
+                </h3>
 
-              <div className="glass-panel overflow-hidden">
-                <div className="overflow-x-auto max-h-[300px]">
-                  <table className="crm-table">
-                    <thead>
-                      <tr>
-                        <th>Date (UTC)</th>
-                        <th>Campaign</th>
-                        <th>Category Heading</th>
-                        <th>Sub-Heading</th>
-                        <th>Net Settled Amount</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {profile?.history?.map((txn, i) => (
-                        <tr key={i}>
-                          <td className="text-xs text-slate-400 font-mono">{txn['Created Date (UTC)'] ? String(txn['Created Date (UTC)']).split('T')[0] : 'N/A'}</td>
-                          <td className="text-xs font-bold text-slate-200 max-w-[160px] truncate">{txn['Campaign Name'] || 'N/A'}</td>
-                          <td className="text-xs text-cyan-400 font-semibold">{txn['Heading'] || 'Unassigned'}</td>
-                          <td className="text-xs text-purple-300">{txn['Sub-Heading'] || 'Unassigned'}</td>
-                          <td className="text-xs font-black text-cyan-400">£{txn['Total Online Donations Net Amount in Settled Currency']?.toFixed(2) || '0.00'}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] text-slate-400 font-bold">Rows:</span>
+                  <select
+                    value={historyPageSize}
+                    onChange={e => handlePageSizeChange(Number(e.target.value))}
+                    className="bg-slate-900 border border-white/10 rounded-lg px-2 py-1 text-[11px] text-white focus:outline-none focus:border-cyan-500 cursor-pointer"
+                  >
+                    <option value={10}>10</option>
+                    <option value={20}>20</option>
+                    <option value={50}>50</option>
+                    <option value={100}>100</option>
+                  </select>
                 </div>
+              </div>
+
+              <div className="glass-panel overflow-hidden border border-white/10 rounded-xl">
+                <div className="overflow-x-auto max-h-[320px]">
+                  {historyLoading ? (
+                    <div className="py-12 text-center text-xs text-slate-400 font-semibold animate-pulse">
+                      ⚡ Loading history page...
+                    </div>
+                  ) : (
+                    <table className="crm-table">
+                      <thead className="sticky top-0 z-10 bg-slate-900 border-b border-white/10">
+                        <tr>
+                          <th>Date (UTC)</th>
+                          <th>Campaign</th>
+                          <th>Category Heading</th>
+                          <th>Sub-Heading</th>
+                          <th>Net Settled Amount</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {historyRecords.map((txn, i) => (
+                          <tr key={i}>
+                            <td className="text-xs text-slate-400 font-mono">{txn['Created Date (UTC)'] ? String(txn['Created Date (UTC)']).split('T')[0] : 'N/A'}</td>
+                            <td className="text-xs font-bold text-slate-200 max-w-[160px] truncate">{txn['Campaign Name'] || 'N/A'}</td>
+                            <td className="text-xs text-cyan-400 font-semibold">{txn['Heading'] || 'Unassigned'}</td>
+                            <td className="text-xs text-purple-300">{txn['Sub-Heading'] || 'Unassigned'}</td>
+                            <td className="text-xs font-black text-cyan-400">£{txn['Total Online Donations Net Amount in Settled Currency']?.toFixed(2) || '0.00'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+
+                {/* History Pagination Bar */}
+                {historyTotalPages > 1 && (
+                  <div className="p-3 border-t border-white/10 flex items-center justify-between text-xs bg-slate-900/60">
+                    <button
+                      disabled={historyPage <= 1 || historyLoading}
+                      onClick={() => handlePageChange(Math.max(1, historyPage - 1))}
+                      className="btn-secondary text-xs px-3 py-1 disabled:opacity-40"
+                    >
+                      Prev
+                    </button>
+                    <span className="text-xs text-slate-400 font-medium">
+                      Page <b className="text-cyan-400">{historyPage}</b> of <b className="text-white">{historyTotalPages}</b>
+                    </span>
+                    <button
+                      disabled={historyPage >= historyTotalPages || historyLoading}
+                      onClick={() => handlePageChange(Math.min(historyTotalPages, historyPage + 1))}
+                      className="btn-secondary text-xs px-3 py-1 disabled:opacity-40"
+                    >
+                      Next
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           </div>
