@@ -134,6 +134,12 @@ export default function App() {
     setTheme(prev => (prev === 'dark' ? 'light' : 'dark'));
   };
 
+  const [dataVersion, setDataVersion] = useState(0);
+
+  const handleDataChange = () => {
+    setDataVersion(v => v + 1);
+  };
+
   // Fetch Live Summary Metrics
   useEffect(() => {
     if (!user) return;
@@ -157,7 +163,7 @@ export default function App() {
       .then(res => res.json())
       .then(data => setMetrics(data))
       .catch(err => console.error('Error fetching metrics summary:', err));
-  }, [user, filters]);
+  }, [user, filters, dataVersion]);
 
   const handleFilterChange = (key, value) => {
     setFilters(prev => ({ ...prev, [key]: value }));
@@ -235,14 +241,14 @@ export default function App() {
 
             {/* Active Tab Main Content */}
             <div className="w-full min-w-0">
-              {activeTab === 'overview' && <OverviewView filters={filters} user={user} metrics={metrics} accentColor={accentColor} />}
-              {activeTab === 'ltv' && <LtvView filters={filters} />}
-              {activeTab === 'kanban' && <KanbanBoard filters={filters} onSelectDonor={setSelectedDonor} />}
-              {activeTab === 'explorer' && <ExplorerView user={user} filters={filters} onSelectDonor={setSelectedDonor} />}
-              {activeTab === 'tracker' && <TrackerView user={user} filters={filters} onSelectDonor={setSelectedDonor} accentColor={accentColor} />}
-              {activeTab === 'classifications' && <ClassificationView user={user} />}
-              {activeTab === 'expenses' && <ExpenseView user={user} />}
-              {activeTab === 'admin' && <AdminView user={user} />}
+              {activeTab === 'overview' && <OverviewView key={dataVersion} filters={filters} user={user} metrics={metrics} accentColor={accentColor} />}
+              {activeTab === 'ltv' && <LtvView key={dataVersion} filters={filters} />}
+              {activeTab === 'kanban' && <KanbanBoard key={dataVersion} filters={filters} onSelectDonor={setSelectedDonor} />}
+              {activeTab === 'explorer' && <ExplorerView key={dataVersion} user={user} filters={filters} onSelectDonor={setSelectedDonor} onDataChange={handleDataChange} />}
+              {activeTab === 'tracker' && <TrackerView key={dataVersion} user={user} filters={filters} onSelectDonor={setSelectedDonor} accentColor={accentColor} />}
+              {activeTab === 'classifications' && <ClassificationView key={dataVersion} user={user} onDataChange={handleDataChange} />}
+              {activeTab === 'expenses' && <ExpenseView key={dataVersion} user={user} />}
+              {activeTab === 'admin' && <AdminView key={dataVersion} user={user} onDataChange={handleDataChange} />}
             </div>
 
 

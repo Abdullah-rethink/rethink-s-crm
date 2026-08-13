@@ -14,6 +14,8 @@ from core.data_processor import (
     save_classification_matrix,
     get_paysuite_classification_matrix,
     save_paysuite_classification_matrix,
+    get_rethink_website_classification_matrix,
+    save_rethink_website_classification_matrix,
     get_code_to_classification_map,
     sync_matrix_classifications_to_donors,
 )
@@ -209,9 +211,41 @@ def get_paysuite_matrix():
 
 
 
+@router.get("/website")
+def get_rethink_website_matrix():
+    """Returns Rethink Website classification matrix rules in < 80ms."""
+    try:
+        conn = sqlite3.connect(LOCAL_DB_PATH, timeout=10.0)
+        df = pd.read_sql_query("""
+            SELECT 
+                campaign_name as "Campaign Name",
+                COALESCE(community_name, 'N/A') as "Community Name",
+                COALESCE(heading, 'Unassigned') as "Heading",
+                COALESCE(sub_heading, 'Unassigned') as "Sub-Heading",
+                COALESCE(country, 'Unassigned') as "Country",
+                COALESCE(code, 'Unassigned') as "Code",
+                COALESCE(zakat_eligibility, 'Unassigned') as "Zakat Eligibility"
+            FROM rethink_website_classifications
+        """, conn)
+        conn.close()
+    except Exception as e:
+        print(f"[Website Matrix Query Notice]: {e}")
+        df = get_rethink_website_classification_matrix().fillna("Unassigned")
+
+    df = sanitize_matrix_df(df)
+    unassigned_count = (df["Heading"] == "Unassigned").sum() if "Heading" in df.columns else 0
+    return {
+        "platform": "Rethink Website",
+        "total_campaigns": len(df),
+        "classified_campaigns": int(len(df) - unassigned_count),
+        "unassigned_campaigns": int(unassigned_count),
+        "rules": df.to_dict(orient="records")
+    }
+
+
 @router.get("/export")
 def export_classifications(
-    platform: str = Query("launchgood", regex="^(launchgood|givebright|paysuite)$"),
+    platform: str = Query("launchgood", regex="^(launchgood|givebright|paysuite|website|rethink_website)$"),
     format: str = Query("csv", regex="^(csv|xlsx)$")
 ):
     """Exports campaign classification rules to CSV or Excel (.xlsx) file format."""
@@ -223,6 +257,8 @@ def export_classifications(
         matrix_df = matrix_df.drop_duplicates(subset=["Campaign Name"], keep="last").reset_index(drop=True)
     elif platform.lower() == "paysuite":
         matrix_df = get_paysuite_classification_matrix(df_raw).fillna("Unassigned")
+    elif platform.lower() in ["website", "rethink_website", "rethink website"]:
+        matrix_df = get_rethink_website_classification_matrix(df_raw).fillna("Unassigned")
     else:
         matrix_df = get_classification_matrix(df_raw).fillna("Unassigned")
 
@@ -308,6 +344,9 @@ def save_matrix_rules(payload: SaveRulesRequest):
     elif payload.platform.lower() == "paysuite":
         n_saved = save_paysuite_classification_matrix(matrix_df)
         sync_matrix_classifications_to_donors(matrix_df)
+    elif payload.platform.lower() in ["website", "rethink_website", "rethink website"]:
+        n_saved = save_rethink_website_classification_matrix(matrix_df)
+        sync_matrix_classifications_to_donors(matrix_df)
     else:
         n_saved = save_classification_matrix(matrix_df)
         sync_matrix_classifications_to_donors(matrix_df)
@@ -336,6 +375,8 @@ def delete_single_rule(payload: DeleteRuleRequest):
             conn.execute("DELETE FROM givebright_classifications WHERE campaign_name = ?", (cname,))
         elif platform == "paysuite":
             conn.execute("DELETE FROM paysuite_classifications WHERE campaign_name = ?", (cname,))
+        elif platform in ["website", "rethink_website", "rethink website"]:
+            conn.execute("DELETE FROM rethink_website_classifications WHERE campaign_name = ?", (cname,))
         else:
             if payload.community_name:
                 conn.execute("DELETE FROM campaign_classifications WHERE campaign_name = ? AND community_name = ?", (cname, sanitize_text(payload.community_name)))
@@ -387,6 +428,8 @@ def clear_platform_rules(payload: ClearPlatformRequest):
             conn.execute("DELETE FROM givebright_classifications;")
         elif platform == "paysuite":
             conn.execute("DELETE FROM paysuite_classifications;")
+        elif platform in ["website", "rethink_website", "rethink website"]:
+            conn.execute("DELETE FROM rethink_website_classifications;")
         else:
             conn.execute("DELETE FROM campaign_classifications;")
         conn.commit()

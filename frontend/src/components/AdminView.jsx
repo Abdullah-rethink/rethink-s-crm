@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { Database, HardDrive, Server, Trash2, Edit, ShieldCheck, UserCheck, Key, Check, X, ShieldAlert, Sparkles, Mail, Save } from 'lucide-react';
+import { Database, HardDrive, Server, Trash2, Edit, ShieldCheck, UserCheck, Key, Check, X, ShieldAlert, Sparkles, Mail, Save, Upload, FileSpreadsheet, RefreshCw } from 'lucide-react';
 import { API_BASE_URL } from '../config';
 
-export default function AdminView({ user }) {
+export default function AdminView({ user, onDataChange }) {
   const [status, setStatus] = useState(null);
   const [tags, setTags] = useState([]);
   const [usersList, setUsersList] = useState([]);
@@ -17,9 +17,93 @@ export default function AdminView({ user }) {
   const [emailSaveMsg, setEmailSaveMsg] = useState('');
   const [editingUser, setEditingUser] = useState(null);
 
+  // Upload Raw Dataset State
+  const [uploadFile, setUploadFile] = useState(null);
+  const [uploadPlatform, setUploadPlatform] = useState('auto');
+  const [uploadMode, setUploadMode] = useState('merge');
+  const [uploading, setUploading] = useState(false);
+  const [uploadMsg, setUploadMsg] = useState('');
+
+  // Purge Database State
+  const [purgeConfirm, setPurgeConfirm] = useState(false);
+  const [purging, setPurging] = useState(false);
+
   const isSuperAdmin = user?.role === 'super_admin';
   const canManageTags = isSuperAdmin || user?.can_manage_tags === 1;
   const canPurgeData = isSuperAdmin || user?.can_purge_data === 1;
+
+  const handlePurgeDatabase = () => {
+    if (!isSuperAdmin) return;
+    if (!purgeConfirm) {
+      setMsg('❌ Please check the confirmation box before purging database records.');
+      return;
+    }
+    if (!window.confirm("⚠️ ARE YOU ABSOLUTELY SURE?\nThis will permanently wipe all transaction records from the system. This action cannot be undone.")) {
+      return;
+    }
+
+    setPurging(true);
+    setMsg('');
+
+    fetch(`${API_BASE_URL}/api/admin/purge`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        user_role: user?.role,
+        confirm: true
+      })
+    })
+      .then(r => r.json())
+      .then(res => {
+        setPurging(false);
+        if (res?.status === 'success') {
+          setMsg(`✅ ${res.message}`);
+          setPurgeConfirm(false);
+          loadAdminData();
+          if (onDataChange) onDataChange();
+        } else {
+          setMsg(`❌ ${res?.detail || 'Failed to purge database.'}`);
+        }
+      })
+      .catch(err => {
+        setPurging(false);
+        setMsg(`❌ Error purging database: ${err.message}`);
+      });
+  };
+
+  const handleUploadData = (e) => {
+    e.preventDefault();
+    if (!uploadFile) return;
+    setUploading(true);
+    setUploadMsg('');
+
+    const formData = new FormData();
+    formData.append('user_role', user?.role || 'admin');
+    formData.append('upload_mode', uploadMode);
+    formData.append('platform', uploadPlatform);
+    formData.append('file', uploadFile);
+
+    fetch(`${API_BASE_URL}/api/admin/upload-data`, {
+      method: 'POST',
+      body: formData,
+    })
+      .then(r => r.json())
+      .then(res => {
+        setUploading(false);
+        if (res.status === 'success') {
+          setUploadMsg(`✅ ${res.message}`);
+          setUploadFile(null);
+          loadAdminData();
+          if (onDataChange) onDataChange();
+        } else {
+          setUploadMsg(`❌ ${res.detail || res.message || 'Failed to upload dataset.'}`);
+        }
+      })
+      .catch(err => {
+        setUploading(false);
+        setUploadMsg(`❌ Error uploading file: ${err.message}`);
+      });
+  };
 
   const loadAdminData = () => {
     setLoading(true);
@@ -302,6 +386,78 @@ export default function AdminView({ user }) {
         </div>
       )}
 
+      {/* 📤 Raw Data Ingestion & File Upload Card */}
+      <div className="glass-panel p-5 border-l-4 border-emerald-400 flex flex-col gap-4">
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <div>
+            <h3 className="text-sm font-bold text-slate-200 flex items-center gap-2">
+              <Upload className="w-4 h-4 text-emerald-400" /> Raw Data Ingestion & File Upload
+            </h3>
+            <p className="text-xs text-slate-400">Upload raw transaction datasets (.csv, .xlsx, .xls) for LaunchGood, GiveBright, Paysuite, or Rethink Website.</p>
+          </div>
+          {uploadMsg && (
+            <div className={`text-xs font-bold ${uploadMsg.includes('✅') ? 'text-emerald-400' : 'text-rose-400'}`}>
+              {uploadMsg}
+            </div>
+          )}
+        </div>
+
+        <form onSubmit={handleUploadData} className="grid grid-cols-1 md:grid-cols-4 gap-3 bg-slate-900/60 p-4 rounded-xl border border-white/10">
+          {/* File Input */}
+          <div className="flex flex-col gap-1 md:col-span-2">
+            <label className="text-[11px] font-bold text-slate-300">Select Dataset File (.csv, .xlsx)</label>
+            <input 
+              type="file" 
+              required
+              accept=".csv, .xlsx, .xls"
+              onChange={e => setUploadFile(e.target.files[0] || null)}
+              className="text-xs text-slate-300 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-emerald-600 file:text-white hover:file:bg-emerald-700 cursor-pointer"
+            />
+          </div>
+
+          {/* Platform Platform Selector */}
+          <div className="flex flex-col gap-1">
+            <label className="text-[11px] font-bold text-slate-300">Data Platform Source</label>
+            <select
+              value={uploadPlatform}
+              onChange={e => setUploadPlatform(e.target.value)}
+              className="bg-slate-900 border border-white/15 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-400 cursor-pointer"
+            >
+              <option value="auto">Auto-Detect Platform</option>
+              <option value="launchgood">LaunchGood</option>
+              <option value="givebright">GiveBright</option>
+              <option value="paysuite">Paysuite</option>
+              <option value="website">Rethink Website</option>
+            </select>
+          </div>
+
+          {/* Upload Strategy */}
+          <div className="flex flex-col gap-1">
+            <label className="text-[11px] font-bold text-slate-300">Upload Strategy</label>
+            <select
+              value={uploadMode}
+              onChange={e => setUploadMode(e.target.value)}
+              className="bg-slate-900 border border-white/15 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-400 cursor-pointer"
+            >
+              <option value="merge">Append / Merge Batch</option>
+              <option value="replace">Replace Entire Dataset</option>
+            </select>
+          </div>
+
+          {/* Submit Button */}
+          <div className="md:col-span-4 flex justify-end pt-1">
+            <button
+              type="submit"
+              disabled={uploading || !uploadFile}
+              className="btn-primary text-xs flex items-center gap-2 px-5 py-2 disabled:opacity-50 cursor-pointer"
+            >
+              {uploading ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
+              <span>{uploading ? 'Processing & Classifying...' : 'Upload & Auto-Classify Dataset'}</span>
+            </button>
+          </div>
+        </form>
+      </div>
+
       {/* Predefined RBAC Roles Matrix Table */}
       <div className="glass-panel p-5 border-l-4 border-purple-400 flex flex-col gap-4">
         <h3 className="text-sm font-bold text-slate-200 flex items-center gap-2">
@@ -581,6 +737,46 @@ export default function AdminView({ user }) {
           </div>
         )}
       </div>
+
+      {/* 🔥 Purge All Database Records (Super Admin Only) */}
+      {canPurgeData && (
+        <div className="glass-panel p-5 border-l-4 border-rose-500 bg-rose-500/5 flex flex-col gap-4">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div>
+              <h3 className="text-sm font-black text-rose-600 dark:text-rose-400 flex items-center gap-2 uppercase tracking-wider">
+                <ShieldAlert className="w-5 h-5 text-rose-500 animate-pulse" /> Purge All Database Records
+              </h3>
+              <p className="text-xs text-slate-600 dark:text-slate-400 mt-1 font-medium">
+                Wipes all donor transactions from SQLite and Parquet database storage. Classification rules and user accounts will remain intact.
+              </p>
+            </div>
+            <span className="px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase bg-rose-500/20 text-rose-400 border border-rose-500/30">
+              SUPER ADMIN ACTION
+            </span>
+          </div>
+
+          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 p-4 rounded-xl border border-rose-500/20 bg-rose-950/20">
+            <label className="flex items-center gap-3 text-xs font-bold text-slate-700 dark:text-slate-300 cursor-pointer select-none">
+              <input 
+                type="checkbox" 
+                checked={purgeConfirm}
+                onChange={e => setPurgeConfirm(e.target.checked)}
+                className="w-4 h-4 text-rose-600 rounded border-slate-300 focus:ring-rose-500 cursor-pointer"
+              />
+              <span>I confirm that I want to permanently delete all donation records.</span>
+            </label>
+
+            <button
+              onClick={handlePurgeDatabase}
+              disabled={purging || !purgeConfirm}
+              className="px-5 py-2 rounded-xl text-xs font-black bg-gradient-to-r from-rose-600 to-red-700 hover:from-rose-700 hover:to-red-800 text-white shadow-lg shadow-rose-500/20 disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center gap-2 cursor-pointer shrink-0"
+            >
+              {purging ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+              <span>{purging ? 'Purging Database...' : '🔥 Purge All Data'}</span>
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

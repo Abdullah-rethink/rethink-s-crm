@@ -42,23 +42,25 @@ def get_metrics_summary(
 
     col_heading = "Heading"
 
-    total_raised = float(df[col_amount].sum()) if col_amount in df.columns else 0.0
+    amount_series = pd.to_numeric(df[col_amount], errors='coerce').fillna(0.0) if col_amount in df.columns else pd.Series(0.0, index=df.index)
+
+    total_raised = float(amount_series.sum())
     total_txns = int(len(df))
     avg_donation = float(total_raised / total_txns) if total_txns > 0 else 0.0
 
     gift_aid_estimate = 0.0
     if col_amount in df.columns:
-        # Check both LaunchGood and GiveBright columns
+        # Check LaunchGood, GiveBright, and Website columns
         mask_lg = pd.Series(False, index=df.index)
         if "Gift Aid (yes or no)" in df.columns:
-            mask_lg = df["Gift Aid (yes or no)"].astype(str).str.strip().str.lower() == 'yes'
+            mask_lg = df["Gift Aid (yes or no)"].astype(str).str.strip().str.lower().isin(['yes', '1', 'true'])
             
         mask_gb = pd.Series(False, index=df.index)
         if "is_giftaid" in df.columns:
-            mask_gb = df["is_giftaid"] == 1.0
+            mask_gb = df["is_giftaid"].astype(str).str.strip().str.lower().isin(['1', '1.0', 'true', 'yes'])
             
-        gift_aid_donations = df[mask_lg | mask_gb]
-        gift_aid_total_donations = float(gift_aid_donations[col_amount].sum())
+        gift_aid_donations = amount_series[mask_lg | mask_gb]
+        gift_aid_total_donations = float(gift_aid_donations.sum())
         gift_aid_estimate = gift_aid_total_donations * 0.25
 
     top_cat = "N/A"
