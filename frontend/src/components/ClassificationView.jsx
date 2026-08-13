@@ -430,6 +430,28 @@ export default function ClassificationView({ user }) {
 
         {/* Global Action Buttons */}
         <div className="flex flex-wrap items-center gap-2">
+          {/* Save & Sync Matrix Button */}
+          {isSuperAdmin && (
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className="px-4 py-2 text-xs font-extrabold rounded-xl text-white bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 shadow-md shadow-emerald-500/20 transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
+              title="Save matrix edits and sync classification rules across all donor records"
+            >
+              {saving ? (
+                <>
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin text-white" />
+                  <span>Saving & Syncing...</span>
+                </>
+              ) : (
+                <>
+                  <Save className="w-3.5 h-3.5 text-white" />
+                  <span>Save Matrix & Sync</span>
+                </>
+              )}
+            </button>
+          )}
+
           {/* Export Dropdown */}
           <div className="flex items-center rounded-xl overflow-hidden border border-slate-200 dark:border-white/10 bg-slate-100 dark:bg-slate-800/60 shadow-sm">
             <button 

@@ -1276,6 +1276,7 @@ def process_and_upload_excel(file_buffer, source_name=None, upload_mode="replace
                 raise ValueError(f"Could not parse uploaded CSV file: {ex}")
     else:
         try:
+            file_buffer.seek(0)
             sheets_dict = pd.read_excel(file_buffer, sheet_name=None)
             list_of_dfs = []
             for sdf in sheets_dict.values():
@@ -1328,7 +1329,7 @@ def process_and_upload_excel(file_buffer, source_name=None, upload_mode="replace
     df_save.to_parquet(PARQUET_PATH, index=False)
 
     conn = sqlite3.connect(LOCAL_DB_PATH, timeout=30.0)
-    df_save.to_sql("donations", con=conn, if_exists="replace", index=False)
+    df_save.to_sql("donations", con=conn, if_exists="replace", index=False, chunksize=5000)
     conn.close()
 
     # Invalidate dataset cache so new rows show up instantly
