@@ -1,11 +1,13 @@
+import io
 import os
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, File, Form, HTTPException, UploadFile, status
 from pydantic import BaseModel
 
 from config.settings import PARQUET_PATH
 from core.data_processor import (
     delete_single_dataset,
     load_data,
+    process_and_upload_excel,
     purge_all_data,
     update_source_tag,
 )
@@ -207,3 +209,49 @@ def purge_database(payload: PurgeDataRequest):
         "status": "success",
         "message": "Database purged cleanly!"
     }
+
+
+@router.post("/upload-data")
+def upload_raw_data_file(
+    user_role: str = Form(...),
+    upload_mode: str = Form("merge"),  # "merge" or "replace"
+    platform: str = Form("auto"),       # "auto", "launchgood", "givebright", "paysuite", "website"
+    file: UploadFile = File(...)
+):
+    """Bulk uploads a raw donation dataset (.csv, .xlsx, .xls) for LaunchGood, GiveBright, Paysuite, or Rethink Website."""
+    if user_role not in ["super_admin", "admin", "data_editor"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Uploading donation datasets requires Data Editor or Admin privileges."
+        )
+
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="No file uploaded.")
+
+    ext = os.path.splitext(file.filename)[1].lower()
+    if ext not in [".csv", ".xlsx", ".xls"]:
+        raise HTTPException(status_code=400, detail="Unsupported file format. Please upload a .csv, .xlsx, or .xls file.")
+
+    try:
+        file_bytes = file.file.read()
+        file_buffer = io.BytesIO(file_bytes)
+
+        res = process_and_upload_excel(
+            file_buffer=file_buffer,
+            source_name=file.filename,
+            upload_mode=upload_mode,
+            platform=platform
+        )
+
+        if isinstance(res, dict) and res.get("status") == "error":
+            raise HTTPException(status_code=400, detail=res.get("message", "Upload failed."))
+
+        return {
+            "status": "success",
+            "message": f"Successfully processed '{file.filename}'! {res.get('added', 0):,} records imported and auto-classified.",
+            "details": res
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to process uploaded file: {str(e)}")

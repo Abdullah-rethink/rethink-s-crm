@@ -66,22 +66,28 @@ export default function ExplorerView({ user, filters, onSelectDonor }) {
       .then(res => res.json())
       .then(resData => {
         setData(resData);
-        if (selectedColumns.length === 0 && resData.available_columns?.length > 0) {
-          const defaultCols = [
-            'First Name',
-            'Last Name',
-            'Total Online Donations Net Amount in Settled Currency',
-            'Transaction Donor Classification',
-            'Lifetime Donor Classification',
-            'Total LTV',
-            'Payment Frequency',
-            'Heading',
-            'Sub-Heading',
-            'Country',
-            'Code',
-            'Zakat Eligibility'
-          ].filter(c => resData.available_columns.includes(c));
-          setSelectedColumns(defaultCols.length > 0 ? defaultCols : resData.available_columns.slice(0, 12));
+        if (resData.available_columns?.length > 0) {
+          setSelectedColumns(prev => {
+            if (prev && prev.length > 0) {
+              const validPrev = prev.filter(c => resData.available_columns.includes(c));
+              if (validPrev.length > 0) return validPrev;
+            }
+            const defaultCols = [
+              'First Name',
+              'Last Name',
+              'Total Online Donations Net Amount in Settled Currency',
+              'Transaction Donor Classification',
+              'Lifetime Donor Classification',
+              'Total LTV',
+              'Payment Frequency',
+              'Heading',
+              'Sub-Heading',
+              'Country',
+              'Code',
+              'Zakat Eligibility'
+            ].filter(c => resData.available_columns.includes(c));
+            return defaultCols.length > 0 ? defaultCols : resData.available_columns.slice(0, 12);
+          });
         }
         setLoading(false);
       })

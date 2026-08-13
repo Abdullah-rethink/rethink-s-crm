@@ -15,6 +15,7 @@ import {
   Zap,
   Gift,
   CreditCard,
+  Globe,
   Search,
   ChevronLeft,
   ChevronRight,
@@ -393,6 +394,14 @@ export default function ClassificationView({ user }) {
       subtitle: 'text-slate-600 dark:text-slate-400 font-medium',
       activePill: 'bg-amber-600 text-white shadow-amber-500/30',
       countPill: 'border-amber-500/40 text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40'
+    },
+    website: {
+      container: 'bg-gradient-to-r from-blue-500/15 via-cyan-500/10 to-transparent border-blue-500/30 text-blue-900 dark:text-blue-200',
+      iconBg: 'bg-blue-600 text-white',
+      title: 'text-blue-700 dark:text-blue-300 font-extrabold',
+      subtitle: 'text-slate-600 dark:text-slate-400 font-medium',
+      activePill: 'bg-blue-600 text-white shadow-blue-500/30',
+      countPill: 'border-blue-500/40 text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/40'
     }
   };
 
@@ -441,52 +450,10 @@ export default function ClassificationView({ user }) {
               <span>Excel</span>
             </button>
           </div>
-
-          {/* Import Button */}
-          {isSuperAdmin && (
-            <button
-              onClick={() => { setShowImportModal(true); setImportMsg(''); }}
-              className="px-3.5 py-2 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800/80 dark:hover:bg-slate-700 dark:text-slate-200 border border-slate-300 dark:border-white/10 shadow-sm transition-all flex items-center gap-1.5 cursor-pointer"
-              title="Bulk import classification rules from CSV / Excel"
-            >
-              <Upload className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
-              <span>Import</span>
-            </button>
-          )}
-
-          {/* Save Button */}
-          {isSuperAdmin ? (
-            <button
-              onClick={handleSave}
-              disabled={saving || loading}
-              className="btn btn-primary px-4 py-2 text-xs font-bold flex items-center gap-2 shadow-lg shadow-cyan-500/20 cursor-pointer disabled:opacity-50"
-            >
-              {saving ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-              <span>{saving ? 'Saving...' : 'Save All Changes'}</span>
-            </button>
-          ) : (
-            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500/10 border border-amber-500/20 rounded-xl text-[11px] font-bold text-amber-600 dark:text-amber-400">
-              <Lock className="w-3.5 h-3.5 shrink-0" />
-              <span>Read-Only Mode</span>
-            </div>
-          )}
         </div>
       </div>
 
-      {saveMsg && (
-        <div className={`p-3.5 rounded-xl border text-xs font-bold flex items-center justify-between gap-2 animate-fade-in ${
-          saveMsg.includes('✅') || saveMsg.includes('🗑️')
-            ? 'bg-emerald-50 text-emerald-800 border-emerald-300 dark:bg-emerald-500/10 dark:text-emerald-300 dark:border-emerald-500/30'
-            : 'bg-rose-50 text-rose-800 border-rose-300 dark:bg-rose-500/10 dark:text-rose-300 dark:border-rose-500/30'
-        }`}>
-          <span>{saveMsg}</span>
-          <button onClick={() => setSaveMsg('')} className="p-1 hover:opacity-75 cursor-pointer">
-            <X className="w-3.5 h-3.5" />
-          </button>
-        </div>
-      )}
-
-      {/* Platform Switcher Tabs */}
+      {/* 🚀 Platform Selector Pill Buttons */}
       <div className="flex flex-wrap items-center gap-3">
         {/* LaunchGood Tab */}
         <button 
@@ -544,6 +511,25 @@ export default function ClassificationView({ user }) {
             </span>
           )}
         </button>
+
+        {/* Website Tab */}
+        <button 
+          onClick={() => handleSelectPlatform('website')}
+          className={`relative px-5 py-3 rounded-xl font-bold text-xs flex items-center gap-2.5 transition-all cursor-pointer ${
+            platform === 'website'
+              ? 'bg-gradient-to-r from-blue-600 to-cyan-600 text-white shadow-md shadow-blue-500/30 border border-blue-400 ring-2 ring-blue-400/40'
+              : 'bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-900/60 dark:hover:bg-slate-800/80 dark:text-slate-300 border border-slate-300 dark:border-white/5'
+          }`}
+        >
+          <Globe className={`w-4 h-4 ${platform === 'website' ? 'text-white' : 'text-blue-600 dark:text-blue-400'}`} />
+          <span className="font-bold">Website Matrix</span>
+          {platform === 'website' && (
+            <span className="flex h-2.5 w-2.5 relative ml-1">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-white"></span>
+            </span>
+          )}
+        </button>
       </div>
 
       {/* 🎯 High-Contrast Active Matrix Banner Indicator */}
@@ -552,12 +538,13 @@ export default function ClassificationView({ user }) {
           <span className={`p-2.5 rounded-xl shadow-sm ${bStyles.iconBg}`}>
             {platform === 'launchgood' ? <Zap className="w-5 h-5" /> :
              platform === 'givebright' ? <Gift className="w-5 h-5" /> :
-             <CreditCard className="w-5 h-5" />}
+             platform === 'paysuite' ? <CreditCard className="w-5 h-5" /> :
+             <Globe className="w-5 h-5" />}
           </span>
           <div>
             <div className="text-xs uppercase tracking-wider flex items-center gap-2.5">
               <span className={bStyles.title}>
-                ACTIVE MATRIX: {platform === 'launchgood' ? 'LaunchGood Campaign Master' : platform === 'givebright' ? 'GiveBright Campaign & URL Master' : 'Paysuite Direct Debit Master'}
+                ACTIVE MATRIX: {platform === 'launchgood' ? 'LaunchGood Campaign Master' : platform === 'givebright' ? 'GiveBright Campaign & URL Master' : platform === 'paysuite' ? 'Paysuite Direct Debit Master' : 'Rethink Website Project Master'}
               </span>
               <span className={`text-[10px] px-2.5 py-0.5 rounded-full font-extrabold uppercase shadow-sm ${bStyles.activePill}`}>
                 ACTIVE
@@ -568,6 +555,8 @@ export default function ClassificationView({ user }) {
                 ? 'Hierarchy: Campaign Name & URL ➔ Code ➔ (Heading, Sub-Heading, Country, Zakat Eligibility)'
                 : platform === 'paysuite'
                 ? 'Hierarchy: Direct Debit Ref (Bank Ref) ➔ Code ➔ (Heading, Sub-Heading, Country, Zakat Eligibility)'
+                : platform === 'website'
+                ? 'Hierarchy: Project Name (Campaign) ➔ Appeal Name (Community) ➔ Location (Country)'
                 : 'Hierarchy: Campaign Name ➔ Code ➔ (Heading, Sub-Heading, Country, Zakat Eligibility)'}
             </div>
           </div>
@@ -582,7 +571,7 @@ export default function ClassificationView({ user }) {
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className={`glass-panel p-4 border-l-4 ${platform === 'launchgood' ? 'border-teal-500 dark:border-cyan-400' : platform === 'givebright' ? 'border-purple-500 dark:border-purple-400' : 'border-amber-500 dark:border-amber-400'}`}>
+        <div className={`glass-panel p-4 border-l-4 ${platform === 'launchgood' ? 'border-teal-500 dark:border-cyan-400' : platform === 'givebright' ? 'border-purple-500 dark:border-purple-400' : platform === 'paysuite' ? 'border-amber-500 dark:border-amber-400' : 'border-blue-500 dark:border-blue-400'}`}>
           <div className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase">
             {platform === 'paysuite' ? 'Total Tracked Direct Debits' : 'Unique Tracked Campaigns'}
           </div>
