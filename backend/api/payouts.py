@@ -5,66 +5,57 @@ import pandas as pd
 import math
 import os
 
-from core.data_processor import LOCAL_DB_PATH, load_data
+from core.data_processor import LOCAL_DB_PATH, load_data, load_payouts_data
 
 router = APIRouter(prefix="/api/payouts", tags=["Payouts Reconciliation"])
 
 
 def _get_payout_data_from_db():
     try:
-        conn = sqlite3.connect(LOCAL_DB_PATH, timeout=15.0)
-        cursor = conn.cursor()
-        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='payout_settlements'")
-        if cursor.fetchone():
-            df = pd.read_sql_query("""
-                SELECT 
-                    COALESCE("Campaign Name", 'Unassigned Campaign') AS campaign_name,
-                    COALESCE("Campaign Name", 'Unassigned Campaign') AS "Campaign Name",
-                    LOWER(COALESCE("Type", "Transaction Type", 'donation')) AS row_type,
-                    COALESCE(CAST("Total Online Donation Gross Amount in Settled Currency" AS REAL), 0.0) AS gross_amt,
-                    COALESCE(CAST("Total Processing Fees Paid by CC In Settled Currency" AS REAL), 0.0) AS fee_amt,
-                    COALESCE(CAST("Total Online Donations Net Amount in Settled Currency" AS REAL), 0.0) AS net_amt,
-                    COALESCE("Transfer ID", 'N/A') AS transfer_id,
-                    "Transfer ID",
-                    "Created Date (UTC)",
-                    COALESCE("Heading", 'Unassigned') AS heading,
-                    COALESCE("Sub-Heading", 'Unassigned') AS sub_heading,
-                    COALESCE("Country", 'Unassigned') AS country,
-                    COALESCE("Code", 'Unassigned') AS code,
-                    COALESCE("Zakat Eligibility", 'Unassigned') AS zakat
-                FROM payout_settlements
-            """, conn)
-            conn.close()
-            return df
-        
-        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='donations'")
-        if cursor.fetchone():
-            df = pd.read_sql_query("""
-                SELECT 
-                    COALESCE("Campaign Name", 'Unassigned Campaign') AS campaign_name,
-                    COALESCE("Campaign Name", 'Unassigned Campaign') AS "Campaign Name",
-                    LOWER(COALESCE("Type", "Transaction Type", 'donation')) AS row_type,
-                    COALESCE(CAST("Total Online Donation Gross Amount in Settled Currency" AS REAL), 0.0) AS gross_amt,
-                    COALESCE(CAST("Total Processing Fees Paid by CC In Settled Currency" AS REAL), 0.0) AS fee_amt,
-                    COALESCE(CAST("Total Online Donations Net Amount in Settled Currency" AS REAL), 0.0) AS net_amt,
-                    COALESCE("Transfer ID", 'N/A') AS transfer_id,
-                    "Transfer ID",
-                    "Created Date (UTC)",
-                    COALESCE("Heading", 'Unassigned') AS heading,
-                    COALESCE("Sub-Heading", 'Unassigned') AS sub_heading,
-                    COALESCE("Country", 'Unassigned') AS country,
-                    COALESCE("Code", 'Unassigned') AS code,
-                    COALESCE("Zakat Eligibility", 'Unassigned') AS zakat
-                FROM donations
-                WHERE ("Platform" LIKE '%Payout%' OR "Transfer ID" IS NOT NULL OR "Type" IS NOT NULL)
-            """, conn)
-            conn.close()
+        df_p = load_payouts_data()
+        if df_p is not None and not df_p.empty:
+            df = df_p.copy() if not df_p.empty else df_p
+            # Normalize column aliases
+            c_name = df.get("Campaign Name", pd.Series("Unassigned Campaign", index=df.index)).fillna("Unassigned Campaign")
+            df["campaign_name"] = c_name
+            df["Campaign Name"] = c_name
+            df["row_type"] = df.get("Type", df.get("Transaction Type", pd.Series("donation", index=df.index))).fillna("donation").astype(str).str.lower()
+            df["gross_amt"] = pd.to_numeric(df.get("Total Online Donation Gross Amount in Settled Currency", 0.0), errors="coerce").fillna(0.0)
+            df["fee_amt"] = pd.to_numeric(df.get("Total Processing Fees Paid by CC In Settled Currency", 0.0), errors="coerce").fillna(0.0)
+            df["net_amt"] = pd.to_numeric(df.get("Total Online Donations Net Amount in Settled Currency", 0.0), errors="coerce").fillna(0.0)
+            df["transfer_id"] = df.get("Transfer ID", pd.Series("N/A", index=df.index)).fillna("N/A").astype(str)
+            df["heading"] = df.get("Heading", pd.Series("Unassigned", index=df.index)).fillna("Unassigned").astype(str)
+            df["sub_heading"] = df.get("Sub-Heading", pd.Series("Unassigned", index=df.index)).fillna("Unassigned").astype(str)
+            df["country"] = df.get("Country", pd.Series("Unassigned", index=df.index)).fillna("Unassigned").astype(str)
+            df["code"] = df.get("Code", pd.Series("Unassigned", index=df.index)).fillna("Unassigned").astype(str)
+            df["zakat"] = df.get("Zakat Eligibility", pd.Series("Unassigned", index=df.index)).fillna("Unassigned").astype(str)
             return df
 
-        conn.close()
+        # Fallback to donations cache if payout_settlements table is empty
+        df_don = load_data()
+        if not df_don.empty:
+            p_mask = df_don.get("Platform", pd.Series("", index=df_don.index)).astype(str).str.lower().str.contains("payout") | df_don.get("Transfer ID", pd.Series(None, index=df_don.index)).notna()
+            df_sub = df_don[p_mask]
+            if not df_sub.empty:
+                df = df_sub.copy()
+                c_name = df.get("Campaign Name", pd.Series("Unassigned Campaign", index=df.index)).fillna("Unassigned Campaign")
+                df["campaign_name"] = c_name
+                df["Campaign Name"] = c_name
+                df["row_type"] = df.get("Type", df.get("Transaction Type", pd.Series("donation", index=df.index))).fillna("donation").astype(str).str.lower()
+                df["gross_amt"] = pd.to_numeric(df.get("Total Online Donation Gross Amount in Settled Currency", 0.0), errors="coerce").fillna(0.0)
+                df["fee_amt"] = pd.to_numeric(df.get("Total Processing Fees Paid by CC In Settled Currency", 0.0), errors="coerce").fillna(0.0)
+                df["net_amt"] = pd.to_numeric(df.get("Total Online Donations Net Amount in Settled Currency", 0.0), errors="coerce").fillna(0.0)
+                df["transfer_id"] = df.get("Transfer ID", pd.Series("N/A", index=df.index)).fillna("N/A").astype(str)
+                df["heading"] = df.get("Heading", pd.Series("Unassigned", index=df.index)).fillna("Unassigned").astype(str)
+                df["sub_heading"] = df.get("Sub-Heading", pd.Series("Unassigned", index=df.index)).fillna("Unassigned").astype(str)
+                df["country"] = df.get("Country", pd.Series("Unassigned", index=df.index)).fillna("Unassigned").astype(str)
+                df["code"] = df.get("Code", pd.Series("Unassigned", index=df.index)).fillna("Unassigned").astype(str)
+                df["zakat"] = df.get("Zakat Eligibility", pd.Series("Unassigned", index=df.index)).fillna("Unassigned").astype(str)
+                return df
+
         return pd.DataFrame()
     except Exception as e:
-        print(f"[Error] Reading payout data: {e}")
+        print(f"[Error] Reading cached payout data: {e}")
         return pd.DataFrame()
 
 
@@ -194,16 +185,14 @@ def get_campaign_payout_breakdown(
             matrix_df = pd.read_sql_query("SELECT campaign_name, heading, sub_heading, country, code, zakat_eligibility FROM campaign_classifications", conn)
             conn.close()
             if not matrix_df.empty:
-                matrix_dict = {str(c).strip().lower(): r for c, r in zip(matrix_df["campaign_name"], matrix_df.to_dict('records'))}
-                for idx in df.index:
-                    cname_key = str(df.at[idx, "campaign_name"]).strip().lower()
-                    if cname_key in matrix_dict:
-                        rule = matrix_dict[cname_key]
-                        df.at[idx, "heading"] = rule.get("heading", "Unassigned")
-                        df.at[idx, "sub_heading"] = rule.get("sub_heading", "Unassigned")
-                        df.at[idx, "country"] = rule.get("country", "Unassigned")
-                        df.at[idx, "code"] = rule.get("code", "N/A")
-                        df.at[idx, "zakat"] = rule.get("zakat_eligibility", "Unassigned")
+                rule_dict = {str(c).strip().lower(): r for c, r in zip(matrix_df["campaign_name"], matrix_df.to_dict('records'))}
+                c_keys = df["campaign_name"].astype(str).str.strip().str.lower()
+                for f, db_f in [("heading", "heading"), ("sub_heading", "sub_heading"), ("country", "country"), ("code", "code"), ("zakat", "zakat_eligibility")]:
+                    col_map = {k: str(v[db_f]) for k, v in rule_dict.items() if db_f in v and str(v[db_f]).lower() not in ["", "nan", "none", "unassigned"]}
+                    mapped = c_keys.map(col_map)
+                    valid_m = mapped.notna()
+                    if valid_m.any():
+                        df.loc[valid_m, f] = mapped[valid_m]
         except Exception as e:
             print(f"[Matrix Overlay Notice]: {e}")
 

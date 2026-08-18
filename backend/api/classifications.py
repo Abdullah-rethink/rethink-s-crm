@@ -248,35 +248,36 @@ def export_classifications(
     platform: str = Query("launchgood", pattern="^(launchgood|givebright|paysuite|website|rethink_website)$"),
     format: str = Query("csv", pattern="^(csv|xlsx)$")
 ):
-    """Exports campaign classification rules to CSV or Excel (.xlsx) file format."""
-    df_raw = load_data()
-    if platform.lower() == "givebright":
-        matrix_df = get_givebright_classification_matrix(df_raw).fillna("Unassigned")
-        if "Community Name" in matrix_df.columns:
-            matrix_df = matrix_df.drop(columns=["Community Name"])
-        matrix_df = matrix_df.drop_duplicates(subset=["Campaign Name"], keep="last").reset_index(drop=True)
-    elif platform.lower() == "paysuite":
-        matrix_df = get_paysuite_classification_matrix(df_raw).fillna("Unassigned")
-    elif platform.lower() in ["website", "rethink_website", "rethink website"]:
-        matrix_df = get_rethink_website_classification_matrix(df_raw).fillna("Unassigned")
+    """Exports active campaign classification matrix rules matching the UI exactly to CSV or Excel (.xlsx)."""
+    p_clean = platform.lower().strip()
+    if p_clean == "givebright":
+        res = get_givebright_matrix()
+    elif p_clean == "paysuite":
+        res = get_paysuite_matrix()
+    elif p_clean in ["website", "rethink_website", "rethink website"]:
+        res = get_rethink_website_matrix()
     else:
-        matrix_df = get_classification_matrix(df_raw).fillna("Unassigned")
+        res = get_launchgood_matrix()
+
+    matrix_df = pd.DataFrame(res.get("rules", []))
+    if matrix_df.empty:
+        raise HTTPException(status_code=400, detail="No classification rules available to export.")
 
     matrix_df = sanitize_matrix_df(matrix_df)
 
     # Rename columns to match the real headers in the frontend UI
     rename_map = {"Code": "Code (Master Link)"}
-    if platform.lower() == "paysuite":
+    if p_clean == "paysuite":
         rename_map["Campaign Name"] = "Direct Debit Ref (Bank Ref)"
         rename_map["Community Name"] = "Platform Source"
     
     matrix_df = matrix_df.rename(columns=rename_map)
 
-    # Reorder columns to match UI if needed
-    if platform.lower() == "paysuite":
+    # Reorder columns to match UI exactly
+    if p_clean == "paysuite":
         cols = ["Direct Debit Ref (Bank Ref)", "Platform Source", "Code (Master Link)", "Heading", "Sub-Heading", "Country", "Zakat Eligibility", "Donor Name", "Donor Email"]
         matrix_df = matrix_df[[c for c in cols if c in matrix_df.columns]]
-    elif platform.lower() == "givebright":
+    elif p_clean == "givebright":
         cols = ["Campaign Name", "Campaign URL", "Code (Master Link)", "Heading", "Sub-Heading", "Country", "Zakat Eligibility"]
         matrix_df = matrix_df[[c for c in cols if c in matrix_df.columns]]
     else:

@@ -1849,3 +1849,91 @@ def load_data(force_reload: bool = False) -> pd.DataFrame:
         # 3. Tertiary Fallback: Return empty DataFrame
         return pd.DataFrame()
 
+
+_CACHED_PAYOUTS_DF = None
+_CACHE_PAYOUTS_MTIME = 0.0
+_CACHE_PAYOUTS_LOCK = threading.Lock()
+
+def invalidate_payouts_cache():
+    """Forces the in-memory payouts dataset cache to be invalidated."""
+    global _CACHED_PAYOUTS_DF, _CACHE_PAYOUTS_MTIME
+    with _CACHE_PAYOUTS_LOCK:
+        _CACHED_PAYOUTS_DF = None
+        _CACHE_PAYOUTS_MTIME = 0.0
+
+def load_payouts_data(force_reload: bool = False) -> pd.DataFrame:
+    """Thread-safe cached loader for payout settlements dataset."""
+    global _CACHED_PAYOUTS_DF, _CACHE_PAYOUTS_MTIME
+
+    current_mtime = 0.0
+    if os.path.exists(PAYOUTS_PARQUET_PATH):
+        try:
+            current_mtime = os.path.getmtime(PAYOUTS_PARQUET_PATH)
+        except Exception:
+            current_mtime = 0.0
+
+    if not force_reload and _CACHED_PAYOUTS_DF is not None and len(_CACHED_PAYOUTS_DF) > 0:
+        if current_mtime == _CACHE_PAYOUTS_MTIME or current_mtime == 0.0:
+            return _CACHED_PAYOUTS_DF
+
+    with _CACHE_PAYOUTS_LOCK:
+        if not force_reload and _CACHED_PAYOUTS_DF is not None and len(_CACHED_PAYOUTS_DF) > 0:
+            if current_mtime == _CACHE_PAYOUTS_MTIME or current_mtime == 0.0:
+                return _CACHED_PAYOUTS_DF
+
+        if os.path.exists(PAYOUTS_PARQUET_PATH):
+            try:
+                df = pd.read_parquet(PAYOUTS_PARQUET_PATH)
+                if not df.empty:
+                    _CACHED_PAYOUTS_DF = df
+                    _CACHE_PAYOUTS_MTIME = current_mtime
+                    return _CACHED_PAYOUTS_DF
+            except Exception as e:
+                print(f"[CACHE NOTICE] Payouts parquet read fallback: {e}")
+
+        try:
+            conn = sqlite3.connect(LOCAL_DB_PATH, timeout=15.0)
+            cursor = conn.cursor()
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='payout_settlements'")
+            if cursor.fetchone():
+                df = pd.read_sql_query("SELECT * FROM payout_settlements", conn)
+                conn.close()
+                if not df.empty:
+                    try:
+                        df.to_parquet(PAYOUTS_PARQUET_PATH, index=False)
+                        if os.path.exists(PAYOUTS_PARQUET_PATH):
+                            _CACHE_PAYOUTS_MTIME = os.path.getmtime(PAYOUTS_PARQUET_PATH)
+                    except Exception:
+                        pass
+                    _CACHED_PAYOUTS_DF = df
+                    return _CACHED_PAYOUTS_DF
+            else:
+                conn.close()
+        except Exception as e:
+            print(f"[CACHE NOTICE] Payouts SQLite read fallback: {e}")
+
+        return pd.DataFrame()
+
+
+def ensure_database_indexes():
+    """Ensures database indexes exist on donations and payout_settlements for instant query performance."""
+    try:
+        conn = sqlite3.connect(LOCAL_DB_PATH, timeout=10.0)
+        cursor = conn.cursor()
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_donations_donor_id ON donations(\"Donor ID\")")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_donations_camp_name ON donations(\"Campaign Name\")")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_donations_code ON donations(\"Code\")")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_donations_platform ON donations(\"Platform\")")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_donations_created_date ON donations(\"Created Date (UTC)\")")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_donations_payout_settled ON donations(\"Payout Settled\")")
+        
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='payout_settlements'")
+        if cursor.fetchone():
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_payouts_transfer_id ON payout_settlements(\"Transfer ID\")")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_payouts_donation_id ON payout_settlements(\"Donation ID\")")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_payouts_camp_name ON payout_settlements(\"Campaign Name\")")
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        print(f"[Index Notice]: {e}")
+
