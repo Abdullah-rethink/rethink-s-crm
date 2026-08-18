@@ -102,76 +102,84 @@ def bulk_edit_donors(payload: BulkEditDonorsRequest):
 
 
 def _apply_filters(df, payment_type=None, tier=None, source=None, heading=None, subheading=None, country=None, code=None, zakat=None, donor_country=None, campaign_search=None, gift_aid=None, start_date=None, end_date=None):
-    if df.empty:
+    if df is None or df.empty:
         return df
-    filtered_df = df.copy()
 
-    if payment_type and payment_type != "All Payment Types" and "Payment Frequency" in filtered_df.columns:
-        norm_type = payment_type
-        if payment_type.lower() in ["one-time", "one-time payment"]:
+    mask = pd.Series(True, index=df.index)
+
+    if isinstance(payment_type, str) and payment_type.strip() and payment_type != "All Payment Types" and "Payment Frequency" in df.columns:
+        norm_type = payment_type.strip()
+        p_lower = norm_type.lower()
+        if p_lower in ["one-time", "one-time payment"]:
             norm_type = "One-Time Payment"
-        elif payment_type.lower() in ["monthly", "recurring", "recurring payment"]:
+        elif p_lower in ["monthly", "recurring", "recurring payment"]:
             norm_type = "Recurring Payment"
-        filtered_df = filtered_df[filtered_df["Payment Frequency"] == norm_type]
+        mask &= (df["Payment Frequency"].astype(str) == norm_type)
 
-    if tier and tier != "All Classifications" and "Lifetime Donor Classification" in filtered_df.columns:
-        filtered_df = filtered_df[filtered_df["Lifetime Donor Classification"] == tier]
+    if isinstance(tier, str) and tier.strip() and tier != "All Classifications" and "Lifetime Donor Classification" in df.columns:
+        mask &= (df["Lifetime Donor Classification"].astype(str) == tier.strip())
 
-    if source and source != "All Sources (Combined)":
-        sources_list = [s.strip().lower() for s in str(source).split(",") if s.strip()]
+    if isinstance(source, str) and source.strip() and source != "All Sources (Combined)":
+        sources_list = [s.strip().lower() for s in source.split(",") if s.strip()]
         if sources_list:
-            mask = pd.Series(False, index=filtered_df.index)
-            if "Platform" in filtered_df.columns:
-                mask = mask | filtered_df["Platform"].astype(str).str.lower().isin(sources_list)
-            if "Source" in filtered_df.columns:
-                mask = mask | filtered_df["Source"].astype(str).str.lower().isin(sources_list)
-            filtered_df = filtered_df[mask]
+            src_mask = pd.Series(False, index=df.index)
+            if "Platform" in df.columns:
+                src_mask |= df["Platform"].astype(str).str.lower().isin(sources_list)
+            if "Source" in df.columns:
+                src_mask |= df["Source"].astype(str).str.lower().isin(sources_list)
+            mask &= src_mask
 
-    if heading and heading != "All Headings" and "Heading" in filtered_df.columns:
-        filtered_df = filtered_df[filtered_df["Heading"].astype(str).str.strip() == heading]
+    if isinstance(heading, str) and heading.strip() and heading != "All Headings" and "Heading" in df.columns:
+        mask &= (df["Heading"].astype(str).str.strip().str.lower() == heading.strip().lower())
 
-    if subheading and subheading != "All Sub-Headings" and "Sub-Heading" in filtered_df.columns:
-        filtered_df = filtered_df[filtered_df["Sub-Heading"].astype(str).str.strip() == subheading]
+    if isinstance(subheading, str) and subheading.strip() and subheading != "All Sub-Headings" and "Sub-Heading" in df.columns:
+        mask &= (df["Sub-Heading"].astype(str).str.strip().str.lower() == subheading.strip().lower())
 
-    if country and country != "All Project Countries" and "Country" in filtered_df.columns:
-        filtered_df = filtered_df[filtered_df["Country"].astype(str).str.contains(country, case=False, regex=False, na=False)]
+    if isinstance(country, str) and country.strip() and country != "All Project Countries" and "Country" in df.columns:
+        mask &= df["Country"].astype(str).str.contains(country.strip(), case=False, regex=False, na=False)
 
-    if code and code != "All Codes" and "Code" in filtered_df.columns:
-        filtered_df = filtered_df[filtered_df["Code"].astype(str).str.strip() == code]
+    if isinstance(code, str) and code.strip() and code != "All Codes" and "Code" in df.columns:
+        mask &= (df["Code"].astype(str).str.strip().str.lower() == code.strip().lower())
 
-    if zakat and zakat != "All Zakat Status" and "Zakat Eligibility" in filtered_df.columns:
-        filtered_df = filtered_df[filtered_df["Zakat Eligibility"].astype(str).str.strip() == zakat]
+    if isinstance(zakat, str) and zakat.strip() and zakat != "All Zakat Status" and "Zakat Eligibility" in df.columns:
+        mask &= (df["Zakat Eligibility"].astype(str).str.strip().str.lower() == zakat.strip().lower())
 
-    if donor_country and donor_country != "All Donor Countries":
+    if isinstance(donor_country, str) and donor_country.strip() and donor_country != "All Donor Countries":
         for dc_col in ["Donor Country", "Billing Country", "Country Code"]:
-            if dc_col in filtered_df.columns:
-                filtered_df = filtered_df[filtered_df[dc_col].astype(str).str.contains(donor_country, case=False, regex=False, na=False)]
+            if dc_col in df.columns:
+                mask &= df[dc_col].astype(str).str.contains(donor_country.strip(), case=False, regex=False, na=False)
                 break
 
-    if campaign_search and str(campaign_search).strip():
-        term = str(campaign_search).strip().lower()
-        c_mask = pd.Series(False, index=filtered_df.index)
+    if isinstance(campaign_search, str) and campaign_search.strip():
+        term = campaign_search.strip().lower()
+        c_mask = pd.Series(False, index=df.index)
         for cs_col in ["Campaign Name", "Community Name"]:
-            if cs_col in filtered_df.columns:
-                c_mask = c_mask | filtered_df[cs_col].astype(str).str.lower().str.contains(term, na=False)
-        filtered_df = filtered_df[c_mask]
+            if cs_col in df.columns:
+                c_mask |= df[cs_col].astype(str).str.lower().str.contains(term, na=False)
+        mask &= c_mask
 
-    if gift_aid and gift_aid != "All Gift Aid Status":
-        ga_col = "Gift Aid (yes or no)" if "Gift Aid (yes or no)" in filtered_df.columns else ("is_giftaid" if "is_giftaid" in filtered_df.columns else None)
+    if isinstance(gift_aid, str) and gift_aid.strip() and gift_aid != "All Gift Aid Status":
+        ga_col = "Gift Aid (yes or no)" if "Gift Aid (yes or no)" in df.columns else ("is_giftaid" if "is_giftaid" in df.columns else None)
         if ga_col:
-            val_str = str(gift_aid).strip().lower()
+            val_str = gift_aid.strip().lower()
             if val_str in ["yes", "1", "true"]:
-                filtered_df = filtered_df[filtered_df[ga_col].astype(str).str.lower().isin(["yes", "1", "1.0", "true"])]
+                mask &= df[ga_col].astype(str).str.lower().isin(["yes", "1", "1.0", "true"])
             elif val_str in ["no", "0", "false"]:
-                filtered_df = filtered_df[filtered_df[ga_col].astype(str).str.lower().isin(["no", "0", "0.0", "false"])]
+                mask &= df[ga_col].astype(str).str.lower().isin(["no", "0", "0.0", "false"])
 
-    if start_date and str(start_date).strip() and "Created Date (UTC)" in filtered_df.columns:
-        filtered_df = filtered_df[pd.to_datetime(filtered_df["Created Date (UTC)"]).dt.date >= pd.to_datetime(start_date).date()]
+    # High-speed ISO Date Filtering (sub-millisecond string comparison)
+    if "Created Date (UTC)" in df.columns:
+        date_col = df["Created Date (UTC)"].astype(str)
+        if isinstance(start_date, str) and start_date.strip():
+            s_date = start_date.strip()[:10]
+            mask &= (date_col >= s_date)
+        if isinstance(end_date, str) and end_date.strip():
+            e_date = end_date.strip()[:10]
+            mask &= (date_col <= e_date)
 
-    if end_date and str(end_date).strip() and "Created Date (UTC)" in filtered_df.columns:
-        filtered_df = filtered_df[pd.to_datetime(filtered_df["Created Date (UTC)"]).dt.date <= pd.to_datetime(end_date).date()]
-
-    return filtered_df
+    if mask.all():
+        return df
+    return df[mask]
 
 
 @router.get("")

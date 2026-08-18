@@ -58,6 +58,9 @@ def update_targets(payload: UpdateTargetsRequest):
     finally:
         conn.close()
 
+_FILTER_CACHE = {}
+_LAST_DATA_MTIME = 0.0
+
 @router.get("/stats")
 def get_tracker_stats(
     payment_type: Optional[str] = Query(None),
@@ -74,26 +77,21 @@ def get_tracker_stats(
     start_date: Optional[str] = Query(None),
     end_date: Optional[str] = Query(None)
 ):
-    """Computes real-time donor target progress stats filtered by sidebar criteria."""
-    has_filters = any([
-        isinstance(payment_type, str) and payment_type != "All Payment Types",
-        isinstance(tier, str) and tier != "All Classifications",
-        isinstance(source, str) and source != "All Sources (Combined)",
-        isinstance(heading, str) and heading != "All Headings",
-        isinstance(subheading, str) and subheading != "All Sub-Headings",
-        isinstance(country, str) and country != "All Project Countries",
-        isinstance(code, str) and code != "All Codes",
-        isinstance(zakat, str) and zakat != "All Zakat Status",
-        isinstance(donor_country, str) and donor_country != "All Donor Countries",
-        isinstance(campaign_search, str) and campaign_search.strip(),
-        isinstance(gift_aid, str) and gift_aid != "All Gift Aid Status",
-        isinstance(start_date, str) and start_date.strip(),
-        isinstance(end_date, str) and end_date.strip()
-    ])
+    """Computes high-speed real-time donor target progress stats filtered by criteria."""
+    global _FILTER_CACHE, _LAST_DATA_MTIME
 
-    global _TRACKER_CACHE
-    if not has_filters and _TRACKER_CACHE is not None:
-        return _TRACKER_CACHE
+    # Check cache invalidation
+    from core.data_processor import _CACHE_MTIME
+    if _CACHE_MTIME != _LAST_DATA_MTIME:
+        _FILTER_CACHE.clear()
+        _LAST_DATA_MTIME = _CACHE_MTIME
+
+    filter_key = (
+        payment_type, tier, source, heading, subheading, country, code,
+        zakat, donor_country, campaign_search, gift_aid, start_date, end_date
+    )
+    if filter_key in _FILTER_CACHE:
+        return _FILTER_CACHE[filter_key]
 
     targets = {"Hafiz": 240.0, "Orphan": 480.0, "Widow": 1080.0, "Ex-Prisoner": 1080.0}
     conn = sqlite3.connect(LOCAL_DB_PATH, timeout=10.0)
@@ -110,11 +108,9 @@ def get_tracker_stats(
     df = load_data()
     if df.empty:
         res = {s: {"target": t, "total_raised": 0.0, "above_count": 0, "near_count": 0, "above": [], "near": []} for s, t in targets.items()}
-        if not has_filters:
-            _TRACKER_CACHE = res
         return res
 
-    # Apply Sidebar Filters
+    # Apply Filters
     from backend.api.donors import _apply_filters
     df = _apply_filters(
         df,
@@ -141,16 +137,12 @@ def get_tracker_stats(
 
     if col_amount not in df.columns or "Donor ID" not in df.columns or df.empty:
         res = {s: {"target": t, "total_raised": 0.0, "above_count": 0, "near_count": 0, "above": [], "near": []} for s, t in targets.items()}
-        if not has_filters:
-            _TRACKER_CACHE = res
+        _FILTER_CACHE[filter_key] = res
         return res
 
-    # Ensure amount column is numeric
-    df[col_amount] = pd.to_numeric(df[col_amount], errors="coerce").fillna(0.0)
-    df["_d_id_str"] = df["Donor ID"].astype(str)
-
-    # Index by Donor ID string for O(1) instant lookup
-    indexed_df = df.set_index("_d_id_str", drop=False)
+    # Fast numeric conversion
+    amt_series = pd.to_numeric(df[col_amount], errors="coerce").fillna(0.0)
+    d_id_series = df["Donor ID"].astype(str)
 
     # Vectorized Code Masking
     code_series = df["Code"].astype(str).str.strip().str.upper() if "Code" in df.columns else pd.Series("", index=df.index)
@@ -165,45 +157,48 @@ def get_tracker_stats(
     results = {}
     for s_type, target in targets.items():
         mask = masks[s_type]
-        s_df = df[mask]
-        total_raised = float(s_df[col_amount].sum()) if not s_df.empty else 0.0
+        if not mask.any():
+            results[s_type] = {
+                "target": target,
+                "total_raised": 0.0,
+                "above_count": 0,
+                "near_count": 0,
+                "above": [],
+                "near": []
+            }
+            continue
+
+        s_amt = amt_series[mask]
+        s_did = d_id_series[mask]
+        total_raised = float(s_amt.sum())
+
+        sums = s_amt.groupby(s_did).sum()
+        relevant = sums[sums >= (0.8 * target)]
 
         above_list = []
         near_list = []
 
-        if not s_df.empty:
-            sums = s_df.groupby("_d_id_str")[col_amount].sum()
-            relevant = sums[sums >= (0.8 * target)]
+        if not relevant.empty:
+            rel_ids = set(relevant.index)
+            rel_df = df[d_id_series.isin(rel_ids)].drop_duplicates(subset=["Donor ID"], keep="first")
+
+            names = rel_df["Display Name"].fillna("") if "Display Name" in rel_df.columns else pd.Series("Anonymous Donor", index=rel_df.index)
+            invalid_mask = names.astype(str).str.strip().str.lower().isin(["", "nan", "none", "null", "anonymous", "anonymous kind soul", "kind soul"])
+            if invalid_mask.any() and "First Name" in rel_df.columns and "Last Name" in rel_df.columns:
+                fn = rel_df.loc[invalid_mask, "First Name"].fillna("").astype(str).str.strip()
+                ln = rel_df.loc[invalid_mask, "Last Name"].fillna("").astype(str).str.strip()
+                comb = (fn + " " + ln).str.strip()
+                names.loc[invalid_mask] = comb.replace({"": "Anonymous Donor", "nan nan": "Anonymous Donor"})
+
+            names = names.replace({"": "Anonymous Donor", "nan": "Anonymous Donor"})
+            emails = rel_df.get("Email", pd.Series("N/A", index=rel_df.index)).fillna("N/A").astype(str)
+
+            donor_meta = dict(zip(rel_df["Donor ID"].astype(str), zip(names, emails)))
 
             for str_id, total in relevant.items():
                 total_val = float(total)
                 progress = round((total_val / target) * 100.0, 1)
-                
-                if str_id not in indexed_df.index:
-                    continue
-                d_rows = indexed_df.loc[[str_id]]
-                first_row = d_rows.iloc[0]
-                
-                best_name = "Anonymous Donor"
-                for _, r in d_rows.iterrows():
-                    disp = str(r.get("Display Name", "")).strip()
-                    disp_lower = disp.lower()
-                    if disp and disp_lower not in ["nan", "none", "null", "anonymous", "anonymous kind soul", "kind soul"]:
-                        best_name = disp
-                        break
-                else:
-                    for _, r in d_rows.iterrows():
-                        fn = str(r.get("First Name", "")).strip()
-                        ln = str(r.get("Last Name", "")).strip()
-                        if fn or ln:
-                            comb = f"{fn} {ln}".strip()
-                            if comb.lower() not in ["nan", "none", "null", "anonymous", "anonymous kind soul", "kind soul", ""]:
-                                best_name = comb
-                                break
-                    else:
-                        best_name = str(first_row.get("Display Name", "Anonymous Donor"))
-
-                email = str(first_row.get("Email", "N/A"))
+                best_name, email = donor_meta.get(str_id, ("Anonymous Donor", "N/A"))
 
                 rec = {
                     "donor_id": str_id,
@@ -219,8 +214,8 @@ def get_tracker_stats(
                 else:
                     near_list.append(rec)
 
-        above_list.sort(key=lambda x: x["total_donated"], reverse=True)
-        near_list.sort(key=lambda x: x["total_donated"], reverse=True)
+            above_list.sort(key=lambda x: x["total_donated"], reverse=True)
+            near_list.sort(key=lambda x: x["total_donated"], reverse=True)
 
         results[s_type] = {
             "target": target,
@@ -231,6 +226,7 @@ def get_tracker_stats(
             "near": near_list
         }
 
-    if not has_filters:
-        _TRACKER_CACHE = results
+    if len(_FILTER_CACHE) > 64:
+        _FILTER_CACHE.clear()
+    _FILTER_CACHE[filter_key] = results
     return results
