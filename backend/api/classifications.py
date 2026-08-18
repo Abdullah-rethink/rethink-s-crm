@@ -24,6 +24,14 @@ from views.classification_view import (
     save_givebright_classification_matrix,
     normalize_classification_import_df,
 )
+try:
+    from backend.api.payouts import invalidate_payouts_cache
+except ImportError:
+    try:
+        from api.payouts import invalidate_payouts_cache
+    except ImportError:
+        def invalidate_payouts_cache():
+            pass
 
 router = APIRouter(prefix="/api/classifications", tags=["Campaign Classifications"])
 
@@ -352,6 +360,8 @@ def save_matrix_rules(payload: SaveRulesRequest):
         n_saved = save_classification_matrix(matrix_df)
         sync_matrix_classifications_to_donors(matrix_df)
 
+    invalidate_payouts_cache()
+
     return {
         "status": "success",
         "message": f"Successfully saved {n_saved:,} {payload.platform} classification rules and updated matching donor records!"
@@ -407,6 +417,8 @@ def delete_single_rule(payload: DeleteRuleRequest):
         except Exception as e:
             print(f"Error updating donors on delete: {e}")
 
+    invalidate_payouts_cache()
+
     return {
         "status": "success",
         "message": f"Successfully deleted rule for '{cname}'!"
@@ -456,6 +468,8 @@ def clear_platform_rules(payload: ClearPlatformRequest):
                 conn.close()
         except Exception as e:
             print(f"Error resetting donors on clear: {e}")
+
+    invalidate_payouts_cache()
 
     return {
         "status": "success",
@@ -522,6 +536,8 @@ async def import_classification_file(
     else:
         n_saved = save_classification_matrix(merged)
         sync_matrix_classifications_to_donors(merged)
+
+    invalidate_payouts_cache()
 
     return {
         "status": "success",

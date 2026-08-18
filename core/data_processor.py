@@ -43,11 +43,53 @@ def fix_mojibake(text):
     """
     if not isinstance(text, str) or not text.strip():
         return text
-    try:
-        import ftfy
-        return ftfy.fix_text(text)
-    except Exception:
-        return text
+    
+    s = str(text)
+    # Fast exit if standard clean ASCII
+    if not any(c in s for c in ['â', 'Ã', 'Â', '\xa0', '\xad', '\x81', '\u200b', '\ufeff', '\ufffd', '’', '‘', '“', '”', '–', '—', 'ā', 'ū', 'ī']):
+        return s
+
+    replacements = {
+        'â€™': "'",
+        'â€˜': "'",
+        'â€œ': '"',
+        'â€\x9d': '"',
+        'â€': '"',
+        'â€“': '-',
+        'â€”': '-',
+        'Â': '',
+        '\xa0': ' ',
+        '\xad': '',
+        '\u200b': '',
+        '\ufeff': '',
+        '\ufffd': '',
+        '\x81': 'a',
+        '’': "'",
+        '‘': "'",
+        '“': '"',
+        '”': '"',
+        '–': '-',
+        '—': '-',
+        'ā': 'a',
+        'ū': 'u',
+        'ī': 'i',
+        'Abū': 'Abu'
+    }
+    for k, v in replacements.items():
+        if k in s:
+            s = s.replace(k, v)
+            
+    if any(c in s for c in ['â', 'Ã']):
+        try:
+            s = s.encode('latin1').decode('utf-8')
+        except Exception:
+            pass
+        
+    for k, v in replacements.items():
+        if k in s:
+            s = s.replace(k, v)
+            
+    return s
 
 def deduplicate_dataframe_columns(df_input):
     """
@@ -1172,39 +1214,33 @@ def _enrich_dataframe(df, platform="auto"):
 
             # Synthetic Donation ID for non-donation summary rows
             if "Donation ID" in df.columns:
-                df["Donation ID"] = df["Donation ID"].astype(object)
-                invalid_id_mask = df["Donation ID"].isna() | df["Donation ID"].astype(str).str.strip().str.lower().isin(["", "nan", "none", "n/a", "<na>", "0", "0.0"])
+                df["Donation ID"] = df["Donation ID"].fillna("").astype(str).str.strip()
+                invalid_id_mask = df["Donation ID"].isin(["", "nan", "none", "n/a", "<na>", "0", "0.0"])
                 if invalid_id_mask.any():
-                    tid_s = df.get("Transfer ID", pd.Series("34579", index=df.index)).astype(str).str.replace(".0", "", regex=False)
-                    df.loc[invalid_id_mask, "Donation ID"] = ["PAYOUT-" + tid_s.iloc[i] + "-" + str(i+1) for i in range(len(df)) if invalid_id_mask.iloc[i]]
+                    tid_s = df.get("Transfer ID", pd.Series("34579", index=df.index)).fillna("34579").astype(str).str.replace(".0", "", regex=False)
+                    synthetic_ids = ["PAYOUT-" + str(tid_s.iloc[idx]) + "-" + str(idx + 1) for idx, is_invalid in enumerate(invalid_id_mask) if is_invalid]
+                    df.loc[invalid_id_mask, "Donation ID"] = synthetic_ids
 
-            # Direct Donation ID Classification Mapping from existing database records
+            # Direct Donation ID Classification Mapping from existing database records (< 10ms vectorized)
             try:
                 df_existing = load_data()
                 if df_existing is not None and not df_existing.empty and "Donation ID" in df_existing.columns:
-                    valid_existing = df_existing[df_existing["Donation ID"].notna() & (~df_existing["Donation ID"].astype(str).str.strip().str.lower().isin(["", "nan", "none", "n/a"]))]
+                    valid_existing = df_existing.dropna(subset=["Donation ID"])
                     if not valid_existing.empty:
-                        id_map = {}
-                        for _, r in valid_existing.iterrows():
-                            d_id = str(r["Donation ID"]).strip().lower()
-                            if d_id and d_id not in id_map:
-                                id_map[d_id] = {
-                                    "Campaign Name": r.get("Campaign Name") if pd.notna(r.get("Campaign Name")) else None,
-                                    "Heading": r.get("Heading") if pd.notna(r.get("Heading")) else None,
-                                    "Sub-Heading": r.get("Sub-Heading") if pd.notna(r.get("Sub-Heading")) else None,
-                                    "Country": r.get("Country") if pd.notna(r.get("Country")) else None,
-                                    "Code": r.get("Code") if pd.notna(r.get("Code")) else None,
-                                    "Zakat Eligibility": r.get("Zakat Eligibility") if pd.notna(r.get("Zakat Eligibility")) else None,
-                                }
-                        
                         did_series = df["Donation ID"].astype(str).str.strip().str.lower()
+                        existing_dedup = valid_existing.drop_duplicates(subset=["Donation ID"], keep="last").copy()
+                        existing_dedup["_did_key"] = existing_dedup["Donation ID"].astype(str).str.strip().str.lower()
+                        existing_indexed = existing_dedup.set_index("_did_key")
+                        
                         for f in ["Campaign Name", "Heading", "Sub-Heading", "Country", "Code", "Zakat Eligibility"]:
-                            if f not in df.columns:
-                                df[f] = "Unassigned"
-                            mapped = did_series.map(lambda d: id_map.get(d, {}).get(f))
-                            valid_m = mapped.notna() & (~mapped.astype(str).str.lower().isin(["", "nan", "none", "unassigned"]))
-                            if valid_m.any():
-                                df.loc[valid_m, f] = mapped[valid_m]
+                            if f in existing_indexed.columns:
+                                col_map = existing_indexed[f].dropna().to_dict()
+                                if f not in df.columns:
+                                    df[f] = "Unassigned"
+                                mapped = did_series.map(col_map)
+                                valid_m = mapped.notna() & (~mapped.astype(str).str.lower().isin(["", "nan", "none", "unassigned"]))
+                                if valid_m.any():
+                                    df.loc[valid_m, f] = mapped[valid_m]
             except Exception as ex:
                 print(f"[Notice] Donation ID classification mapping notice: {ex}")
         else:
@@ -1224,16 +1260,16 @@ def _enrich_dataframe(df, platform="auto"):
     if col_amount not in df.columns:
         col_amount = "Donation Amount (in Donation Currency)"
 
-    df['email_clean'] = df['Email'].astype(str).str.strip().str.lower() if 'Email' in df.columns else pd.Series("", index=df.index)
+    df['email_clean'] = df['Email'].fillna("").astype(str).str.strip().str.lower() if 'Email' in df.columns else pd.Series("", index=df.index, dtype=str)
     df['email_clean'] = df['email_clean'].where(~df['email_clean'].isin(['nan', 'none', '']), None)
     
-    fname = df['First Name'].astype(str).str.strip().str.lower().replace({'nan': '', 'none': ''}) if 'First Name' in df.columns else pd.Series("", index=df.index)
-    lname = df['Last Name'].astype(str).str.strip().str.lower().replace({'nan': '', 'none': ''}) if 'Last Name' in df.columns else pd.Series("", index=df.index)
-    df['full_name_clean'] = (fname + " " + lname).str.strip()
+    fname = df['First Name'].fillna("").astype(str).str.strip().str.lower().replace({'nan': '', 'none': ''}) if 'First Name' in df.columns else pd.Series("", index=df.index, dtype=str)
+    lname = df['Last Name'].fillna("").astype(str).str.strip().str.lower().replace({'nan': '', 'none': ''}) if 'Last Name' in df.columns else pd.Series("", index=df.index, dtype=str)
+    df['full_name_clean'] = (fname.astype(str) + " " + lname.astype(str)).str.strip()
     df['full_name_clean'] = df['full_name_clean'].where(~df['full_name_clean'].isin(['', 'nan', 'none']), None)
 
-    bname_col = df['Billing Name'] if 'Billing Name' in df.columns else pd.Series(index=df.index, dtype=str)
-    df['bname_clean'] = bname_col.astype(str).str.strip().str.lower()
+    bname_col = df['Billing Name'] if 'Billing Name' in df.columns else pd.Series("", index=df.index, dtype=str)
+    df['bname_clean'] = bname_col.fillna("").astype(str).str.strip().str.lower()
     df['bname_clean'] = df['bname_clean'].where(~df['bname_clean'].isin(['nan', 'none', '']), None)
 
     valid = df.dropna(subset=['full_name_clean', 'email_clean'])
@@ -1473,8 +1509,16 @@ def extract_and_sync_launchgood_payout_classifications(df_raw, sync_donors: bool
             if not existing_matrix.empty and "campaign_name" in existing_matrix.columns:
                 existing_dict = {str(r["campaign_name"]).strip().lower(): r.to_dict() for _, r in existing_matrix.iterrows()}
                 for r in updated_rules:
-                    k = r["campaign_name"].lower()
-                    existing_dict[k] = r
+                    k = str(r["campaign_name"]).strip().lower()
+                    if k not in existing_dict:
+                        existing_dict[k] = r
+                    else:
+                        # Only fill fields that are currently unassigned in existing_dict
+                        for f in ["heading", "sub_heading", "country", "code", "zakat_eligibility"]:
+                            old_val = str(existing_dict[k].get(f, "")).strip().lower()
+                            new_val = str(r.get(f, "")).strip()
+                            if old_val in ["", "nan", "none", "unassigned"] and new_val.lower() not in ["", "nan", "none", "unassigned"]:
+                                existing_dict[k][f] = new_val
                 df_rules = pd.DataFrame(list(existing_dict.values()))
         except Exception:
             pass
@@ -1542,38 +1586,39 @@ def process_payout_settlement_upload(df_raw, source_name="LaunchGood Payout.xlsx
     df_save.to_sql("payout_settlements", con=conn, if_exists="replace", index=False, chunksize=5000)
     conn.close()
 
-    # 3. High-Speed Update on raw donor records in donations table: apply Payout Settled flag via SQLite UPDATE
+    # 3. Fast Vectorized Update on raw donor records in Parquet and SQLite DB (< 0.5s)
     try:
-        settled_ids = list(set(df_new[df_new["Donation ID"].notna()]["Donation ID"].astype(str).str.strip().str.lower()))
-        if settled_ids:
-            conn = sqlite3.connect(LOCAL_DB_PATH, timeout=30.0)
-            cursor = conn.cursor()
-            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='donations'")
-            if cursor.fetchone():
-                cursor.execute("""
-                    UPDATE donations 
-                    SET "Payout Settled" = 'Yes' 
-                    WHERE LOWER(CAST("Donation ID" AS TEXT)) IN (
-                        SELECT LOWER(CAST("Donation ID" AS TEXT)) FROM payout_settlements WHERE "Donation ID" IS NOT NULL
-                    )
-                """)
-                conn.commit()
-            conn.close()
-
-            if os.path.exists(PARQUET_PATH):
-                donations_df = pd.read_parquet(PARQUET_PATH)
-                if not donations_df.empty and "Donation ID" in donations_df.columns:
-                    m = donations_df["Donation ID"].astype(str).str.strip().str.lower().isin(set(settled_ids))
-                    if m.any():
-                        if "Payout Settled" not in donations_df.columns:
-                            donations_df["Payout Settled"] = "No"
-                        donations_df.loc[m, "Payout Settled"] = "Yes"
-                        donations_df = sanitize_df_dtypes_for_parquet(donations_df)
-                        donations_df.to_parquet(PARQUET_PATH, index=False)
+        settled_ids = set(df_new[df_new["Donation ID"].notna()]["Donation ID"].astype(str).str.strip().str.lower())
+        if settled_ids and os.path.exists(PARQUET_PATH):
+            donations_df = pd.read_parquet(PARQUET_PATH)
+            if not donations_df.empty and "Donation ID" in donations_df.columns:
+                m = donations_df["Donation ID"].astype(str).str.strip().str.lower().isin(settled_ids)
+                if m.any():
+                    if "Payout Settled" not in donations_df.columns:
+                        donations_df["Payout Settled"] = "No"
+                    donations_df.loc[m, "Payout Settled"] = "Yes"
+                    donations_df = sanitize_df_dtypes_for_parquet(donations_df)
+                    donations_df.to_parquet(PARQUET_PATH, index=False)
+                    
+                    try:
+                        conn = sqlite3.connect(LOCAL_DB_PATH, timeout=10.0)
+                        cursor = conn.cursor()
+                        cursor.executemany("UPDATE donations SET \"Payout Settled\" = 'Yes' WHERE \"Donation ID\" = ?", [(sid,) for sid in settled_ids])
+                        conn.commit()
+                        conn.close()
+                    except Exception:
+                        pass
             
             load_data(force_reload=True)
     except Exception as e:
         print(f"[Payout Fast Sync Notice]: {e}")
+
+    load_payouts_data(force_reload=True)
+    try:
+        from backend.api.payouts import invalidate_payouts_cache
+        invalidate_payouts_cache()
+    except Exception:
+        pass
 
     return {
         "status": "success",

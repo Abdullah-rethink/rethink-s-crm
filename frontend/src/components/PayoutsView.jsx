@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { 
   CreditCard, 
   DollarSign, 
@@ -19,12 +19,14 @@ import {
   FolderOpen,
   Maximize2,
   Minimize2,
-  Tag
+  Tag,
+  Download,
+  FileSpreadsheet
 } from 'lucide-react';
 import { API_BASE_URL } from '../config';
 
 export default function PayoutsView({ user, accentColor }) {
-  const [currency, setCurrency] = useState('ALL'); // 'ALL', 'GBP', or 'USD'
+  const currency = 'GBP'; // Unified GBP (£) settlement
   const [summary, setSummary] = useState({
     total_gross: 0,
     total_fees: 0,
@@ -37,14 +39,17 @@ export default function PayoutsView({ user, accentColor }) {
   });
   
   const [batchesData, setBatchesData] = useState({ total_batches: 0, page: 1, page_size: 25, total_pages: 1, batches: [] });
+  const [selectedBatch, setSelectedBatch] = useState('ALL'); // 'ALL' or specific transfer_id
   const [campaignData, setCampaignData] = useState([]);
   const [codeGroups, setCodeGroups] = useState([]);
   const [expandedCodes, setExpandedCodes] = useState({});
   const [breakdownViewMode, setBreakdownViewMode] = useState('code_groups'); // 'code_groups' or 'flat'
   const [loading, setLoading] = useState(true);
+  const [exporting, setExporting] = useState(false);
   const [activeTab, setActiveTab] = useState('disbursement'); // 'disbursement', 'batches', 'campaigns', 'ledger'
   
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
 
@@ -63,19 +68,33 @@ export default function PayoutsView({ user, accentColor }) {
   const [purgeMsg, setPurgeMsg] = useState('');
 
   const isSuperAdmin = user?.role === 'super_admin';
-  const currSymbol = currency === 'USD' ? '$' : '£';
+  const currSymbol = '£';
 
-  const fetchPayoutData = () => {
+  // 300ms Debounce on Search Input to prevent server flooding
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  const fetchPayoutData = (searchQuery = debouncedSearch, batchVal = selectedBatch) => {
     setLoading(true);
-    const searchParam = search ? `&search=${encodeURIComponent(search)}` : '';
+    const searchParam = searchQuery ? `&search=${encodeURIComponent(searchQuery)}` : '';
+    const batchParam = batchVal && batchVal !== 'ALL' ? `&batch=${encodeURIComponent(batchVal)}` : '';
     
     Promise.all([
-      fetch(`${API_BASE_URL}/api/payouts/summary?currency=${currency}`).then(r => r.json()),
+      fetch(`${API_BASE_URL}/api/payouts/summary?currency=${currency}${batchParam}`).then(r => r.json()),
       fetch(`${API_BASE_URL}/api/payouts/batches?currency=${currency}&page=${currentPage}&page_size=${pageSize}${searchParam}`).then(r => r.json()),
-      fetch(`${API_BASE_URL}/api/payouts/campaign-breakdown?currency=${currency}${searchParam}`).then(r => r.json())
+      fetch(`${API_BASE_URL}/api/payouts/campaign-breakdown?currency=${currency}${batchParam}${searchParam}`).then(r => r.json()),
+      fetch(`${API_BASE_URL}/api/payouts/ledger-breakdown?currency=${currency}${batchParam}`).then(r => r.json())
     ])
-      .then(([sumRes, batchRes, campRes]) => {
-        setSummary(sumRes);
+      .then(([sumRes, batchRes, campRes, ledgerRes]) => {
+        setSummary({
+          ...sumRes,
+          disbursement_summary: sumRes.disbursement_summary || ledgerRes?.disbursement_summary || {},
+          ledger_breakdown: sumRes.ledger_breakdown || ledgerRes?.ledger || []
+        });
         setBatchesData(batchRes);
         setCampaignData(campRes.campaigns || []);
         setCodeGroups(campRes.code_groups || []);
@@ -88,8 +107,8 @@ export default function PayoutsView({ user, accentColor }) {
   };
 
   useEffect(() => {
-    fetchPayoutData();
-  }, [currency, currentPage, pageSize, search]);
+    fetchPayoutData(debouncedSearch, selectedBatch);
+  }, [currentPage, pageSize, debouncedSearch, selectedBatch]);
 
   const handlePageChange = (newPage) => {
     if (newPage >= 1 && newPage <= batchesData.total_pages) {
@@ -153,7 +172,32 @@ export default function PayoutsView({ user, accentColor }) {
       });
   };
 
-  // Code Breakdown Pagination Calculations
+  const handleExportExcel = async () => {
+    try {
+      setExporting(true);
+      const batchParam = selectedBatch && selectedBatch !== 'ALL' ? `&batch=${encodeURIComponent(selectedBatch)}` : '';
+      const res = await fetch(`${API_BASE_URL}/api/payouts/export?currency=${currency}${batchParam}`);
+      if (!res.ok) throw new Error('Failed to generate export file');
+      
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const batchTag = selectedBatch !== 'ALL' ? `_batch_${selectedBatch}` : '';
+      a.download = `payout_reconciliation_report_${currency.toLowerCase()}${batchTag}_${new Date().toISOString().slice(0, 10)}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (err) {
+      console.error('Export error:', err);
+      alert(`Export failed: ${err.message}`);
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  // Code Breakdown Pagination Calculations (Directly Synced with Backend Data)
   const effectiveCodePageSize = codePageSize === 'All' ? Math.max(1, codeGroups.length) : Number(codePageSize);
   const totalCodePages = Math.max(1, Math.ceil(codeGroups.length / effectiveCodePageSize));
   const safeCodePage = Math.min(Math.max(1, codePage), totalCodePages);
@@ -162,7 +206,7 @@ export default function PayoutsView({ user, accentColor }) {
     ? codeGroups 
     : codeGroups.slice((safeCodePage - 1) * effectiveCodePageSize, safeCodePage * effectiveCodePageSize);
 
-  // Campaign Breakdown Pagination Calculations
+  // Campaign Breakdown Pagination Calculations (Directly Synced with Backend Data)
   const effectiveCampPageSize = campPageSize === 'All' ? Math.max(1, campaignData.length) : Number(campPageSize);
   const totalCampPages = Math.max(1, Math.ceil(campaignData.length / effectiveCampPageSize));
   const safeCampPage = Math.min(Math.max(1, campPage), totalCampPages);
@@ -195,54 +239,20 @@ export default function PayoutsView({ user, accentColor }) {
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Currency Switcher Toggle */}
-          <div className="flex items-center p-1 bg-slate-100 dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-white/10 shadow-inner">
-            <button
-              onClick={() => {
-                setCurrency('ALL');
-                setCurrentPage(1);
-                setCodePage(1);
-                setCampPage(1);
-              }}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                currency === 'ALL'
-                  ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md shadow-emerald-500/20'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-              }`}
-            >
-              <span>🌐 Combined</span>
-            </button>
-            <button
-              onClick={() => {
-                setCurrency('GBP');
-                setCurrentPage(1);
-                setCodePage(1);
-                setCampPage(1);
-              }}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                currency === 'GBP'
-                  ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md shadow-emerald-500/20'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-              }`}
-            >
-              <span>🇬🇧 GBP (£) Primary</span>
-            </button>
-            <button
-              onClick={() => {
-                setCurrency('USD');
-                setCurrentPage(1);
-                setCodePage(1);
-                setCampPage(1);
-              }}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                currency === 'USD'
-                  ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md shadow-emerald-500/20'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-              }`}
-            >
-              <span>🇺🇸 USD ($) Foreign FX</span>
-            </button>
-          </div>
+          {/* Export Multi-Sheet Excel Button */}
+          <button
+            onClick={handleExportExcel}
+            disabled={exporting || loading}
+            className="px-4 py-2 text-xs font-bold text-white bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 rounded-xl shadow-md shadow-emerald-500/20 transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
+            title="Download multi-sheet Excel report (.xlsx) with Disbursement Summary, Code Breakdown, Campaign Breakdown, Transfer Batches, and Ledger Audit"
+          >
+            {exporting ? (
+              <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+            ) : (
+              <FileSpreadsheet className="w-3.5 h-3.5" />
+            )}
+            <span>{exporting ? 'Exporting...' : selectedBatch !== 'ALL' ? `Export Batch #${selectedBatch}` : 'Export Excel (.xlsx)'}</span>
+          </button>
 
           {/* Super Admin Purge Payout Button */}
           {isSuperAdmin && (
@@ -257,7 +267,7 @@ export default function PayoutsView({ user, accentColor }) {
           )}
 
           <button 
-            onClick={fetchPayoutData}
+            onClick={() => fetchPayoutData(debouncedSearch, selectedBatch)}
             disabled={loading}
             className="px-4 py-2 text-xs font-bold text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800/80 hover:bg-slate-200 dark:hover:bg-slate-700/80 rounded-xl border border-slate-300 dark:border-white/10 transition-all flex items-center gap-2 cursor-pointer shadow-sm disabled:opacity-50"
           >
@@ -267,13 +277,82 @@ export default function PayoutsView({ user, accentColor }) {
         </div>
       </div>
 
+      {/* Batch Split Selector Toolbar */}
+      <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 rounded-2xl border border-slate-200 dark:border-white/10 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl shadow-sm">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-xs font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400 mr-1 flex items-center gap-1.5">
+            <Layers className="w-4 h-4 text-emerald-500" />
+            <span>Split by Batch:</span>
+          </span>
+
+          <button
+            onClick={() => {
+              setSelectedBatch('ALL');
+              setCurrentPage(1);
+            }}
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+              selectedBatch === 'ALL'
+                ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md shadow-emerald-500/20'
+                : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
+            }`}
+          >
+            <span>All Payout Batches</span>
+            <span className={`px-1.5 py-0.2 rounded-md text-[10px] font-mono ${selectedBatch === 'ALL' ? 'bg-white/20 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300'}`}>
+              {batchesData.total_batches}
+            </span>
+          </button>
+
+          {batchesData.batches
+            .filter(b => b.transfer_id && !['N/A', 'nan', 'none', ''].includes(String(b.transfer_id).toLowerCase()))
+            .map((b, idx) => {
+              const cleanId = String(b.transfer_id).replace('.0', '');
+              const isSelected = selectedBatch === cleanId;
+              return (
+                <button
+                  key={idx}
+                  onClick={() => {
+                    setSelectedBatch(cleanId);
+                    setCurrentPage(1);
+                  }}
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                    isSelected
+                      ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md shadow-emerald-500/20'
+                      : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
+                  }`}
+                >
+                  <span className="font-mono">#{cleanId}</span>
+                  <span className="text-[11px] font-normal opacity-80">({b.created_date})</span>
+                  <span className={`px-1.5 py-0.2 rounded-md text-[10px] font-mono font-bold ${isSelected ? 'bg-white/20 text-white' : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'}`}>
+                    £{Number(b.transfer_amount || 0).toLocaleString('en-GB', { maximumFractionDigits: 0 })}
+                  </span>
+                </button>
+              );
+            })}
+        </div>
+
+        {selectedBatch !== 'ALL' && (
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold text-amber-600 dark:text-amber-400 bg-amber-500/10 px-2.5 py-1 rounded-lg border border-amber-500/20">
+              Active Filter: Batch #{selectedBatch}
+            </span>
+            <button
+              onClick={() => setSelectedBatch('ALL')}
+              className="text-xs font-bold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-all cursor-pointer flex items-center gap-1"
+            >
+              <X className="w-3.5 h-3.5" />
+              <span>Show All</span>
+            </button>
+          </div>
+        )}
+      </div>
+
       {/* Top 4 Financial Metric Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Total Gross Settlement */}
         <div className="p-5 rounded-2xl border border-slate-200 dark:border-white/10 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl shadow-sm flex flex-col gap-2">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-              {currency === 'ALL' ? 'Combined' : currency} Gross Settlement
+              Gross Donations Settlement
             </span>
             <div className="p-2 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-xl">
               <DollarSign className="w-4 h-4" />
@@ -283,7 +362,7 @@ export default function PayoutsView({ user, accentColor }) {
             {currSymbol}{summary.total_gross.toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </div>
           <div className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
-            From {summary.settled_donations_count.toLocaleString()} settled {currency === 'ALL' ? 'all' : currency} transactions
+            From {summary.settled_donations_count.toLocaleString()} settled donor transactions
           </div>
         </div>
 
@@ -309,20 +388,17 @@ export default function PayoutsView({ user, accentColor }) {
         <div className="p-5 rounded-2xl border border-slate-200 dark:border-white/10 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl shadow-sm flex flex-col gap-2">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-              {currency === 'USD' ? 'FX Outflow to GBP' : 'Reserve Adjustment'}
+              Reserve Adjustment
             </span>
             <div className="p-2 bg-amber-500/10 text-amber-600 dark:text-amber-400 rounded-xl">
               <Layers className="w-4 h-4" />
             </div>
           </div>
           <div className="text-2xl font-black text-amber-600 dark:text-amber-400">
-            {currency === 'USD' 
-              ? `${currSymbol}${Math.abs(Number(disb.foreign_exchange || 0)).toLocaleString('en-GB', { minimumFractionDigits: 2 })}`
-              : `${currSymbol}${summary.total_reserves.toLocaleString('en-GB', { minimumFractionDigits: 2 })}`
-            }
+            {currSymbol}{summary.total_reserves.toLocaleString('en-GB', { minimumFractionDigits: 2 })}
           </div>
           <div className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
-            {currency === 'USD' ? 'Converted into GBP charity account' : 'Platform rolling reserves & hold funds'}
+            Platform rolling reserves & hold funds
           </div>
         </div>
 
@@ -330,7 +406,7 @@ export default function PayoutsView({ user, accentColor }) {
         <div className="p-5 rounded-2xl border border-slate-200 dark:border-white/10 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl shadow-sm flex flex-col gap-2">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-              {currency === 'USD' ? 'Net USD Remaining' : 'Net Bank Transfers'}
+              Net Bank Transfers Disbursed
             </span>
             <div className="p-2 bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 rounded-xl">
               <Building className="w-4 h-4" />
@@ -341,7 +417,7 @@ export default function PayoutsView({ user, accentColor }) {
           </div>
           <div className="text-[11px] text-slate-500 dark:text-slate-400 font-medium flex items-center gap-1">
             <CheckCircle className="w-3.5 h-3.5 text-cyan-500" />
-            <span>{currency === 'USD' ? '100% converted to GBP balance' : 'Net payout transferred to bank'}</span>
+            <span>Total net payout transferred to bank</span>
           </div>
         </div>
       </div>
@@ -359,7 +435,7 @@ export default function PayoutsView({ user, accentColor }) {
             }`}
           >
             <TrendingUp className="w-3.5 h-3.5" />
-            <span>Finance Disbursement Summary ({currency === 'ALL' ? 'Combined' : currency})</span>
+            <span>Finance Disbursement Summary</span>
           </button>
 
           <button 
@@ -433,10 +509,10 @@ export default function PayoutsView({ user, accentColor }) {
                 </div>
                 <div>
                   <h3 className="text-sm font-black text-slate-900 dark:text-white">
-                    Disbursement Summary ({currency})
+                    Disbursement Summary (GBP)
                   </h3>
                   <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
-                    Verified finance team ledger reconciliation model for {currency} settlement
+                    Verified finance team ledger reconciliation model for GBP settlement
                   </p>
                 </div>
               </div>
@@ -451,7 +527,7 @@ export default function PayoutsView({ user, accentColor }) {
                   <tr className="bg-slate-100/70 dark:bg-slate-800/60 text-[11px] uppercase font-bold text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-white/10">
                     <th className="p-3.5 pl-6">Disbursement Summary Line Item</th>
                     <th className="p-3.5 text-center"># Transactions</th>
-                    <th className="p-3.5 pr-6 text-right">Value ({currency})</th>
+                    <th className="p-3.5 pr-6 text-right">Value (£)</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200 dark:divide-white/5 text-xs text-slate-800 dark:text-slate-200 font-medium">
@@ -625,46 +701,73 @@ export default function PayoutsView({ user, accentColor }) {
                     <th className="p-3.5">Donations</th>
                     <th className="p-3.5">Gross Amount</th>
                     <th className="p-3.5">Processing Fees</th>
-                    <th className="p-3.5 pr-5">Net Payout</th>
+                    <th className="p-3.5">Net Payout</th>
+                    <th className="p-3.5 pr-5 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200 dark:divide-white/5 text-xs text-slate-800 dark:text-slate-200 font-medium">
-                  {batchesData.batches.length === 0 ? (
+                  {batchesData.batches.filter(b => b.transfer_id && !['N/A', 'nan', 'none', ''].includes(String(b.transfer_id).toLowerCase())).length === 0 ? (
                     <tr>
-                      <td colSpan="7" className="p-8 text-center text-slate-500 dark:text-slate-400 font-semibold">
+                      <td colSpan="8" className="p-8 text-center text-slate-500 dark:text-slate-400 font-semibold">
                         No payout transfer batches found.
                       </td>
                     </tr>
                   ) : (
-                    batchesData.batches.map((batch, idx) => (
-                      <tr key={idx} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/40 transition-colors">
-                        <td className="p-3.5 pl-5 font-mono font-bold text-emerald-600 dark:text-emerald-400">
-                          #{batch.transfer_id}
-                        </td>
-                        <td className="p-3.5 font-medium text-slate-600 dark:text-slate-400">
-                          {batch.created_date}
-                        </td>
-                        <td className="p-3.5">
-                          <span className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
-                            {batch.campaigns_count} campaigns
-                          </span>
-                        </td>
-                        <td className="p-3.5">
-                          <span className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-teal-50 text-teal-700 dark:bg-teal-950/40 dark:text-teal-300 border border-teal-500/20">
-                            {batch.donations_count} transactions
-                          </span>
-                        </td>
-                        <td className="p-3.5 font-bold text-slate-900 dark:text-white">
-                          £{Number(batch.gross_amount).toLocaleString('en-GB', { minimumFractionDigits: 2 })}
-                        </td>
-                        <td className="p-3.5 font-semibold text-rose-600 dark:text-rose-400">
-                          £{Number(batch.processing_fees).toLocaleString('en-GB', { minimumFractionDigits: 2 })}
-                        </td>
-                        <td className="p-3.5 pr-5 font-extrabold text-emerald-600 dark:text-emerald-400">
-                          £{Number(batch.transfer_amount).toLocaleString('en-GB', { minimumFractionDigits: 2 })}
-                        </td>
-                      </tr>
-                    ))
+                    batchesData.batches
+                      .filter(b => b.transfer_id && !['N/A', 'nan', 'none', ''].includes(String(b.transfer_id).toLowerCase()))
+                      .map((batch, idx) => {
+                        const cleanId = String(batch.transfer_id).replace('.0', '');
+                        const isSelected = selectedBatch === cleanId;
+                        return (
+                          <tr key={idx} className={`hover:bg-slate-50/60 dark:hover:bg-slate-800/40 transition-colors ${isSelected ? 'bg-emerald-50/50 dark:bg-emerald-950/20' : ''}`}>
+                            <td className="p-3.5 pl-5 font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                              #{cleanId}
+                            </td>
+                            <td className="p-3.5 font-medium text-slate-600 dark:text-slate-400">
+                              {batch.created_date}
+                            </td>
+                            <td className="p-3.5">
+                              <span className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                                {batch.campaigns_count} campaigns
+                              </span>
+                            </td>
+                            <td className="p-3.5">
+                              <span className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-teal-50 text-teal-700 dark:bg-teal-950/40 dark:text-teal-300 border border-teal-500/20">
+                                {batch.donations_count} transactions
+                              </span>
+                            </td>
+                            <td className="p-3.5 font-bold text-slate-900 dark:text-white">
+                              £{Number(batch.gross_amount).toLocaleString('en-GB', { minimumFractionDigits: 2 })}
+                            </td>
+                            <td className="p-3.5 font-semibold text-rose-600 dark:text-rose-400">
+                              £{Number(batch.processing_fees).toLocaleString('en-GB', { minimumFractionDigits: 2 })}
+                            </td>
+                            <td className="p-3.5 font-extrabold text-emerald-600 dark:text-emerald-400">
+                              £{Number(batch.transfer_amount).toLocaleString('en-GB', { minimumFractionDigits: 2 })}
+                            </td>
+                            <td className="p-3.5 pr-5 text-right">
+                              {isSelected ? (
+                                <button
+                                  onClick={() => setSelectedBatch('ALL')}
+                                  className="px-3 py-1.5 rounded-xl text-[11px] font-bold bg-emerald-600 text-white shadow-sm hover:bg-emerald-500 transition-all cursor-pointer"
+                                >
+                                  Filtered (Clear)
+                                </button>
+                              ) : (
+                                <button
+                                  onClick={() => {
+                                    setSelectedBatch(cleanId);
+                                    setActiveTab('campaigns');
+                                  }}
+                                  className="px-3 py-1.5 rounded-xl text-[11px] font-bold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 hover:text-emerald-600 dark:hover:text-emerald-400 transition-all border border-slate-200 dark:border-white/10 cursor-pointer"
+                                >
+                                  View Breakdown
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })
                   )}
                 </tbody>
               </table>
@@ -817,8 +920,10 @@ export default function PayoutsView({ user, accentColor }) {
                                   </div>
                                 </td>
 
-                                <td className="p-3.5 font-black text-slate-900 dark:text-white font-mono">
-                                  {currSymbol}{Number(cg.gross_amount).toLocaleString('en-GB', { minimumFractionDigits: 2 })}
+                                <td className={`p-3.5 font-black font-mono ${Number(cg.gross_amount) < 0 ? 'text-rose-600 dark:text-rose-400' : 'text-slate-900 dark:text-white'}`}>
+                                  {Number(cg.gross_amount) < 0 
+                                    ? `-${currSymbol}${Math.abs(Number(cg.gross_amount)).toLocaleString('en-GB', { minimumFractionDigits: 2 })}` 
+                                    : `${currSymbol}${Number(cg.gross_amount).toLocaleString('en-GB', { minimumFractionDigits: 2 })}`}
                                 </td>
 
                                 <td className="p-3.5 font-bold text-rose-600 dark:text-rose-400 font-mono">
@@ -837,8 +942,10 @@ export default function PayoutsView({ user, accentColor }) {
                                   </div>
                                 </td>
 
-                                <td className="p-3.5 pr-6 font-black text-emerald-600 dark:text-emerald-400 font-mono text-sm">
-                                  {currSymbol}{Number(cg.transfer_amount).toLocaleString('en-GB', { minimumFractionDigits: 2 })}
+                                <td className={`p-3.5 pr-6 font-black font-mono text-sm ${Number(cg.transfer_amount) < 0 ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                                  {Number(cg.transfer_amount) < 0 
+                                    ? `-${currSymbol}${Math.abs(Number(cg.transfer_amount)).toLocaleString('en-GB', { minimumFractionDigits: 2 })}` 
+                                    : `${currSymbol}${Number(cg.transfer_amount).toLocaleString('en-GB', { minimumFractionDigits: 2 })}`}
                                 </td>
                               </tr>
 
@@ -870,18 +977,18 @@ export default function PayoutsView({ user, accentColor }) {
                                             </tr>
                                           </thead>
                                           <tbody className="divide-y divide-slate-100 dark:divide-white/5 text-xs text-slate-700 dark:text-slate-300">
-                                            {cg.campaigns.map((sc, sIdx) => (
-                                              <tr key={sIdx} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/40 transition-colors">
-                                                <td className="p-2.5 pl-4 font-bold text-slate-900 dark:text-white max-w-[340px] truncate" title={sc.campaign_name}>
+                                            {cg.campaigns.map((sc, scIdx) => (
+                                              <tr key={scIdx} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
+                                                <td className="p-2.5 pl-4 font-semibold text-slate-800 dark:text-slate-200">
                                                   {sc.campaign_name}
                                                 </td>
-                                                <td className="p-2.5 text-center font-mono text-[11px]">
-                                                  <span className="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
-                                                    {Number(sc.donations_count || 0).toLocaleString()}
-                                                  </span>
+                                                <td className="p-2.5 text-center font-bold text-slate-500 dark:text-slate-400 font-mono">
+                                                  {sc.donations_count || 0}
                                                 </td>
-                                                <td className="p-2.5 font-bold font-mono text-slate-900 dark:text-white">
-                                                  {currSymbol}{Number(sc.gross_amount).toLocaleString('en-GB', { minimumFractionDigits: 2 })}
+                                                <td className={`p-2.5 font-bold font-mono ${Number(sc.gross_amount) < 0 ? 'text-rose-600 dark:text-rose-400' : 'text-slate-900 dark:text-white'}`}>
+                                                  {Number(sc.gross_amount) < 0 
+                                                    ? `-${currSymbol}${Math.abs(Number(sc.gross_amount)).toLocaleString('en-GB', { minimumFractionDigits: 2 })}` 
+                                                    : `${currSymbol}${Number(sc.gross_amount).toLocaleString('en-GB', { minimumFractionDigits: 2 })}`}
                                                 </td>
                                                 <td className="p-2.5 font-semibold font-mono text-rose-600 dark:text-rose-400">
                                                   {currSymbol}{Number(sc.processing_fees).toLocaleString('en-GB', { minimumFractionDigits: 2 })}
@@ -889,8 +996,10 @@ export default function PayoutsView({ user, accentColor }) {
                                                 <td className="p-2.5 font-mono text-[11px] text-rose-600 dark:text-rose-400 font-bold">
                                                   {sc.fee_percentage}%
                                                 </td>
-                                                <td className="p-2.5 pr-4 font-black font-mono text-emerald-600 dark:text-emerald-400">
-                                                  {currSymbol}{Number(sc.transfer_amount).toLocaleString('en-GB', { minimumFractionDigits: 2 })}
+                                                <td className={`p-2.5 pr-4 font-black font-mono ${Number(sc.transfer_amount) < 0 ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                                                  {Number(sc.transfer_amount) < 0 
+                                                    ? `-${currSymbol}${Math.abs(Number(sc.transfer_amount)).toLocaleString('en-GB', { minimumFractionDigits: 2 })}` 
+                                                    : `${currSymbol}${Number(sc.transfer_amount).toLocaleString('en-GB', { minimumFractionDigits: 2 })}`}
                                                 </td>
                                               </tr>
                                             ))}
@@ -987,8 +1096,10 @@ export default function PayoutsView({ user, accentColor }) {
                                 <span className="text-slate-500 dark:text-slate-400 text-[10px] font-mono font-bold">{camp.code !== 'Unassigned' ? camp.code : camp.sub_heading}</span>
                               </div>
                             </td>
-                            <td className="p-3.5 font-bold text-slate-900 dark:text-white font-mono">
-                              {currSymbol}{Number(camp.gross_amount).toLocaleString('en-GB', { minimumFractionDigits: 2 })}
+                            <td className={`p-3.5 font-bold font-mono ${Number(camp.gross_amount) < 0 ? 'text-rose-600 dark:text-rose-400' : 'text-slate-900 dark:text-white'}`}>
+                              {Number(camp.gross_amount) < 0 
+                                ? `-${currSymbol}${Math.abs(Number(camp.gross_amount)).toLocaleString('en-GB', { minimumFractionDigits: 2 })}` 
+                                : `${currSymbol}${Number(camp.gross_amount).toLocaleString('en-GB', { minimumFractionDigits: 2 })}`}
                             </td>
                             <td className="p-3.5 font-semibold text-rose-600 dark:text-rose-400 font-mono">
                               {currSymbol}{Number(camp.processing_fees).toLocaleString('en-GB', { minimumFractionDigits: 2 })}
@@ -1004,8 +1115,10 @@ export default function PayoutsView({ user, accentColor }) {
                                 <span className="text-[11px] font-bold text-rose-600 dark:text-rose-400 font-mono">{camp.fee_percentage}%</span>
                               </div>
                             </td>
-                            <td className="p-3.5 pr-5 font-black text-emerald-600 dark:text-emerald-400 font-mono">
-                              {currSymbol}{Number(camp.transfer_amount).toLocaleString('en-GB', { minimumFractionDigits: 2 })}
+                            <td className={`p-3.5 pr-5 font-black font-mono ${Number(camp.transfer_amount) < 0 ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                              {Number(camp.transfer_amount) < 0 
+                                ? `-${currSymbol}${Math.abs(Number(camp.transfer_amount)).toLocaleString('en-GB', { minimumFractionDigits: 2 })}` 
+                                : `${currSymbol}${Number(camp.transfer_amount).toLocaleString('en-GB', { minimumFractionDigits: 2 })}`}
                             </td>
                           </tr>
                         ))
