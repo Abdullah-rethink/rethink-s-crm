@@ -7,9 +7,8 @@ from fastapi.staticfiles import StaticFiles
 # Add project root to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from backend.api import admin, auth, classifications, donors, events, expenses, filters, ltv, metrics, overview, tracker
+from backend.api import admin, auth, classifications, donors, events, expenses, filters, ltv, metrics, overview, payouts, tracker
 from core.auth import init_user_db
-from core.data_processor import load_data
 
 # Initialize user DB
 init_user_db()
@@ -44,6 +43,7 @@ app.include_router(expenses.router)
 app.include_router(filters.router)
 app.include_router(events.router)
 app.include_router(tracker.router)
+app.include_router(payouts.router)
 
 
 @app.get("/api/health", tags=["Health"])

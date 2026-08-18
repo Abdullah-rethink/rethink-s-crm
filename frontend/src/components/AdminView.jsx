@@ -28,9 +28,52 @@ export default function AdminView({ user, onDataChange }) {
   const [purgeConfirm, setPurgeConfirm] = useState(false);
   const [purging, setPurging] = useState(false);
 
+  // Purge Payout State
+  const [purgePayoutConfirm, setPurgePayoutConfirm] = useState(false);
+  const [purgingPayout, setPurgingPayout] = useState(false);
+
   const isSuperAdmin = user?.role === 'super_admin';
   const canManageTags = isSuperAdmin || user?.can_manage_tags === 1;
   const canPurgeData = isSuperAdmin || user?.can_purge_data === 1;
+
+  const handlePurgePayouts = () => {
+    if (!isSuperAdmin) return;
+    if (!purgePayoutConfirm) {
+      setMsg('❌ Please check the confirmation box before purging payout data.');
+      return;
+    }
+    if (!window.confirm("⚠️ ARE YOU SURE?\nThis will delete all LaunchGood payout settlement records. Raw donor contribution data will remain untouched.")) {
+      return;
+    }
+
+    setPurgingPayout(true);
+    setMsg('');
+
+    fetch(`${API_BASE_URL}/api/admin/purge-payouts`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        user_role: user?.role,
+        confirm: true
+      })
+    })
+      .then(r => r.json())
+      .then(res => {
+        setPurgingPayout(false);
+        if (res?.status === 'success') {
+          setMsg(`✅ ${res.message}`);
+          setPurgePayoutConfirm(false);
+          loadAdminData();
+          if (onDataChange) onDataChange();
+        } else {
+          setMsg(`❌ ${res?.detail || 'Failed to purge payout data.'}`);
+        }
+      })
+      .catch(err => {
+        setPurgingPayout(false);
+        setMsg(`❌ Error purging payout data: ${err.message}`);
+      });
+  };
 
   const handlePurgeDatabase = () => {
     if (!isSuperAdmin) return;
@@ -424,7 +467,8 @@ export default function AdminView({ user, onDataChange }) {
               className="bg-slate-900 border border-white/15 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-400 cursor-pointer"
             >
               <option value="auto">Auto-Detect Platform</option>
-              <option value="launchgood">LaunchGood</option>
+              <option value="launchgood">LaunchGood (Raw Donations)</option>
+              <option value="launchgood payout">LaunchGood Payout Settlement</option>
               <option value="givebright">GiveBright</option>
               <option value="paysuite">Paysuite</option>
               <option value="website">Rethink Website</option>
@@ -737,6 +781,46 @@ export default function AdminView({ user, onDataChange }) {
           </div>
         )}
       </div>
+
+      {/* 🔥 Purge LaunchGood Payout Settlement Data Only (Super Admin Only) */}
+      {canPurgeData && (
+        <div className="glass-panel p-5 border-l-4 border-amber-500 bg-amber-500/5 flex flex-col gap-4">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div>
+              <h3 className="text-sm font-black text-amber-600 dark:text-amber-400 flex items-center gap-2 uppercase tracking-wider">
+                <Trash2 className="w-5 h-5 text-amber-500" /> Purge LaunchGood Payout Data Only
+              </h3>
+              <p className="text-xs text-slate-600 dark:text-slate-400 mt-1 font-medium">
+                Deletes all LaunchGood payout settlement transaction records from database storage. Raw donor contribution reports will <span className="font-bold text-emerald-500">NOT</span> be deleted.
+              </p>
+            </div>
+            <span className="px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase bg-amber-500/20 text-amber-400 border border-amber-500/30">
+              SUPER ADMIN ACTION
+            </span>
+          </div>
+
+          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 p-4 rounded-xl border border-amber-500/20 bg-amber-950/20">
+            <label className="flex items-center gap-3 text-xs font-bold text-slate-700 dark:text-slate-300 cursor-pointer select-none">
+              <input 
+                type="checkbox" 
+                checked={purgePayoutConfirm}
+                onChange={e => setPurgePayoutConfirm(e.target.checked)}
+                className="w-4 h-4 text-amber-600 rounded border-slate-300 focus:ring-amber-500 cursor-pointer"
+              />
+              <span>I confirm that I want to delete all LaunchGood payout settlement records.</span>
+            </label>
+
+            <button
+              onClick={handlePurgePayouts}
+              disabled={purgingPayout || !purgePayoutConfirm}
+              className="px-5 py-2 rounded-xl text-xs font-black bg-gradient-to-r from-amber-600 to-orange-700 hover:from-amber-700 hover:to-orange-800 text-white shadow-lg shadow-amber-500/20 disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center gap-2 cursor-pointer shrink-0"
+            >
+              {purgingPayout ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+              <span>{purgingPayout ? 'Purging Payouts...' : '🔥 Purge Payout Data'}</span>
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* 🔥 Purge All Database Records (Super Admin Only) */}
       {canPurgeData && (

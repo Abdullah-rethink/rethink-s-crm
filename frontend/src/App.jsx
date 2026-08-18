@@ -10,6 +10,7 @@ import ClassificationView from './components/ClassificationView';
 import ExpenseView from './components/ExpenseView';
 import AdminView from './components/AdminView';
 import TrackerView from './components/TrackerView';
+import PayoutsView from './components/PayoutsView';
 import DonorDrawer from './components/DonorDrawer';
 import LoginView from './components/LoginView';
 
@@ -245,6 +246,7 @@ export default function App() {
               {activeTab === 'ltv' && <LtvView key={dataVersion} filters={filters} />}
               {activeTab === 'kanban' && <KanbanBoard key={dataVersion} filters={filters} onSelectDonor={setSelectedDonor} />}
               {activeTab === 'explorer' && <ExplorerView key={dataVersion} user={user} filters={filters} onSelectDonor={setSelectedDonor} onDataChange={handleDataChange} />}
+              {activeTab === 'payouts' && <PayoutsView key={dataVersion} user={user} accentColor={accentColor} />}
               {activeTab === 'tracker' && <TrackerView key={dataVersion} user={user} filters={filters} onSelectDonor={setSelectedDonor} accentColor={accentColor} />}
               {activeTab === 'classifications' && <ClassificationView key={dataVersion} user={user} onDataChange={handleDataChange} />}
               {activeTab === 'expenses' && <ExpenseView key={dataVersion} user={user} />}

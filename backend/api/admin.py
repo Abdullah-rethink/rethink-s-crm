@@ -9,6 +9,7 @@ from core.data_processor import (
     load_data,
     process_and_upload_excel,
     purge_all_data,
+    purge_payout_data,
     update_source_tag,
 )
 from core.database import get_cloud_sync_status
@@ -208,6 +209,24 @@ def purge_database(payload: PurgeDataRequest):
     return {
         "status": "success",
         "message": "Database purged cleanly!"
+    }
+
+
+@router.post("/purge-payouts")
+def purge_payouts_endpoint(payload: PurgeDataRequest):
+    if payload.user_role != "super_admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Purging payout data is restricted to Super Admin accounts."
+        )
+
+    if not payload.confirm:
+        raise HTTPException(status_code=400, detail="Confirmation is required to purge payout data.")
+
+    n_purged = purge_payout_data()
+    return {
+        "status": "success",
+        "message": f"Successfully purged LaunchGood payout settlement data! ({n_purged:,} records removed)"
     }
 
 

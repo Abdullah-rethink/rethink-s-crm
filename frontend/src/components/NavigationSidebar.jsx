@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { TrendingUp, Crown, Columns, Table, Shield, CreditCard, Database, Target, Diamond, ChevronLeft, ChevronRight } from 'lucide-react';
+import { TrendingUp, Crown, Columns, Table, Shield, CreditCard, Database, Target, Diamond, DollarSign, ChevronLeft, ChevronRight } from 'lucide-react';
 
 const tabs = [
   { id: 'overview', label: 'Dashboard', icon: TrendingUp },
   { id: 'kanban', label: 'Kanban Pipeline', icon: Columns },
   { id: 'ltv', label: 'Lifetime LTV', icon: Crown },
   { id: 'explorer', label: 'Data Explorer', icon: Table },
+  { id: 'payouts', label: 'Payout Reconciliation', icon: DollarSign },
   { id: 'tracker', label: 'Sponsorship Tracker', icon: Target },
   { id: 'classifications', label: 'Classifications', icon: Shield },
   { id: 'expenses', label: 'Expenses', icon: CreditCard },
