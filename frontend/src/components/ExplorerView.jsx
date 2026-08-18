@@ -637,6 +637,21 @@ export default function ExplorerView({ user, filters, onSelectDonor }) {
                           );
                         }
 
+                        if (c === 'First Name') {
+                          const isSettled = String(row['Payout Settled'] || row['payout_settled'] || '').toLowerCase() === 'yes';
+                          return (
+                            <td key={c} className="whitespace-nowrap font-medium">
+                              <div className="flex items-center gap-2">
+                                <span>{val || ''}</span>
+                                {isSettled && (
+                                  <span className="text-[10px] px-2 py-0.5 rounded-full font-extrabold uppercase bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 shadow-sm" title="Donor transaction settled in payout bank transfer">
+                                    Settled
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+                          );
+                        }
                         if (c === 'Total Online Donations Net Amount in Settled Currency' || typeof val === 'number') {
                           return (
                             <td key={c} className="font-mono text-cyan-400 font-extrabold whitespace-nowrap">

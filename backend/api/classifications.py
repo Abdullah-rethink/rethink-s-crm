@@ -245,8 +245,8 @@ def get_rethink_website_matrix():
 
 @router.get("/export")
 def export_classifications(
-    platform: str = Query("launchgood", regex="^(launchgood|givebright|paysuite|website|rethink_website)$"),
-    format: str = Query("csv", regex="^(csv|xlsx)$")
+    platform: str = Query("launchgood", pattern="^(launchgood|givebright|paysuite|website|rethink_website)$"),
+    format: str = Query("csv", pattern="^(csv|xlsx)$")
 ):
     """Exports campaign classification rules to CSV or Excel (.xlsx) file format."""
     df_raw = load_data()

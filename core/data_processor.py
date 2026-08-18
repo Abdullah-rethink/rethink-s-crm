@@ -6,7 +6,7 @@ from typing import Optional
 import pandas as pd
 import streamlit as st
 
-from config.settings import LOCAL_DB_PATH, PARQUET_PATH
+from config.settings import LOCAL_DB_PATH, PARQUET_PATH, PAYOUTS_PARQUET_PATH
 from core.database import sync_to_cloud_async
 
 COUNTRY_ISO_MAP = {
@@ -53,28 +53,26 @@ def deduplicate_dataframe_columns(df_input):
     """
     Finds and merges duplicate columns case-insensitively.
     """
-    if df_input.empty:
+    if df_input is None or df_input.empty:
         return df_input
     
-    seen = {}
-    col_map = {}
-    for col in df_input.columns:
-        norm = str(col).strip().lower()
-        if norm in seen:
-            col_map[col] = seen[norm]
-        else:
-            seen[norm] = col
-
-    if len(col_map) == 0:
-        return df_input
-
+    # Handle duplicate column names positional-indexed
     res_df = pd.DataFrame(index=df_input.index)
-    for original_col in seen.values():
-        res_df[original_col] = df_input[original_col]
-        
-    for dup_col, primary_col in col_map.items():
-        res_df[primary_col] = res_df[primary_col].fillna(df_input[dup_col])
-        
+    col_dict = {}
+    
+    for i, col in enumerate(df_input.columns):
+        series = df_input.iloc[:, i]
+        norm = str(col).strip()
+        norm_key = norm.lower()
+        if norm_key not in col_dict:
+            col_dict[norm_key] = (norm, series)
+        else:
+            orig_name, existing_series = col_dict[norm_key]
+            col_dict[norm_key] = (orig_name, existing_series.fillna(series))
+
+    for norm_key, (orig_name, s) in col_dict.items():
+        res_df[orig_name] = s
+
     return res_df
 
 # Global In-Memory Code Map Cache
@@ -1147,7 +1145,73 @@ def _enrich_dataframe(df, platform="auto"):
                     conn.close()
 
     else:
-        df["Platform"] = "LaunchGood"
+        is_payout_file = ("Settlement Gross (SC)" in df.columns or "Transfer Amount (SC)" in df.columns or "Transfer ID" in df.columns)
+        if is_payout_file or str(platform).lower() in ["payout", "launchgood payout", "payouts"]:
+            df["Platform"] = "LaunchGood Payout"
+            if "Code" in df.columns and "Giving Level Fund Code" in df.columns:
+                df.drop(columns=["Giving Level Fund Code"], inplace=True, errors="ignore")
+            df.rename(columns={
+                "Project Name": "Campaign Name",
+                "Settlement Gross (SC)": "Total Online Donation Gross Amount in Settled Currency",
+                "Settlement Processing Fees (SC)": "Total Processing Fees Paid by CC In Settled Currency",
+                "Transfer Amount (SC)": "Total Online Donations Net Amount in Settled Currency",
+                "Transfer ID": "Transfer ID",
+                "Type": "Type",
+                "Gift Aid": "Gift Aid (yes or no)",
+                "Giving Level Fund Code": "Code"
+            }, inplace=True)
+            df = deduplicate_dataframe_columns(df)
+
+            if "Created Date" in df.columns:
+                parsed_d = pd.to_datetime(df["Created Date"], errors="coerce")
+                df["Created Date (UTC)"] = parsed_d.dt.date.astype(str)
+            if "Created Time" in df.columns:
+                df["Created Time (UTC)"] = df["Created Time"].astype(str)
+
+            df["Payout Settled"] = "Yes"
+
+            # Synthetic Donation ID for non-donation summary rows
+            if "Donation ID" in df.columns:
+                df["Donation ID"] = df["Donation ID"].astype(object)
+                invalid_id_mask = df["Donation ID"].isna() | df["Donation ID"].astype(str).str.strip().str.lower().isin(["", "nan", "none", "n/a", "<na>", "0", "0.0"])
+                if invalid_id_mask.any():
+                    tid_s = df.get("Transfer ID", pd.Series("34579", index=df.index)).astype(str).str.replace(".0", "", regex=False)
+                    df.loc[invalid_id_mask, "Donation ID"] = ["PAYOUT-" + tid_s.iloc[i] + "-" + str(i+1) for i in range(len(df)) if invalid_id_mask.iloc[i]]
+
+            # Direct Donation ID Classification Mapping from existing database records
+            try:
+                df_existing = load_data()
+                if df_existing is not None and not df_existing.empty and "Donation ID" in df_existing.columns:
+                    valid_existing = df_existing[df_existing["Donation ID"].notna() & (~df_existing["Donation ID"].astype(str).str.strip().str.lower().isin(["", "nan", "none", "n/a"]))]
+                    if not valid_existing.empty:
+                        id_map = {}
+                        for _, r in valid_existing.iterrows():
+                            d_id = str(r["Donation ID"]).strip().lower()
+                            if d_id and d_id not in id_map:
+                                id_map[d_id] = {
+                                    "Campaign Name": r.get("Campaign Name") if pd.notna(r.get("Campaign Name")) else None,
+                                    "Heading": r.get("Heading") if pd.notna(r.get("Heading")) else None,
+                                    "Sub-Heading": r.get("Sub-Heading") if pd.notna(r.get("Sub-Heading")) else None,
+                                    "Country": r.get("Country") if pd.notna(r.get("Country")) else None,
+                                    "Code": r.get("Code") if pd.notna(r.get("Code")) else None,
+                                    "Zakat Eligibility": r.get("Zakat Eligibility") if pd.notna(r.get("Zakat Eligibility")) else None,
+                                }
+                        
+                        did_series = df["Donation ID"].astype(str).str.strip().str.lower()
+                        for f in ["Campaign Name", "Heading", "Sub-Heading", "Country", "Code", "Zakat Eligibility"]:
+                            if f not in df.columns:
+                                df[f] = "Unassigned"
+                            mapped = did_series.map(lambda d: id_map.get(d, {}).get(f))
+                            valid_m = mapped.notna() & (~mapped.astype(str).str.lower().isin(["", "nan", "none", "unassigned"]))
+                            if valid_m.any():
+                                df.loc[valid_m, f] = mapped[valid_m]
+            except Exception as ex:
+                print(f"[Notice] Donation ID classification mapping notice: {ex}")
+        else:
+            df["Platform"] = "LaunchGood"
+
+    if "Payout Settled" not in df.columns:
+        df["Payout Settled"] = "No"
 
     if "Total Online Donations Net Amount in Settled Currency" in df.columns and "Donation Amount in Project Currency (May be approx.)" in df.columns:
         df["Total Online Donations Net Amount in Settled Currency"] = df["Total Online Donations Net Amount in Settled Currency"].fillna(df["Donation Amount in Project Currency (May be approx.)"])
@@ -1299,6 +1363,17 @@ def process_and_upload_excel(file_buffer, source_name=None, upload_mode="replace
     batch_label = str(source_name).strip() if (source_name and str(source_name).strip()) else "Master Dataset"
     df["Source"] = batch_label
 
+    # Check if uploaded file is a Payout report vs Raw Donor report
+    is_payout_file = (
+        str(platform).lower() == "launchgood payout" or
+        "Settlement Gross (SC)" in df.columns or
+        "Transfer Amount (SC)" in df.columns or
+        ("Transfer ID" in df.columns and "Type" in df.columns)
+    )
+
+    if is_payout_file:
+        return process_payout_settlement_upload(df, source_name=batch_label, upload_mode=upload_mode)
+
     # Enrich and Auto-Classify New Raw Data
     df_new = _enrich_dataframe(df, platform=platform)
 
@@ -1341,6 +1416,171 @@ def process_and_upload_excel(file_buffer, source_name=None, upload_mode="replace
         "total_records": len(df_save)
     }
 
+def extract_and_sync_launchgood_payout_classifications(df_raw, sync_donors: bool = True):
+    """
+    Extracts all Project Name -> Code pairs from a payout file, resolves 5-tier classification
+    (Heading, Sub-Heading, Country, Code, Zakat Eligibility) via get_code_to_classification_map(),
+    upserts into campaign_classifications SQLite table & campaign_classifications_launchgood.json,
+    and optionally auto-syncs raw donor records and payout settlement records in real time.
+    """
+    if df_raw.empty:
+        return 0
+
+    p_col = None
+    for candidate in ["Project Name", "Campaign Name"]:
+        if candidate in df_raw.columns:
+            p_col = candidate
+            break
+
+    c_col = None
+    for candidate in ["Code", "Giving Level Fund Code"]:
+        if candidate in df_raw.columns:
+            c_col = candidate
+            break
+
+    if not p_col or not c_col:
+        return 0
+
+    pairs_df = df_raw[[p_col, c_col]].drop_duplicates().dropna()
+    code_map = get_code_to_classification_map()
+    
+    updated_rules = []
+    for _, r in pairs_df.iterrows():
+        p_name = str(r[p_col]).strip()
+        c_code = str(r[c_col]).strip().lower()
+        if not p_name or p_name.lower() in ["nan", "none", "n/a", ""]:
+            continue
+        
+        info = code_map.get(c_code, {})
+        updated_rules.append({
+            "campaign_name": p_name,
+            "community_name": "N/A",
+            "heading": info.get("Heading", "Unassigned"),
+            "sub_heading": info.get("Sub-Heading", "Unassigned"),
+            "country": info.get("Country", "Unassigned"),
+            "code": str(r[c_col]).strip().upper(),
+            "zakat_eligibility": info.get("Zakat Eligibility", "Unassigned")
+        })
+
+    if not updated_rules:
+        return 0
+
+    conn = sqlite3.connect(LOCAL_DB_PATH, timeout=30.0)
+    try:
+        df_rules = pd.DataFrame(updated_rules)
+        try:
+            existing_matrix = pd.read_sql_query("SELECT * FROM campaign_classifications", conn)
+            if not existing_matrix.empty and "campaign_name" in existing_matrix.columns:
+                existing_dict = {str(r["campaign_name"]).strip().lower(): r.to_dict() for _, r in existing_matrix.iterrows()}
+                for r in updated_rules:
+                    k = r["campaign_name"].lower()
+                    existing_dict[k] = r
+                df_rules = pd.DataFrame(list(existing_dict.values()))
+        except Exception:
+            pass
+
+        df_rules.to_sql("campaign_classifications", con=conn, if_exists="replace", index=False)
+        conn.close()
+
+        # Save to JSON file as well
+        json_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "config", "campaign_classifications_launchgood.json")
+        json_df = df_rules.rename(columns={
+            "campaign_name": "Campaign Name",
+            "community_name": "Community Name",
+            "heading": "Heading",
+            "sub_heading": "Sub-Heading",
+            "country": "Country",
+            "code": "Code",
+            "zakat_eligibility": "Zakat Eligibility"
+        })
+        with open(json_path, "w", encoding="utf-8") as f:
+            import json
+            json.dump(json_df.to_dict(orient="records"), f, indent=2)
+
+        if sync_donors:
+            sync_matrix_classifications_to_donors(json_df)
+
+        return len(updated_rules)
+    except Exception as e:
+        print(f"Error extracting payout classifications: {e}")
+        return 0
+
+def process_payout_settlement_upload(df_raw, source_name="LaunchGood Payout.xlsx", upload_mode="replace"):
+    """
+    Processes and saves Payout settlement records into the isolated payout_settlements SQLite table
+    and payouts_cache.parquet without polluting raw donor contribution data in the donations table.
+    """
+    df_new = _enrich_dataframe(df_raw, platform="launchgood payout")
+    
+    # 1. Extract Campaign Code Mappings from Payout File and Update LaunchGood Matrix (without redundant donor loop)
+    extract_and_sync_launchgood_payout_classifications(df_raw, sync_donors=False)
+
+    # 2. Save Payout Settlement Dataset independently
+    if upload_mode in ["merge", "append"] and os.path.exists(PAYOUTS_PARQUET_PATH):
+        try:
+            existing_payouts = pd.read_parquet(PAYOUTS_PARQUET_PATH)
+            if existing_payouts is not None and not existing_payouts.empty:
+                df_combined = pd.concat([existing_payouts, df_new], ignore_index=True)
+                if "Donation ID" in df_combined.columns:
+                    valid_mask = df_combined["Donation ID"].notna() & (~df_combined["Donation ID"].astype(str).str.strip().str.lower().isin(["", "nan", "none", "n/a", "<na>"]))
+                    df_valid = df_combined[valid_mask].drop_duplicates(subset=["Donation ID"], keep="last")
+                    df_invalid = df_combined[~valid_mask]
+                    df_combined = pd.concat([df_valid, df_invalid], ignore_index=True)
+                df_save = df_combined
+            else:
+                df_save = df_new
+        except Exception as e:
+            print(f"[Payout Merge Notice]: {e}")
+            df_save = df_new
+    else:
+        df_save = df_new
+
+    df_save = sanitize_df_dtypes_for_parquet(df_save)
+    df_save.to_parquet(PAYOUTS_PARQUET_PATH, index=False)
+
+    conn = sqlite3.connect(LOCAL_DB_PATH, timeout=30.0)
+    df_save.to_sql("payout_settlements", con=conn, if_exists="replace", index=False, chunksize=5000)
+    conn.close()
+
+    # 3. High-Speed Update on raw donor records in donations table: apply Payout Settled flag via SQLite UPDATE
+    try:
+        settled_ids = list(set(df_new[df_new["Donation ID"].notna()]["Donation ID"].astype(str).str.strip().str.lower()))
+        if settled_ids:
+            conn = sqlite3.connect(LOCAL_DB_PATH, timeout=30.0)
+            cursor = conn.cursor()
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='donations'")
+            if cursor.fetchone():
+                cursor.execute("""
+                    UPDATE donations 
+                    SET "Payout Settled" = 'Yes' 
+                    WHERE LOWER(CAST("Donation ID" AS TEXT)) IN (
+                        SELECT LOWER(CAST("Donation ID" AS TEXT)) FROM payout_settlements WHERE "Donation ID" IS NOT NULL
+                    )
+                """)
+                conn.commit()
+            conn.close()
+
+            if os.path.exists(PARQUET_PATH):
+                donations_df = pd.read_parquet(PARQUET_PATH)
+                if not donations_df.empty and "Donation ID" in donations_df.columns:
+                    m = donations_df["Donation ID"].astype(str).str.strip().str.lower().isin(set(settled_ids))
+                    if m.any():
+                        if "Payout Settled" not in donations_df.columns:
+                            donations_df["Payout Settled"] = "No"
+                        donations_df.loc[m, "Payout Settled"] = "Yes"
+                        donations_df = sanitize_df_dtypes_for_parquet(donations_df)
+                        donations_df.to_parquet(PARQUET_PATH, index=False)
+            
+            load_data(force_reload=True)
+    except Exception as e:
+        print(f"[Payout Fast Sync Notice]: {e}")
+
+    return {
+        "status": "success",
+        "added": len(df_new),
+        "total_records": len(df_save)
+    }
+
 def sync_donor_classifications_to_matrix(df_donations):
     """Synchronizes cell edits from donor records back into campaign classification rules."""
     if df_donations.empty or "Campaign Name" not in df_donations.columns:
@@ -1364,12 +1604,8 @@ def sync_donor_classifications_to_matrix(df_donations):
         print(f"Donor to matrix sync notice: {e}")
 
 def sync_matrix_classifications_to_donors(matrix_df):
-    """Applies classification matrix rule changes directly to all matching donor donation records instantly."""
+    """Applies classification matrix rule changes directly to all matching donor donation records and payout settlement records instantly (Single Source of Truth)."""
     if matrix_df.empty or "Campaign Name" not in matrix_df.columns:
-        return 0
-
-    df_donations = load_data()
-    if df_donations.empty or "Campaign Name" not in df_donations.columns:
         return 0
 
     try:
@@ -1384,26 +1620,52 @@ def sync_matrix_classifications_to_donors(matrix_df):
                 "Zakat Eligibility": str(r.get("Zakat Eligibility", "Unassigned"))
             }
 
-        c_keys = df_donations["Campaign Name"].astype(str).str.strip().str.lower()
         target_fields = ["Heading", "Sub-Heading", "Country", "Code", "Zakat Eligibility"]
         updated_count = 0
 
-        for col in target_fields:
-            if col in df_donations.columns:
-                col_map = {k: v[col] for k, v in camp_rule_map.items()}
-                mapped_series = c_keys.map(col_map)
-                mask = mapped_series.notna()
-                df_donations.loc[mask, col] = mapped_series[mask]
-                updated_count = int(mask.sum())
+        # 1. Update Raw Donor Records in donations table
+        df_donations = load_data(force_reload=True)
+        if not df_donations.empty and "Campaign Name" in df_donations.columns:
+            c_keys = df_donations["Campaign Name"].astype(str).str.strip().str.lower()
+            for col in target_fields:
+                if col in df_donations.columns:
+                    col_map = {k: v[col] for k, v in camp_rule_map.items()}
+                    mapped_series = c_keys.map(col_map)
+                    mask = mapped_series.notna()
+                    df_donations.loc[mask, col] = mapped_series[mask]
+                    updated_count = int(mask.sum())
 
-        df_donations.to_parquet(PARQUET_PATH, index=False)
-        conn = sqlite3.connect(LOCAL_DB_PATH, timeout=30.0)
-        df_donations.to_sql("donations", con=conn, if_exists="replace", index=False)
-        conn.close()
+            df_donations = sanitize_df_dtypes_for_parquet(df_donations)
+            df_donations.to_parquet(PARQUET_PATH, index=False)
+            conn = sqlite3.connect(LOCAL_DB_PATH, timeout=30.0)
+            df_donations.to_sql("donations", con=conn, if_exists="replace", index=False, chunksize=5000)
+            conn.close()
 
+        # 2. Update Payout Settlement Records in payout_settlements table
+        if os.path.exists(PAYOUTS_PARQUET_PATH):
+            try:
+                df_payouts = pd.read_parquet(PAYOUTS_PARQUET_PATH)
+                if not df_payouts.empty and "Campaign Name" in df_payouts.columns:
+                    p_keys = df_payouts["Campaign Name"].astype(str).str.strip().str.lower()
+                    for col in target_fields:
+                        if col in df_payouts.columns:
+                            col_map = {k: v[col] for k, v in camp_rule_map.items()}
+                            mapped_series = p_keys.map(col_map)
+                            mask = mapped_series.notna()
+                            df_payouts.loc[mask, col] = mapped_series[mask]
+
+                    df_payouts = sanitize_df_dtypes_for_parquet(df_payouts)
+                    df_payouts.to_parquet(PAYOUTS_PARQUET_PATH, index=False)
+                    conn = sqlite3.connect(LOCAL_DB_PATH, timeout=30.0)
+                    df_payouts.to_sql("payout_settlements", con=conn, if_exists="replace", index=False, chunksize=5000)
+                    conn.close()
+            except Exception as e:
+                print(f"Payout matrix sync notice: {e}")
+
+        load_data(force_reload=True)
         return updated_count
     except Exception as e:
-        print(f"Matrix to donor sync notice: {e}")
+        print(f"Matrix to donor/payout sync notice: {e}")
         return 0
 
 def purge_all_data():
@@ -1485,13 +1747,48 @@ def set_cached_data(df: pd.DataFrame):
     global _CACHED_DF, _CACHE_MTIME
     with _CACHE_LOCK:
         _CACHED_DF = df
+        _CACHE_MTIME = time.time()
+
+
+def purge_payout_data():
+    """Purges all LaunchGood Payout records (Platform LIKE '%Payout%', Source LIKE '%Payout%', or Type IN ('payout', 'reserve', 'fx', 'adjustment')) from SQLite & Parquet."""
+    conn = sqlite3.connect(LOCAL_DB_PATH, timeout=30.0)
+    cursor = conn.cursor()
+    cursor.execute("""
+        DELETE FROM donations 
+        WHERE "Platform" LIKE '%Payout%' 
+           OR "Source" LIKE '%Payout%' 
+           OR "Type" IN ('payout', 'reserve', 'fx', 'adjustment')
+    """)
+    deleted_count = cursor.rowcount
+    
+    # Reset Payout Settled flag on remaining records if any
+    cursor.execute("UPDATE donations SET \"Payout Settled\" = 'No' WHERE \"Payout Settled\" = 'Yes'")
+    conn.commit()
+    conn.close()
+
+    if os.path.exists(PARQUET_PATH):
         try:
-            if os.path.exists(PARQUET_PATH):
-                _CACHE_MTIME = os.path.getmtime(PARQUET_PATH)
-            else:
-                _CACHE_MTIME = 0.0
-        except Exception:
-            _CACHE_MTIME = 0.0
+            df = pd.read_parquet(PARQUET_PATH)
+            if not df.empty:
+                p_mask = pd.Series(False, index=df.index)
+                if "Platform" in df.columns:
+                    p_mask = p_mask | df["Platform"].astype(str).str.lower().str.contains("payout", na=False)
+                if "Source" in df.columns:
+                    p_mask = p_mask | df["Source"].astype(str).str.lower().str.contains("payout", na=False)
+                if "Type" in df.columns:
+                    p_mask = p_mask | df["Type"].astype(str).str.lower().isin(["payout", "reserve", "fx", "adjustment"])
+                
+                df_clean = df[~p_mask].copy()
+                if "Payout Settled" in df_clean.columns:
+                    df_clean["Payout Settled"] = "No"
+                df_clean = sanitize_df_dtypes_for_parquet(df_clean)
+                df_clean.to_parquet(PARQUET_PATH, index=False)
+        except Exception as e:
+            print(f"Parquet payout purge notice: {e}")
+
+    load_data(force_reload=True)
+    return deleted_count
 
 
 def load_data(force_reload: bool = False) -> pd.DataFrame:
