@@ -34,6 +34,67 @@ class BulkEditDonorsRequest(BaseModel):
     can_edit_donors: Optional[bool] = False
 
 
+class UpdateSingleDonorRequest(BaseModel):
+    user_role: str
+    row_id: Optional[int] = None
+    donation_id: Optional[str] = None
+    donor_identifier: Optional[str] = None
+    column_name: Optional[str] = None
+    new_value: Optional[str] = None
+    updated_fields: Optional[dict] = None
+    can_edit_donors: Optional[bool] = False
+
+
+@router.post("/update-record")
+def update_single_donor_record(payload: UpdateSingleDonorRequest):
+    if payload.user_role != "super_admin" and not payload.can_edit_donors:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Editing donor records is restricted to authorized accounts."
+        )
+
+    df_raw = load_data()
+    if df_raw.empty:
+        raise HTTPException(status_code=400, detail="Donor dataset is empty.")
+
+    target_idx = None
+
+    # 1. Exact Row Index targeting (100% precision guarantee)
+    if payload.row_id is not None and payload.row_id in df_raw.index:
+        target_idx = payload.row_id
+    elif payload.donation_id and "Donation ID" in df_raw.columns:
+        d_id_str = str(payload.donation_id).strip().lower()
+        matches = df_raw.index[df_raw["Donation ID"].astype(str).str.strip().str.lower() == d_id_str].tolist()
+        if len(matches) > 0:
+            target_idx = matches[0]
+
+    if target_idx is None:
+        raise HTTPException(status_code=404, detail="Specific donor record could not be uniquely identified for editing.")
+
+    # Apply changes strictly to ONE single row
+    if payload.updated_fields and isinstance(payload.updated_fields, dict):
+        for col, val in payload.updated_fields.items():
+            if col in df_raw.columns and not col.startswith("_"):
+                df_raw.loc[target_idx, col] = val
+    elif payload.column_name and payload.new_value is not None:
+        if payload.column_name in df_raw.columns and not payload.column_name.startswith("_"):
+            df_raw.loc[target_idx, payload.column_name] = payload.new_value
+
+    df_raw.to_parquet(PARQUET_PATH, index=False)
+    conn = sqlite3.connect(LOCAL_DB_PATH, timeout=30.0)
+    df_raw.to_sql("donations", con=conn, if_exists="replace", index=False)
+    conn.close()
+
+    from core.data_processor import invalidate_data_cache, sync_donors_to_classification_matrix
+    invalidate_data_cache()
+    sync_donors_to_classification_matrix(df_raw)
+
+    return {
+        "status": "success",
+        "message": f"Successfully updated record #{target_idx}."
+    }
+
+
 @router.post("/bulk-edit")
 def bulk_edit_donors(payload: BulkEditDonorsRequest):
     if payload.user_role != "super_admin" and not payload.can_edit_donors:
@@ -358,6 +419,7 @@ def get_donors_paginated(
     end_idx = min(start_idx + page_size, total_records)
 
     page_df = display_df.iloc[start_idx:end_idx].copy()
+    page_df["_row_id"] = [int(idx) for idx in page_df.index]
     float_cols = page_df.select_dtypes(include=['float', 'float64']).columns
     for fc in float_cols:
         page_df[fc] = page_df[fc].round(2)
