@@ -258,6 +258,45 @@ export default function HorizontalFilters({ filters, onFilterChange, onResetFilt
           )}
         </div>
 
+        {/* Sub-Heading Pill */}
+        <div className="relative">
+          <button
+            onClick={() => toggleDropdown('subheading')}
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-semibold transition-all hover:bg-slate-50 dark:hover:bg-slate-800/50 ${
+              filters.subheading && filters.subheading !== 'All Sub-Headings'
+                ? `${actClass} font-bold`
+                : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-white/10'
+            }`}
+          >
+            <span>Sub-Heading: {!filters.subheading || filters.subheading === 'All Sub-Headings' ? 'All' : filters.subheading}</span>
+            <ChevronDown className="w-3 h-3 opacity-60" />
+          </button>
+          
+          {activeDropdown === 'subheading' && (
+            <div className="absolute left-0 mt-2 w-64 bg-white dark:bg-slate-950 border border-slate-200 dark:border-white/10 rounded-xl shadow-xl z-50 py-1.5 animate-in fade-in slide-in-from-top-1 duration-150 max-h-60 overflow-y-auto custom-scrollbar">
+              <button
+                onClick={() => handleSelect('subheading', 'All Sub-Headings')}
+                className={`w-full text-left px-4 py-2 text-xs hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors ${
+                  !filters.subheading || filters.subheading === 'All Sub-Headings' ? 'text-cyan-500 font-bold' : 'text-slate-700 dark:text-slate-300'
+                }`}
+              >
+                All Sub-Headings
+              </button>
+              {filterOptions.subheadings.map(opt => (
+                <button
+                  key={opt}
+                  onClick={() => handleSelect('subheading', opt)}
+                  className={`w-full text-left px-4 py-2 text-xs hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors ${
+                    filters.subheading === opt ? 'text-cyan-500 font-bold' : 'text-slate-700 dark:text-slate-300'
+                  }`}
+                >
+                  {opt}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
         {/* More Filters Pill */}
         <div className="relative">
           <button
