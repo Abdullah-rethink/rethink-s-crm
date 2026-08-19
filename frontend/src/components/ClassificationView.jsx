@@ -21,7 +21,8 @@ import {
   ChevronRight,
   ChevronsLeft,
   ChevronsRight,
-  Filter
+  Filter,
+  Plus
 } from 'lucide-react';
 import { API_BASE_URL } from '../config';
 
@@ -38,7 +39,16 @@ function cleanText(val) {
        .replace(/â€œ/g, '“')
        .replace(/â€/g, '”')
        .replace(/Ã©/g, 'é')
-       .replace(/Ã /g, 'à');
+       .replace(/Ã¨/g, 'è')
+       .replace(/Ã®/g, 'î')
+       .replace(/Ã´/g, 'ô')
+       .replace(/Ã¹/g, 'ù')
+       .replace(/Ã¡/g, 'á')
+       .replace(/Ã­/g, 'í')
+       .replace(/Ã³/g, 'ó')
+       .replace(/Ãº/g, 'ú')
+       .replace(/Ã±/g, 'ñ')
+       .replace(/Ã\s/g, 'à');
   return s;
 }
 
@@ -150,50 +160,232 @@ export default function ClassificationView({ user }) {
     };
   }, [platform]);
 
-  // Dynamic cell change handler with Code -> Classification Auto-Fill
-  const handleCellChange = (campaignKey, field, value) => {
+  // Dynamic list of all known unique codes (from central code map + active rules + any newly typed codes)
+  const knownCodes = useMemo(() => {
+    const codeSet = new Set();
+    Object.keys(codeMap || {}).forEach(c => {
+      const clean = String(c).trim().toUpperCase();
+      if (clean && !['UNASSIGNED', 'N/A', 'NONE', 'NAN', ''].includes(clean)) {
+        codeSet.add(clean);
+      }
+    });
+    (matrixData?.rules || []).forEach(r => {
+      const cd = String(r['Code'] || r['code'] || '').trim().toUpperCase();
+      if (cd && !['UNASSIGNED', 'N/A', 'NONE', 'NAN', ''].includes(cd)) {
+        codeSet.add(cd);
+      }
+    });
+    return Array.from(codeSet).sort();
+  }, [codeMap, matrixData?.rules]);
+
+  // Dynamic cell change handler with Code -> Classification Auto-Fill & Same-Code Auto-Propagation
+  const handleCellChange = (campaignKey, codeKey, field, value) => {
     if (!isSuperAdmin) return;
     const valClean = cleanText(value);
+
+    // 1. If user is changing Code on a row:
+    if (field === 'Code') {
+      const newCodeClean = valClean.trim().toUpperCase();
+      const newCodeLower = valClean.trim().toLowerCase();
+
+      // Find if we already have classification metadata for this code in codeMap or elsewhere in rules
+      let existingInfo = codeMap[newCodeLower];
+      if (!existingInfo || Object.values(existingInfo).every(v => !v || v === 'Unassigned')) {
+        const matchingRule = (matrixData.rules || []).find(r => {
+          const cd = (r['Code'] || r['code'] || '').trim().toLowerCase();
+          return cd === newCodeLower && r['Heading'] && r['Heading'] !== 'Unassigned';
+        });
+        if (matchingRule) {
+          existingInfo = {
+            Heading: matchingRule['Heading'] || 'Unassigned',
+            'Sub-Heading': matchingRule['Sub-Heading'] || 'Unassigned',
+            Country: matchingRule['Country'] || 'Unassigned',
+            'Zakat Eligibility': matchingRule['Zakat Eligibility'] || 'Unassigned'
+          };
+        }
+      }
+
+      setMatrixData(prev => {
+        let targetFound = false;
+        const updatedRules = prev.rules.map(r => {
+          const cName = r['Campaign Name'] || r['campaign_name'];
+          const cCode = r['Code'] || r['code'] || 'Unassigned';
+          if (!targetFound && cName === campaignKey && cCode === codeKey) {
+            targetFound = true;
+            const currentRow = { ...r, Code: newCodeClean };
+            if (existingInfo) {
+              if (existingInfo.Heading && existingInfo.Heading !== 'Unassigned') currentRow['Heading'] = existingInfo.Heading;
+              if (existingInfo['Sub-Heading'] && existingInfo['Sub-Heading'] !== 'Unassigned') currentRow['Sub-Heading'] = existingInfo['Sub-Heading'];
+              if (existingInfo.Country && existingInfo.Country !== 'Unassigned') currentRow['Country'] = existingInfo.Country;
+              if (existingInfo['Zakat Eligibility'] && existingInfo['Zakat Eligibility'] !== 'Unassigned') currentRow['Zakat Eligibility'] = existingInfo['Zakat Eligibility'];
+            }
+            return currentRow;
+          }
+          return r;
+        });
+
+        return {
+          ...prev,
+          classified_campaigns: updatedRules.filter(r => r['Heading'] && r['Heading'] !== 'Unassigned').length,
+          unassigned_campaigns: updatedRules.filter(r => !r['Heading'] || r['Heading'] === 'Unassigned').length,
+          rules: updatedRules
+        };
+      });
+      return;
+    }
+
+    // 2. If user is changing Heading, Sub-Heading, Country, or Zakat Eligibility on a row:
+    const classificationFields = ['Heading', 'Sub-Heading', 'Country', 'Zakat Eligibility'];
+    if (classificationFields.includes(field)) {
+      const codeUpper = (codeKey || '').trim().toUpperCase();
+      const codeLower = (codeKey || '').trim().toLowerCase();
+      const isValidCode = codeUpper && !['UNASSIGNED', 'N/A', 'NONE', 'NAN', ''].includes(codeUpper);
+
+      // Update central codeMap dictionary if code is valid
+      if (isValidCode && valClean && valClean !== 'Unassigned') {
+        setCodeMap(prevMap => {
+          const currentEntry = prevMap[codeLower] || {
+            Heading: 'Unassigned',
+            'Sub-Heading': 'Unassigned',
+            Country: 'Unassigned',
+            'Zakat Eligibility': 'Unassigned'
+          };
+          return {
+            ...prevMap,
+            [codeLower]: {
+              ...currentEntry,
+              [field]: valClean
+            }
+          };
+        });
+      }
+
+      setMatrixData(prev => {
+        const updatedRules = prev.rules.map(r => {
+          const cName = r['Campaign Name'] || r['campaign_name'];
+          const cCode = r['Code'] || r['code'] || 'Unassigned';
+          const rCodeUpper = (cCode || '').trim().toUpperCase();
+
+          // Target row being edited
+          if (cName === campaignKey && cCode === codeKey) {
+            return { ...r, [field]: valClean };
+          }
+
+          // AUTO-PROPAGATE to any other row that shares the SAME valid Code:
+          if (isValidCode && rCodeUpper === codeUpper) {
+            return { ...r, [field]: valClean };
+          }
+
+          return r;
+        });
+
+        return {
+          ...prev,
+          classified_campaigns: updatedRules.filter(r => r['Heading'] && r['Heading'] !== 'Unassigned').length,
+          unassigned_campaigns: updatedRules.filter(r => !r['Heading'] || r['Heading'] === 'Unassigned').length,
+          rules: updatedRules
+        };
+      });
+      return;
+    }
+
+    // 3. For any other field (e.g. Campaign URL, Community Name)
     setMatrixData(prev => {
+      let targetFound = false;
       const updatedRules = prev.rules.map(r => {
         const cName = r['Campaign Name'] || r['campaign_name'];
-        if (cName === campaignKey) {
-          const currentRow = { ...r, [field]: valClean };
-
-          // When Code changes, automatically resolve & fill Heading, Sub-Heading, Country, and Zakat!
-          if (field === 'Code' && valClean) {
-            const codeKey = valClean.trim().toLowerCase();
-            if (codeMap[codeKey]) {
-              const info = codeMap[codeKey];
-              if (info.Heading && info.Heading !== 'Unassigned') currentRow['Heading'] = info.Heading;
-              if (info['Sub-Heading'] && info['Sub-Heading'] !== 'Unassigned') currentRow['Sub-Heading'] = info['Sub-Heading'];
-              if (info.Country && info.Country !== 'Unassigned') currentRow['Country'] = info.Country;
-              if (info['Zakat Eligibility'] && info['Zakat Eligibility'] !== 'Unassigned') currentRow['Zakat Eligibility'] = info['Zakat Eligibility'];
-            }
-          }
-          return currentRow;
+        const cCode = r['Code'] || r['code'] || 'Unassigned';
+        if (!targetFound && cName === campaignKey && cCode === codeKey) {
+          targetFound = true;
+          return { ...r, [field]: valClean };
         }
         return r;
       });
-
       return {
         ...prev,
-        classified_campaigns: updatedRules.filter(r => r['Heading'] && r['Heading'] !== 'Unassigned').length,
-        unassigned_campaigns: updatedRules.filter(r => !r['Heading'] || r['Heading'] === 'Unassigned').length,
         rules: updatedRules
       };
     });
   };
+
+  // Add/Duplicate a new code variant rule for the same campaign name
+  const handleDuplicateRule = (rule) => {
+    if (!isSuperAdmin) return;
+    const cName = rule['Campaign Name'] || rule['campaign_name'];
+    const newRule = {
+      ...rule,
+      Code: '',
+      Heading: 'Unassigned',
+      'Sub-Heading': 'Unassigned',
+      Country: 'Unassigned',
+      'Zakat Eligibility': 'Unassigned',
+      is_primary: false,
+      status: 'multi_code',
+      variants_count: (rule.variants_count || 1) + 1
+    };
+    setMatrixData(prev => ({
+      ...prev,
+      total_campaigns: prev.rules.length + 1,
+      unassigned_campaigns: prev.unassigned_campaigns + 1,
+      rules: [newRule, ...prev.rules]
+    }));
+    setSaveMsg(`➕ Added new code variant slot for "${cName}". Specify Code and click Save.`);
+  };
+
+  // Toggle Primary/Default Code Variant for a Multi-Code Campaign
+  const handleTogglePrimary = (rule) => {
+    if (!isSuperAdmin) return;
+    const cName = rule['Campaign Name'] || rule['campaign_name'];
+    const targetCode = rule['Code'] || rule['code'] || 'Unassigned';
+
+    setMatrixData(prev => {
+      const updatedRules = prev.rules.map(r => {
+        const rowName = r['Campaign Name'] || r['campaign_name'];
+        const rowCode = r['Code'] || r['code'] || 'Unassigned';
+        if (rowName === cName) {
+          return {
+            ...r,
+            is_primary: rowCode === targetCode
+          };
+        }
+        return r;
+      });
+      return {
+        ...prev,
+        rules: updatedRules
+      };
+    });
+
+    setSaveMsg(`⭐ Marked "${targetCode}" as Primary code for "${cName}". Click Save All Rules to persist.`);
+  };
+
+  // Dynamic status counts calculation
+  const { singleCodeCount, multiCodeCount, unassignedCount } = useMemo(() => {
+    let single = 0, multi = 0, unassigned = 0;
+    (matrixData.rules || []).forEach(r => {
+      const isUn = !r['Heading'] || r['Heading'] === 'Unassigned' || !r['Code'] || r['Code'] === 'Unassigned';
+      if (isUn) {
+        unassigned++;
+      } else if (r.status === 'multi_code' || r.variants_count > 1) {
+        multi++;
+      } else {
+        single++;
+      }
+    });
+    return { singleCodeCount: single, multiCodeCount: multi, unassignedCount: unassigned };
+  }, [matrixData.rules]);
 
   // 🔍 Filtered Rules Calculation (Status + Live Search)
   const filteredRules = useMemo(() => {
     let list = matrixData.rules || [];
 
     // 1. Status Filter
-    if (statusFilter === 'CLASSIFIED') {
-      list = list.filter(r => r['Heading'] && r['Heading'] !== 'Unassigned');
+    if (statusFilter === 'SINGLE_CODE') {
+      list = list.filter(r => (r.status === 'single_code' || (!r.status && (r.variants_count === 1 || !r.variants_count) && r['Heading'] && r['Heading'] !== 'Unassigned')));
+    } else if (statusFilter === 'MULTI_CODE') {
+      list = list.filter(r => (r.status === 'multi_code' || r.variants_count > 1));
     } else if (statusFilter === 'UNASSIGNED') {
-      list = list.filter(r => !r['Heading'] || r['Heading'] === 'Unassigned');
+      list = list.filter(r => (r.status === 'unassigned' || !r['Heading'] || r['Heading'] === 'Unassigned' || !r['Code'] || r['Code'] === 'Unassigned'));
     }
 
     // 2. Search Query Filter
@@ -260,7 +452,8 @@ export default function ClassificationView({ user }) {
   const handleDeleteRule = async (rule) => {
     if (!isSuperAdmin) return;
     const cName = rule['Campaign Name'] || rule['campaign_name'];
-    if (!window.confirm(`Are you sure you want to delete the classification rule for "${cName}"?\n\nMatching donor records will be reset to Unassigned.`)) {
+    const cCode = rule['Code'] || rule['code'] || '';
+    if (!window.confirm(`Are you sure you want to delete the classification rule for "${cName}" (Code: ${cCode || 'Unassigned'})?\n\nMatching donor records will be reset to Unassigned.`)) {
       return;
     }
 
@@ -272,6 +465,7 @@ export default function ClassificationView({ user }) {
           user_role: user?.role,
           platform: platform,
           campaign_name: cName,
+          code: cCode || null,
           community_name: rule['Community Name'] || rule['community_name'] || null
         })
       });
@@ -279,7 +473,11 @@ export default function ClassificationView({ user }) {
       if (data?.status === 'success') {
         setSaveMsg(`🗑️ ${data.message}`);
         setMatrixData(prev => {
-          const filtered = prev.rules.filter(r => (r['Campaign Name'] || r['campaign_name']) !== cName);
+          const filtered = prev.rules.filter(r => {
+            const matchName = (r['Campaign Name'] || r['campaign_name']) === cName;
+            const matchCode = (r['Code'] || r['code'] || '') === cCode;
+            return !(matchName && matchCode);
+          });
           return {
             ...prev,
             total_campaigns: filtered.length,
@@ -365,9 +563,6 @@ export default function ClassificationView({ user }) {
       setImportMsg(`❌ Error uploading file: ${err.message}`);
     }
   };
-
-  // Known valid Codes for the datalist autocomplete dropdown
-  const knownCodes = Object.keys(codeMap).map(k => k.toUpperCase());
 
   // Visual Theme Badges per platform
   const bannerStyles = {
@@ -638,7 +833,7 @@ export default function ClassificationView({ user }) {
         </div>
 
         {/* Status Filter Badges */}
-        <div className="flex items-center gap-1.5 p-1 rounded-xl bg-slate-100 dark:bg-slate-900/60 border border-slate-200 dark:border-white/5">
+        <div className="flex flex-wrap items-center gap-1.5 p-1 rounded-xl bg-slate-100 dark:bg-slate-900/60 border border-slate-200 dark:border-white/5">
           <button
             onClick={() => setStatusFilter('ALL')}
             className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
@@ -647,27 +842,40 @@ export default function ClassificationView({ user }) {
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
-            All ({matrixData.total_campaigns?.toLocaleString() || 0})
+            All ({matrixData.rules?.length?.toLocaleString() || 0})
           </button>
           <button
-            onClick={() => setStatusFilter('CLASSIFIED')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-              statusFilter === 'CLASSIFIED'
+            onClick={() => setStatusFilter('SINGLE_CODE')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+              statusFilter === 'SINGLE_CODE'
                 ? 'bg-emerald-600 text-white shadow-sm'
                 : 'text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10'
             }`}
           >
-            Classified ({matrixData.classified_campaigns?.toLocaleString() || 0})
+            <span>🟢 Single Code</span>
+            <span className="opacity-80">({singleCodeCount.toLocaleString()})</span>
           </button>
           <button
-            onClick={() => setStatusFilter('UNASSIGNED')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-              statusFilter === 'UNASSIGNED'
-                ? 'bg-amber-600 text-white shadow-sm'
+            onClick={() => setStatusFilter('MULTI_CODE')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+              statusFilter === 'MULTI_CODE'
+                ? 'bg-amber-500 text-slate-950 font-black shadow-sm'
                 : 'text-amber-600 dark:text-amber-400 hover:bg-amber-500/10'
             }`}
           >
-            Unassigned ({matrixData.unassigned_campaigns?.toLocaleString() || 0})
+            <span>🟡 Multi-Code Splits</span>
+            <span className="opacity-80">({multiCodeCount.toLocaleString()})</span>
+          </button>
+          <button
+            onClick={() => setStatusFilter('UNASSIGNED')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+              statusFilter === 'UNASSIGNED'
+                ? 'bg-rose-600 text-white shadow-sm'
+                : 'text-rose-600 dark:text-rose-400 hover:bg-rose-500/10'
+            }`}
+          >
+            <span>🔴 Unassigned</span>
+            <span className="opacity-80">({unassignedCount.toLocaleString()})</span>
           </button>
         </div>
 
@@ -704,7 +912,7 @@ export default function ClassificationView({ user }) {
             <table className="crm-table w-full">
               <thead>
                 <tr>
-                  <th className="min-w-[200px] text-left">{platform === 'paysuite' ? 'Direct Debit Ref (Bank Ref)' : 'Campaign Name'}</th>
+                  <th className="min-w-[220px] text-left">{platform === 'paysuite' ? 'Direct Debit Ref (Bank Ref)' : 'Campaign Name'}</th>
                   
                   {/* Paysuite: Donor Name and Email columns */}
                   {platform === 'paysuite' && (
@@ -729,7 +937,7 @@ export default function ClassificationView({ user }) {
                   <th className="min-w-[190px] text-left">Sub-Heading</th>
                   <th className="min-w-[150px] text-left">Country</th>
                   <th className="w-40 text-left">Zakat Eligibility</th>
-                  {isSuperAdmin && <th className="text-center w-16">Action</th>}
+                  {isSuperAdmin && <th className="text-center w-24">Action</th>}
                 </tr>
               </thead>
               <tbody>
@@ -742,11 +950,26 @@ export default function ClassificationView({ user }) {
                 ) : (
                   paginatedRules.map((r, idx) => {
                     const cKey = r['Campaign Name'] || r['campaign_name'];
+                    const cCode = r['Code'] || r['code'] || 'Unassigned';
+                    const rowUniqueKey = `${cKey}__${cCode}__${idx}`;
+                    const isMulti = r.variants_count > 1 || r.status === 'multi_code';
                     return (
-                      <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-cyan-500/5 transition-colors border-b border-slate-200 dark:border-white/5">
+                      <tr key={rowUniqueKey} className="hover:bg-slate-50 dark:hover:bg-cyan-500/5 transition-colors border-b border-slate-200 dark:border-white/5">
                         {/* Campaign Name */}
-                        <td className="font-bold text-slate-800 dark:text-slate-100 text-xs py-2.5 px-3 min-w-[200px] max-w-[280px]" title={r['Campaign Name']}>
+                        <td className="font-bold text-slate-800 dark:text-slate-100 text-xs py-2.5 px-3 min-w-[220px] max-w-[300px]" title={r['Campaign Name']}>
                           <div className="truncate font-bold text-slate-900 dark:text-slate-100">{r['Campaign Name']}</div>
+                          {isMulti && (
+                            <div className="flex items-center gap-1.5 mt-1">
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-100 text-amber-900 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-400/40 shadow-xs">
+                                🟡 {r.variants_count} Code Variants
+                              </span>
+                              {r.is_primary && (
+                                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[9px] font-extrabold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-400/40">
+                                  ⭐ Primary
+                                </span>
+                              )}
+                            </div>
+                          )}
                         </td>
 
                         {/* Paysuite: Donor Name and Email */}
@@ -780,7 +1003,7 @@ export default function ClassificationView({ user }) {
                                 type="text"
                                 disabled={!isSuperAdmin}
                                 value={r['Campaign URL'] || ''}
-                                onChange={e => handleCellChange(cKey, 'Campaign URL', e.target.value)}
+                                onChange={e => handleCellChange(cKey, cCode, 'Campaign URL', e.target.value)}
                                 placeholder="Paste URL..."
                                 className="bg-white dark:bg-slate-900/90 border border-slate-300 dark:border-white/10 rounded-lg px-2 py-1 text-[11px] text-slate-800 dark:text-slate-300 w-24 focus:outline-none focus:border-cyan-500 disabled:opacity-60 font-mono"
                                 title="Paste or edit campaign URL"
@@ -803,7 +1026,7 @@ export default function ClassificationView({ user }) {
                             list="known-codes-list"
                             disabled={!isSuperAdmin}
                             value={r['Code'] || ''} 
-                            onChange={e => handleCellChange(cKey, 'Code', e.target.value)}
+                            onChange={e => handleCellChange(cKey, cCode, 'Code', e.target.value)}
                             placeholder="Type Code..."
                             className="bg-white dark:bg-slate-900/90 border border-cyan-400 dark:border-cyan-500/40 rounded-lg px-2.5 py-1.5 text-xs font-mono text-cyan-800 dark:text-cyan-300 font-extrabold w-full focus:outline-none focus:border-cyan-500 disabled:opacity-60 uppercase shadow-sm"
                             title="Changing Code automatically auto-fills Heading, Sub-Heading, Country, and Zakat!"
@@ -816,7 +1039,7 @@ export default function ClassificationView({ user }) {
                             type="text" 
                             disabled={!isSuperAdmin}
                             value={r['Heading'] || ''} 
-                            onChange={e => handleCellChange(cKey, 'Heading', e.target.value)}
+                            onChange={e => handleCellChange(cKey, cCode, 'Heading', e.target.value)}
                             className="bg-white dark:bg-slate-900/90 border border-slate-300 dark:border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-slate-800 dark:text-slate-200 font-semibold w-full focus:outline-none focus:border-teal-500 dark:focus:border-cyan-400 disabled:opacity-60 shadow-sm"
                             title={r['Heading']}
                           />
@@ -828,7 +1051,7 @@ export default function ClassificationView({ user }) {
                             type="text" 
                             disabled={!isSuperAdmin}
                             value={r['Sub-Heading'] || ''} 
-                            onChange={e => handleCellChange(cKey, 'Sub-Heading', e.target.value)}
+                            onChange={e => handleCellChange(cKey, cCode, 'Sub-Heading', e.target.value)}
                             className="bg-white dark:bg-slate-900/90 border border-slate-300 dark:border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-purple-800 dark:text-purple-300 font-semibold w-full focus:outline-none focus:border-purple-500 dark:focus:border-purple-400 disabled:opacity-60 shadow-sm"
                             title={r['Sub-Heading']}
                           />
@@ -840,7 +1063,7 @@ export default function ClassificationView({ user }) {
                             type="text" 
                             disabled={!isSuperAdmin}
                             value={r['Country'] || ''} 
-                            onChange={e => handleCellChange(cKey, 'Country', e.target.value)}
+                            onChange={e => handleCellChange(cKey, cCode, 'Country', e.target.value)}
                             className="bg-white dark:bg-slate-900/90 border border-slate-300 dark:border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-emerald-800 dark:text-emerald-300 font-semibold w-full focus:outline-none focus:border-emerald-500 dark:focus:border-emerald-400 disabled:opacity-60 shadow-sm"
                             title={r['Country']}
                           />
@@ -851,7 +1074,7 @@ export default function ClassificationView({ user }) {
                           <select 
                             disabled={!isSuperAdmin}
                             value={r['Zakat Eligibility'] || 'Unassigned'} 
-                            onChange={e => handleCellChange(cKey, 'Zakat Eligibility', e.target.value)}
+                            onChange={e => handleCellChange(cKey, cCode, 'Zakat Eligibility', e.target.value)}
                             className="bg-white dark:bg-slate-900/90 border border-slate-300 dark:border-white/10 rounded-lg px-2 py-1.5 text-xs font-bold text-slate-800 dark:text-slate-200 w-full focus:outline-none focus:border-teal-500 dark:focus:border-cyan-400 disabled:opacity-60 cursor-pointer shadow-sm"
                           >
                             <option value="Unassigned">Unassigned</option>
@@ -860,16 +1083,41 @@ export default function ClassificationView({ user }) {
                           </select>
                         </td>
 
-                        {/* Super Admin Delete Single Rule Action */}
+                        {/* Super Admin Actions: Primary Toggle, Add Code Variant & Delete */}
                         {isSuperAdmin && (
-                          <td className="text-center py-2 px-2 w-16">
-                            <button 
-                              onClick={() => handleDeleteRule(r)}
-                              className="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-500/10 rounded-lg transition-colors cursor-pointer"
-                              title="Delete this classification rule"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
+                          <td className="text-center py-2 px-2 w-24">
+                            <div className="flex items-center justify-center gap-1">
+                              {isMulti && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleTogglePrimary(r)}
+                                  className={`p-1.5 rounded-lg transition-all cursor-pointer ${
+                                    r.is_primary 
+                                      ? 'text-amber-500 bg-amber-500/20 border border-amber-400' 
+                                      : 'text-slate-400 hover:text-amber-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+                                  }`}
+                                  title={r.is_primary ? 'Current Primary Code for this Campaign' : 'Click to make this the Primary Code for this Campaign'}
+                                >
+                                  <span className="text-xs font-bold">{r.is_primary ? '⭐' : '☆'}</span>
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => handleDuplicateRule(r)}
+                                className="p-1.5 text-cyan-600 dark:text-cyan-400 hover:text-cyan-800 dark:hover:text-cyan-200 hover:bg-cyan-500/10 rounded-lg transition-colors cursor-pointer"
+                                title="Add another Code variant rule for this campaign"
+                              >
+                                <Plus className="w-4 h-4" />
+                              </button>
+                              <button 
+                                type="button"
+                                onClick={() => handleDeleteRule(r)}
+                                className="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-500/10 rounded-lg transition-colors cursor-pointer"
+                                title="Delete this classification rule"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
                           </td>
                         )}
                       </tr>

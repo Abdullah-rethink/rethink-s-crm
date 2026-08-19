@@ -15,7 +15,7 @@ from core.data_processor import (
 
 
 def get_givebright_classification_matrix(df_raw=None):
-    """Returns GiveBright classification matrix DataFrame in < 20ms using vectorized SQLite + in-memory lookup."""
+    """Returns GiveBright classification matrix DataFrame with (Campaign Name, Code) granularity."""
     target_cols_display = ["Heading", "Sub-Heading", "Country", "Code", "Zakat Eligibility"]
 
     # 1. Read SQLite stored GiveBright classifications
@@ -24,16 +24,16 @@ def get_givebright_classification_matrix(df_raw=None):
         db_matrix = pd.read_sql_query("""
             SELECT 
                 campaign_name as "Campaign Name",
+                COALESCE(code, 'Unassigned') as "Code",
                 COALESCE(campaign_url, '') as "Campaign URL",
                 COALESCE(heading, 'Unassigned') as "Heading",
                 COALESCE(sub_heading, 'Unassigned') as "Sub-Heading",
                 COALESCE(country, 'Unassigned') as "Country",
-                COALESCE(code, 'Unassigned') as "Code",
                 COALESCE(zakat_eligibility, 'Unassigned') as "Zakat Eligibility"
             FROM givebright_classifications
         """, conn)
     except Exception:
-        db_matrix = pd.DataFrame(columns=["Campaign Name", "Campaign URL"] + target_cols_display)
+        db_matrix = pd.DataFrame(columns=["Campaign Name", "Code", "Campaign URL"] + [c for c in target_cols_display if c != "Code"])
     finally:
         conn.close()
 
@@ -49,6 +49,7 @@ def get_givebright_classification_matrix(df_raw=None):
         if not gb_df.empty:
             c_name = gb_df["Campaign Name"].astype(str).str.strip()
             c_name = c_name[~c_name.str.lower().isin(['nan', 'none', 'n/a', '', 'unassigned'])]
+            code_val = gb_df.loc[c_name.index, "Code"].astype(str).str.strip().replace({'nan': 'Unassigned', '': 'Unassigned', 'None': 'Unassigned'}) if "Code" in gb_df.columns else pd.Series("Unassigned", index=c_name.index)
             
             url_series = pd.Series("", index=gb_df.index)
             for u_col in ["Campaign URL", "campaign_url", "URL", "url"]:
@@ -56,29 +57,29 @@ def get_givebright_classification_matrix(df_raw=None):
                     url_series = gb_df[u_col].fillna("").astype(str).replace({'nan': '', 'None': ''})
                     break
 
-            donor_df = pd.DataFrame({"Campaign Name": c_name, "Campaign URL": url_series.loc[c_name.index]})
+            donor_df = pd.DataFrame({"Campaign Name": c_name, "Code": code_val, "Campaign URL": url_series.loc[c_name.index]})
             for tc in target_cols_display:
-                if tc in gb_df.columns:
+                if tc in gb_df.columns and tc != "Code":
                     donor_df[tc] = gb_df.loc[c_name.index, tc].values
 
-            donor_distinct = donor_df.drop_duplicates(subset=["Campaign Name"])
+            donor_distinct = donor_df.drop_duplicates(subset=["Campaign Name", "Code"])
 
             if db_matrix.empty:
                 return donor_distinct.fillna("Unassigned").reset_index(drop=True)
 
             merged = pd.merge(
-                donor_distinct[["Campaign Name"]],
+                donor_distinct[["Campaign Name", "Code", "Campaign URL"]],
                 db_matrix,
-                on="Campaign Name",
-                how="outer"
+                on=["Campaign Name", "Code"],
+                how="outer",
+                suffixes=('', '_db')
             ).fillna("Unassigned")
-            return merged.drop_duplicates(subset=["Campaign Name"]).reset_index(drop=True)
+            return merged.drop_duplicates(subset=["Campaign Name", "Code"]).reset_index(drop=True)
 
     if not db_matrix.empty:
         return db_matrix.fillna("Unassigned").reset_index(drop=True)
 
-    return pd.DataFrame(columns=["Campaign Name", "Campaign URL"] + target_cols_display)
-
+    return pd.DataFrame(columns=["Campaign Name", "Code", "Campaign URL"] + [c for c in target_cols_display if c != "Code"])
 
 
 def save_givebright_classification_matrix(matrix_df):
@@ -87,72 +88,32 @@ def save_givebright_classification_matrix(matrix_df):
         return 0
 
     conn = sqlite3.connect(LOCAL_DB_PATH, timeout=30.0)
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS givebright_classifications (
-            campaign_name TEXT PRIMARY KEY,
-            campaign_url TEXT,
-            heading TEXT DEFAULT 'Unassigned',
-            sub_heading TEXT DEFAULT 'Unassigned',
-            country TEXT DEFAULT 'Unassigned',
-            code TEXT DEFAULT 'Unassigned',
-            zakat_eligibility TEXT DEFAULT 'Unassigned'
-        );
-    """)
-    try:
-        conn.execute("ALTER TABLE givebright_classifications ADD COLUMN campaign_url TEXT;")
-    except Exception:
-        pass
-
     for _, row in matrix_df.iterrows():
-        cname = str(row.get("Campaign Name", "Unassigned"))
+        cname = str(row.get("Campaign Name", "Unassigned")).strip()
+        code = str(row.get("Code", "Unassigned")).strip()
         curl = str(row.get("Campaign URL") or row.get("campaign_url") or "")
-        conn.execute("DELETE FROM givebright_classifications WHERE campaign_name = ?", (cname,))
+        if not cname or cname.lower() in ["nan", "none", "n/a", ""]:
+            continue
+        conn.execute("DELETE FROM givebright_classifications WHERE campaign_name = ? AND code = ?", (cname, code))
         conn.execute("""
-            INSERT INTO givebright_classifications (campaign_name, campaign_url, heading, sub_heading, country, code, zakat_eligibility)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO givebright_classifications (campaign_name, code, campaign_url, heading, sub_heading, country, zakat_eligibility, is_primary)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             cname,
+            code,
             curl,
             str(row.get("Heading", "Unassigned")),
             str(row.get("Sub-Heading", "Unassigned")),
             str(row.get("Country", "Unassigned")),
-            str(row.get("Code", "Unassigned")),
-            str(row.get("Zakat Eligibility", "Unassigned"))
+            str(row.get("Zakat Eligibility", "Unassigned")),
+            1 if row.get("is_primary") in [1, True, "1", "true", "True"] else 0
         ))
     conn.commit()
     conn.close()
 
-    # Re-apply to active dataset in Parquet and SQLite
-    if os.path.exists(PARQUET_PATH):
-        try:
-            df_donations = pd.read_parquet(PARQUET_PATH)
-            if not df_donations.empty and "Campaign Name" in df_donations.columns:
-                target_cols = ["Heading", "Sub-Heading", "Country", "Code", "Zakat Eligibility"]
-                clean_matrix = matrix_df.copy()
-                clean_matrix["_c_key"] = clean_matrix["Campaign Name"].astype(str).str.strip().str.lower()
-                for f in target_cols:
-                    if f not in clean_matrix.columns:
-                        clean_matrix[f] = "Unassigned"
-                    clean_matrix[f] = clean_matrix[f].fillna("Unassigned").astype(str).replace({'nan': 'Unassigned', '': 'Unassigned', 'None': 'Unassigned'})
-
-                map_data = clean_matrix.drop_duplicates(subset=["_c_key"], keep="last").set_index("_c_key")
-
-                gb_mask = df_donations.get("Platform", pd.Series("", index=df_donations.index)).astype(str).str.lower() == "givebright"
-                if gb_mask.any():
-                    c_keys = df_donations.loc[gb_mask, "Campaign Name"].astype(str).str.strip().str.lower()
-                    for f in target_cols:
-                        if f in map_data.columns:
-                            map_dict = map_data[f].to_dict()
-                            mapped_vals = c_keys.map(map_dict)
-                            valid_m = mapped_vals.notna() & (mapped_vals != "Unassigned")
-                            df_donations.loc[gb_mask & valid_m, f] = mapped_vals[valid_m]
-
-                    df_donations.to_parquet(PARQUET_PATH, index=False)
-                    conn = sqlite3.connect(LOCAL_DB_PATH, timeout=30.0)
-                    df_donations.to_sql("donations", con=conn, if_exists="replace", index=False)
-                    conn.close()
-        except Exception as e:
-            print(f"Error syncing GiveBright matrix to donors: {e}")
+    # Re-apply to active dataset in Parquet and SQLite using sync_matrix_classifications_to_donors
+    from core.data_processor import sync_matrix_classifications_to_donors
+    sync_matrix_classifications_to_donors(matrix_df)
 
     return len(matrix_df)
 
@@ -166,7 +127,7 @@ def normalize_classification_import_df(raw_df):
             col_mapping[col] = "Campaign Name"
         elif c_clean in ["community", "community name", "fundraiser by", "platform source"]:
             col_mapping[col] = "Community Name"
-        elif c_clean in ["code", "campaign code", "project code", "cost code", "item code"]:
+        elif c_clean in ["code", "campaign code", "project code", "cost code", "item code", "giving level fund code", "giving level campaign code", "fund code", "accounting code"]:
             col_mapping[col] = "Code"
         elif c_clean in ["heading", "main heading", "category", "main category"]:
             col_mapping[col] = "Heading"

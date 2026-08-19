@@ -1,6 +1,6 @@
 from typing import Optional
 from fastapi import APIRouter, Query
-from core.data_processor import load_data
+from core.data_processor import load_data, load_payouts_data
 from backend.api.donors import _apply_filters
 
 router = APIRouter(prefix="/api/filters", tags=["Filter Controls"])
@@ -22,10 +22,19 @@ def get_filter_options(
     start_date: Optional[str] = None,
     end_date: Optional[str] = None
 ):
-    df_raw = load_data()
-    if df_raw.empty:
+    df_donations = load_data()
+    df_payouts = load_payouts_data()
+
+    # Determine primary dataset based on source filter
+    is_payout_only = bool(source and str(source).strip().lower() in ["launchgood payout", "payout", "payouts"])
+    if is_payout_only:
+        df_raw = df_payouts if not df_payouts.empty else df_donations
+    else:
+        df_raw = df_donations
+
+    if df_raw.empty and df_payouts.empty:
         return {
-            "sources": [],
+            "sources": ["GiveBright", "LaunchGood", "LaunchGood Payout", "Paysuite", "Rethink Website"],
             "headings": [],
             "subheadings": [],
             "countries": [],
@@ -44,6 +53,11 @@ def get_filter_options(
         sources = sorted([str(p).strip() for p in s_df["Platform"].dropna().unique() if str(p).strip() not in ["", "nan", "None"]])
     if not sources and "Platform" in df_raw.columns:
         sources = sorted([str(p).strip() for p in df_raw["Platform"].dropna().unique() if str(p).strip() not in ["", "nan", "None"]])
+
+    # Always ensure LaunchGood Payout is available in sources if payout records exist
+    if not df_payouts.empty and "LaunchGood Payout" not in sources:
+        sources.append("LaunchGood Payout")
+        sources = sorted(sources)
 
     # 2. Headings: filter by all active criteria EXCEPT heading itself
     h_df = _apply_filters(df_raw, payment_type, tier, source, None, subheading, country, code, zakat, donor_country, campaign_search, gift_aid, start_date, end_date)

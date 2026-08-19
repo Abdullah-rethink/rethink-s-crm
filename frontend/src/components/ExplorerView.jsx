@@ -20,6 +20,10 @@ export default function ExplorerView({ user, filters, onSelectDonor }) {
   const [editingCell, setEditingCell] = useState(null); // { rowIdx, colName, value }
   const [cellMessage, setCellMessage] = useState('');
 
+  // Classification lookups for smart quick-pick and auto-enrichment
+  const [campaignCodesLookup, setCampaignCodesLookup] = useState({});
+  const [codeMap, setCodeMap] = useState({});
+
   // Single Donor Record Modal Edit State
   const [editingDonorModal, setEditingDonorModal] = useState(null); // { row, fields }
   const [editModalSaving, setEditModalSaving] = useState(false);
@@ -39,6 +43,19 @@ export default function ExplorerView({ user, filters, onSelectDonor }) {
   const [bulkMessage, setBulkMessage] = useState('');
 
   const canEdit = user?.role === 'super_admin' || user?.can_edit_donors === 1;
+
+  // Load Campaign Codes lookup and Code Map on mount
+  useEffect(() => {
+    fetch(`${API_BASE_URL}/api/classifications/campaign-codes`)
+      .then(r => r.json())
+      .then(data => { if (data && typeof data === 'object') setCampaignCodesLookup(data); })
+      .catch(err => console.error('Error fetching campaign-codes lookup:', err));
+
+    fetch(`${API_BASE_URL}/api/classifications/code-map`)
+      .then(r => r.json())
+      .then(data => { if (data && typeof data === 'object') setCodeMap(data); })
+      .catch(err => console.error('Error fetching code-map:', err));
+  }, []);
 
   const loadDonors = () => {
     setLoading(true);
@@ -546,11 +563,11 @@ export default function ExplorerView({ user, filters, onSelectDonor }) {
       {/* Control Toolbar */}
       <div className="glass-panel p-4 flex flex-wrap items-center justify-between gap-4">
         {/* Search */}
-        <div className="relative min-w-[300px]">
+        <div className="relative min-w-[340px]">
           <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
           <input 
             type="text"
-            placeholder="🔍 Quick Search (Name / Email / Campaign)..."
+            placeholder="🔍 Quick Search (Name, Email, Campaign, or Donation ID(s)...)"
             value={search}
             onChange={e => { setSearch(e.target.value); setCurrentPage(1); }}
             className="w-full bg-slate-900/90 border border-white/10 rounded-xl pl-10 pr-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 transition-all"
@@ -615,27 +632,105 @@ export default function ExplorerView({ user, filters, onSelectDonor }) {
             )}
 
             <form onSubmit={handleSaveDonorModal} className="flex flex-col gap-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 text-xs">
-                {Object.keys(editingDonorModal.fields).map(field => (
-                  <div key={field} className="flex flex-col gap-1.5">
-                    <label className="text-slate-400 font-bold uppercase tracking-wider text-[10px]">
-                      {COLUMN_ALIASES[field] || field}
-                    </label>
-                    <input
-                      type="text"
-                      value={editingDonorModal.fields[field] || ''}
-                      onChange={e => setEditingDonorModal({
-                        ...editingDonorModal,
-                        fields: {
-                          ...editingDonorModal.fields,
-                          [field]: e.target.value
-                        }
+              {/* 🎯 Smart Campaign Code Quick-Pick (If Campaign has known code variants) */}
+              {(() => {
+                const activeCName = (editingDonorModal.fields['Campaign Name'] || editingDonorModal.row['Campaign Name'] || '').trim().toLowerCase();
+                const variants = (activeCName && campaignCodesLookup[activeCName]) || [];
+                if (variants.length === 0) return null;
+
+                return (
+                  <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex flex-col gap-2 shadow-inner">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-bold text-amber-300 uppercase tracking-wider flex items-center gap-1.5">
+                        🎯 Campaign Quick-Pick ({variants.length} Code {variants.length > 1 ? 'Variants' : 'Variant'})
+                      </span>
+                      <span className="text-[10px] text-amber-200/70">Click variant to auto-fill all classification fields</span>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {variants.map(v => {
+                        const isSelected = editingDonorModal.fields['Code']?.trim().toUpperCase() === v.code.toUpperCase();
+                        return (
+                          <button
+                            key={v.code}
+                            type="button"
+                            onClick={() => {
+                              setEditingDonorModal(prev => ({
+                                ...prev,
+                                fields: {
+                                  ...prev.fields,
+                                  'Code': v.code,
+                                  'Heading': v.heading,
+                                  'Sub-Heading': v.sub_heading,
+                                  'Country': v.country,
+                                  'Zakat Eligibility': v.zakat_eligibility
+                                }
+                              }));
+                            }}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-mono font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                              isSelected
+                                ? 'bg-amber-400 text-slate-950 shadow-md shadow-amber-500/30 ring-2 ring-amber-300'
+                                : 'bg-slate-800/90 text-amber-300 hover:bg-amber-500/20 border border-amber-500/30'
+                            }`}
+                          >
+                            <span>{v.code}</span>
+                            {v.is_primary && <span className="text-[10px] text-emerald-400 font-sans">⭐ Primary</span>}
+                            <span className="text-[10px] opacity-70 font-sans font-normal">({v.heading} • {v.country})</span>
+                          </button>
+                        );
                       })}
-                      className="bg-slate-950 border border-white/10 rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:border-cyan-400 transition-all"
-                    />
+                    </div>
                   </div>
-                ))}
+                );
+              })()}
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 text-xs">
+                {Object.keys(editingDonorModal.fields).map(field => {
+                  const isCodeField = field === 'Code';
+                  return (
+                    <div key={field} className="flex flex-col gap-1.5">
+                      <label className="text-slate-400 font-bold uppercase tracking-wider text-[10px]">
+                        {COLUMN_ALIASES[field] || field}
+                      </label>
+                      <input
+                        type="text"
+                        list={isCodeField ? "explorer-modal-codes-list" : undefined}
+                        value={editingDonorModal.fields[field] || ''}
+                        onChange={e => {
+                          const val = e.target.value;
+                          let updatedFields = {
+                            ...editingDonorModal.fields,
+                            [field]: val
+                          };
+                          // If user typed/selected a Code, auto-fill recognized fields
+                          if (isCodeField) {
+                            const codeKey = (val || '').trim().toLowerCase();
+                            if (codeMap[codeKey]) {
+                              const cInfo = codeMap[codeKey];
+                              if (cInfo.Heading && cInfo.Heading !== 'Unassigned') updatedFields['Heading'] = cInfo.Heading;
+                              if (cInfo['Sub-Heading'] && cInfo['Sub-Heading'] !== 'Unassigned') updatedFields['Sub-Heading'] = cInfo['Sub-Heading'];
+                              if (cInfo.Country && cInfo.Country !== 'Unassigned') updatedFields['Country'] = cInfo.Country;
+                              if (cInfo['Zakat Eligibility'] && cInfo['Zakat Eligibility'] !== 'Unassigned') updatedFields['Zakat Eligibility'] = cInfo['Zakat Eligibility'];
+                            }
+                          }
+                          setEditingDonorModal({
+                            ...editingDonorModal,
+                            fields: updatedFields
+                          });
+                        }}
+                        className={`bg-slate-950 border border-white/10 rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:border-cyan-400 transition-all ${
+                          isCodeField ? 'font-mono uppercase font-bold text-cyan-400 border-cyan-500/40' : ''
+                        }`}
+                      />
+                    </div>
+                  );
+                })}
               </div>
+
+              <datalist id="explorer-modal-codes-list">
+                {Object.keys(codeMap).map(k => (
+                  <option key={k} value={k.toUpperCase()} />
+                ))}
+              </datalist>
 
               <div className="flex items-center justify-end gap-3 pt-4 border-t border-white/10">
                 <button
@@ -754,12 +849,15 @@ export default function ExplorerView({ user, filters, onSelectDonor }) {
                         const isEditingThis = editingCell?.rowIdx === rowIdx && editingCell?.colName === c;
 
                         if (isEditingThis) {
+                          const rowCName = (row['Campaign Name'] || '').trim().toLowerCase();
+                          const rowVariants = (rowCName && campaignCodesLookup[rowCName]) || [];
                           return (
                             <td key={c} className="p-1">
                               <div className="flex items-center gap-1 inline-edit-input" onClick={e => e.stopPropagation()}>
                                 <input 
                                   autoFocus
                                   type="text" 
+                                  list={c === 'Code' ? `explorer-inline-codes-${rowIdx}` : undefined}
                                   value={editingCell.value} 
                                   onChange={e => setEditingCell({ ...editingCell, value: e.target.value })}
                                   onKeyDown={e => {
@@ -768,6 +866,16 @@ export default function ExplorerView({ user, filters, onSelectDonor }) {
                                   }}
                                   className="bg-slate-900 border border-cyan-400 rounded-lg px-2 py-1 text-xs text-white w-full focus:outline-none"
                                 />
+                                {c === 'Code' && (
+                                  <datalist id={`explorer-inline-codes-${rowIdx}`}>
+                                    {rowVariants.map(v => (
+                                      <option key={v.code} value={v.code}>{v.code} - {v.heading} ({v.country})</option>
+                                    ))}
+                                    {Object.keys(codeMap).map(k => (
+                                      <option key={k} value={k.toUpperCase()} />
+                                    ))}
+                                  </datalist>
+                                )}
                                 <button 
                                   onClick={() => handleInlineSave(row, c, editingCell.value)}
                                   className="p-1 rounded-lg bg-emerald-500 text-slate-950 hover:bg-emerald-400 transition-all font-bold text-xs cursor-pointer"
