@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Table, Search, Download, ChevronLeft, ChevronRight, Edit3, UserCheck, Eye, Columns, CheckSquare, Square, Save, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { Table, Search, Download, ChevronLeft, ChevronRight, Edit3, UserCheck, Eye, Columns, CheckSquare, Square, Save, ArrowUpDown, ArrowUp, ArrowDown, X, Check, AlertCircle } from 'lucide-react';
 import { API_BASE_URL } from '../config';
 
 export default function ExplorerView({ user, filters, onSelectDonor }) {
@@ -20,6 +20,11 @@ export default function ExplorerView({ user, filters, onSelectDonor }) {
   const [editingCell, setEditingCell] = useState(null); // { rowIdx, colName, value }
   const [cellMessage, setCellMessage] = useState('');
 
+  // Single Donor Record Modal Edit State
+  const [editingDonorModal, setEditingDonorModal] = useState(null); // { row, fields }
+  const [editModalSaving, setEditModalSaving] = useState(false);
+  const [editModalMsg, setEditModalMsg] = useState('');
+
   // Bulk edit form state
   const [showBulkEdit, setShowBulkEdit] = useState(false);
   const [bulkCol1, setBulkCol1] = useState('First Name');
@@ -32,6 +37,8 @@ export default function ExplorerView({ user, filters, onSelectDonor }) {
   const [bulkVal4, setBulkVal4] = useState('');
   const [bulkSaving, setBulkSaving] = useState(false);
   const [bulkMessage, setBulkMessage] = useState('');
+
+  const canEdit = user?.role === 'super_admin' || user?.can_edit_donors === 1;
 
   const loadDonors = () => {
     setLoading(true);
@@ -110,26 +117,72 @@ export default function ExplorerView({ user, filters, onSelectDonor }) {
   };
 
   const handleInlineSave = (row, colName, newVal) => {
-    if (user?.role !== 'super_admin') return;
+    if (!canEdit) return;
 
-    fetch(`${API_BASE_URL}/api/donors/bulk-edit`, {
+    fetch(`${API_BASE_URL}/api/donors/update-record`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        user_role: user?.role,
-        target_columns: [colName],
-        new_values: [newVal],
-        filter_search: row['Email'] || row['Display Name']
+        user_role: user?.role || 'admin',
+        can_edit_donors: canEdit,
+        row_id: row._row_id !== undefined && row._row_id !== null ? Number(row._row_id) : null,
+        donation_id: row['Donation ID'] || null,
+        column_name: colName,
+        new_value: String(newVal)
       })
     })
       .then(r => r.json())
       .then(res => {
         if (res?.status === 'success') {
-          setCellMessage('✅ Saved cell edit!');
+          setCellMessage(`✅ Saved ${colName}!`);
           setEditingCell(null);
           loadDonors();
-          setTimeout(() => setCellMessage(''), 2000);
+          setTimeout(() => setCellMessage(''), 2500);
+        } else {
+          setCellMessage(`❌ ${res?.detail || 'Save failed'}`);
+          setTimeout(() => setCellMessage(''), 3000);
         }
+      })
+      .catch(err => {
+        setCellMessage(`❌ Error: ${err.message}`);
+        setTimeout(() => setCellMessage(''), 3000);
+      });
+  };
+
+  const handleSaveDonorModal = (e) => {
+    e.preventDefault();
+    if (!editingDonorModal || !canEdit) return;
+    setEditModalSaving(true);
+    setEditModalMsg('');
+
+    fetch(`${API_BASE_URL}/api/donors/update-record`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        user_role: user?.role || 'admin',
+        can_edit_donors: canEdit,
+        row_id: editingDonorModal.row._row_id !== undefined && editingDonorModal.row._row_id !== null ? Number(editingDonorModal.row._row_id) : null,
+        donation_id: editingDonorModal.row['Donation ID'] || null,
+        updated_fields: editingDonorModal.fields
+      })
+    })
+      .then(r => r.json())
+      .then(res => {
+        setEditModalSaving(false);
+        if (res?.status === 'success') {
+          setEditModalMsg(`✅ Successfully updated donor record!`);
+          loadDonors();
+          setTimeout(() => {
+            setEditingDonorModal(null);
+            setEditModalMsg('');
+          }, 1000);
+        } else {
+          setEditModalMsg(`❌ ${res?.detail || 'Failed to update record.'}`);
+        }
+      })
+      .catch(err => {
+        setEditModalSaving(false);
+        setEditModalMsg(`❌ Error: ${err.message}`);
       });
   };
 
@@ -518,7 +571,99 @@ export default function ExplorerView({ user, filters, onSelectDonor }) {
             <option value={500}>500 rows</option>
           </select>
         </div>
+
+        {/* Cell Message Banner */}
+        {cellMessage && (
+          <div className="p-2.5 rounded-xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-300 text-xs font-bold flex items-center gap-2 animate-fade-in">
+            <Check className="w-4 h-4 text-cyan-400" />
+            <span>{cellMessage}</span>
+          </div>
+        )}
       </div>
+
+      {/* Single Donor Record Edit Modal */}
+      {editingDonorModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fade-in">
+          <div className="bg-slate-900 border border-white/15 rounded-3xl p-6 max-w-xl w-full shadow-2xl flex flex-col gap-5 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-white/10 pb-4">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                  <Edit3 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-white">
+                    Edit Donor Record
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    {editingDonorModal.row['Display Name'] || editingDonorModal.row['First Name'] || 'Donor Record'} {editingDonorModal.row['Donation ID'] ? `(#${editingDonorModal.row['Donation ID']})` : ''}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setEditingDonorModal(null)}
+                className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-all cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {editModalMsg && (
+              <div className={`p-3 rounded-xl text-xs font-bold flex items-center gap-2 ${editModalMsg.startsWith('✅') ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30' : 'bg-rose-500/15 text-rose-300 border border-rose-500/30'}`}>
+                {editModalMsg.startsWith('✅') ? <Check className="w-4 h-4 text-emerald-400" /> : <AlertCircle className="w-4 h-4 text-rose-400" />}
+                <span>{editModalMsg}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleSaveDonorModal} className="flex flex-col gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 text-xs">
+                {Object.keys(editingDonorModal.fields).map(field => (
+                  <div key={field} className="flex flex-col gap-1.5">
+                    <label className="text-slate-400 font-bold uppercase tracking-wider text-[10px]">
+                      {COLUMN_ALIASES[field] || field}
+                    </label>
+                    <input
+                      type="text"
+                      value={editingDonorModal.fields[field] || ''}
+                      onChange={e => setEditingDonorModal({
+                        ...editingDonorModal,
+                        fields: {
+                          ...editingDonorModal.fields,
+                          [field]: e.target.value
+                        }
+                      })}
+                      className="bg-slate-950 border border-white/10 rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:border-cyan-400 transition-all"
+                    />
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-white/10">
+                <button
+                  type="button"
+                  onClick={() => setEditingDonorModal(null)}
+                  className="px-4 py-2 rounded-xl text-xs font-bold text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 transition-all cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={editModalSaving}
+                  className="px-5 py-2 rounded-xl text-xs font-bold text-slate-950 bg-gradient-to-r from-emerald-400 to-teal-400 hover:from-emerald-300 hover:to-teal-300 shadow-md shadow-emerald-500/20 transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                >
+                  {editModalSaving ? (
+                    <span>Saving...</span>
+                  ) : (
+                    <>
+                      <Save className="w-3.5 h-3.5" />
+                      <span>Save Changes</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Sleek Pagination Bar */}
       <div className="glass-panel px-4 py-3 flex flex-wrap items-center justify-between gap-4 text-xs">
@@ -591,6 +736,9 @@ export default function ExplorerView({ user, filters, onSelectDonor }) {
                       </th>
                     );
                   })}
+                  <th className="whitespace-nowrap font-extrabold tracking-wider text-right pr-4">
+                    Actions
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5">
@@ -599,18 +747,7 @@ export default function ExplorerView({ user, filters, onSelectDonor }) {
                   return (
                     <tr 
                       key={rowIdx} 
-                      onClick={(e) => {
-                        if (
-                          e.target.tagName !== 'INPUT' && 
-                          e.target.tagName !== 'SELECT' && 
-                          e.target.tagName !== 'BUTTON' && 
-                          !e.target.closest('button') &&
-                          !e.target.closest('.inline-edit-input')
-                        ) {
-                          onSelectDonor(donorKey);
-                        }
-                      }}
-                      className="hover:bg-cyan-500/5 cursor-pointer transition-colors group"
+                      className="hover:bg-cyan-500/5 transition-colors group"
                     >
                       {selectedColumns.map(c => {
                         const val = row[c];
@@ -619,30 +756,62 @@ export default function ExplorerView({ user, filters, onSelectDonor }) {
                         if (isEditingThis) {
                           return (
                             <td key={c} className="p-1">
-                              <div className="flex items-center gap-1 inline-edit-input">
+                              <div className="flex items-center gap-1 inline-edit-input" onClick={e => e.stopPropagation()}>
                                 <input 
+                                  autoFocus
                                   type="text" 
                                   value={editingCell.value} 
                                   onChange={e => setEditingCell({ ...editingCell, value: e.target.value })}
-                                  className="bg-slate-900 border border-cyan-400 rounded px-2 py-1 text-xs text-white w-full"
+                                  onKeyDown={e => {
+                                    if (e.key === 'Enter') handleInlineSave(row, c, editingCell.value);
+                                    if (e.key === 'Escape') setEditingCell(null);
+                                  }}
+                                  className="bg-slate-900 border border-cyan-400 rounded-lg px-2 py-1 text-xs text-white w-full focus:outline-none"
                                 />
                                 <button 
                                   onClick={() => handleInlineSave(row, c, editingCell.value)}
-                                  className="p-1 rounded bg-cyan-500 text-slate-950 font-bold text-xs"
+                                  className="p-1 rounded-lg bg-emerald-500 text-slate-950 hover:bg-emerald-400 transition-all font-bold text-xs cursor-pointer"
+                                  title="Save (Enter)"
                                 >
-                                  <Save className="w-3.5 h-3.5" />
+                                  <Check className="w-3.5 h-3.5" />
+                                </button>
+                                <button 
+                                  onClick={() => setEditingCell(null)}
+                                  className="p-1 rounded-lg bg-slate-800 text-slate-400 hover:text-white transition-all text-xs cursor-pointer"
+                                  title="Cancel (Esc)"
+                                >
+                                  <X className="w-3.5 h-3.5" />
                                 </button>
                               </div>
                             </td>
                           );
                         }
 
-                        if (c === 'First Name') {
+                        if (c === 'First Name' || c === 'Display Name') {
                           const isSettled = String(row['Payout Settled'] || row['payout_settled'] || '').toLowerCase() === 'yes';
                           return (
-                            <td key={c} className="whitespace-nowrap font-medium">
+                            <td 
+                              key={c} 
+                              onDoubleClick={(e) => {
+                                e.stopPropagation();
+                                if (canEdit) setEditingCell({ rowIdx, colName: c, value: String(val || '') });
+                              }}
+                              title={canEdit ? "Double-click to edit name" : ""}
+                              className="whitespace-nowrap font-medium"
+                            >
                               <div className="flex items-center gap-2">
-                                <span>{val || ''}</span>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    onSelectDonor(donorKey);
+                                  }}
+                                  className="text-cyan-400 hover:text-cyan-300 font-bold hover:underline flex items-center gap-1.5 cursor-pointer text-left"
+                                  title="Click to view donor detail side view"
+                                >
+                                  <Eye className="w-3 h-3 opacity-60 group-hover:opacity-100" />
+                                  <span>{val || 'Unnamed Donor'}</span>
+                                </button>
                                 {isSettled && (
                                   <span className="text-[10px] px-2 py-0.5 rounded-full font-extrabold uppercase bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 shadow-sm" title="Donor transaction settled in payout bank transfer">
                                     Settled
@@ -654,21 +823,45 @@ export default function ExplorerView({ user, filters, onSelectDonor }) {
                         }
                         if (c === 'Total Online Donations Net Amount in Settled Currency' || typeof val === 'number') {
                           return (
-                            <td key={c} className="font-mono text-cyan-400 font-extrabold whitespace-nowrap">
+                            <td 
+                              key={c} 
+                              onDoubleClick={(e) => {
+                                e.stopPropagation();
+                                if (canEdit) setEditingCell({ rowIdx, colName: c, value: String(val ?? '') });
+                              }}
+                              title={canEdit ? "Double-click to edit amount" : ""}
+                              className="font-mono text-cyan-400 font-extrabold whitespace-nowrap"
+                            >
                               £{typeof val === 'number' ? val.toFixed(2) : parseFloat(val || 0).toFixed(2)}
                             </td>
                           );
                         }
                         if (c === 'Lifetime Donor Classification' || c === 'Transaction Donor Classification') {
                           return (
-                            <td key={c} className="whitespace-nowrap">
+                            <td 
+                              key={c} 
+                              onDoubleClick={(e) => {
+                                e.stopPropagation();
+                                if (canEdit) setEditingCell({ rowIdx, colName: c, value: String(val ?? '') });
+                              }}
+                              title={canEdit ? "Double-click to edit tier" : ""}
+                              className="whitespace-nowrap"
+                            >
                               <span className={`badge ${getTierBadgeClass(val)}`}>{val || 'Unassigned'}</span>
                             </td>
                           );
                         }
                         if (c === 'Created Date (UTC)') {
                           return (
-                            <td key={c} className="text-slate-400 text-xs font-mono whitespace-nowrap">
+                            <td 
+                              key={c} 
+                              onDoubleClick={(e) => {
+                                e.stopPropagation();
+                                if (canEdit) setEditingCell({ rowIdx, colName: c, value: String(val ?? '') });
+                              }}
+                              title={canEdit ? "Double-click to edit date" : ""}
+                              className="text-slate-400 text-xs font-mono whitespace-nowrap"
+                            >
                               {formatDate(val)}
                             </td>
                           );
@@ -676,14 +869,54 @@ export default function ExplorerView({ user, filters, onSelectDonor }) {
                         return (
                           <td 
                             key={c} 
-                            onDoubleClick={() => (user?.role === 'super_admin' || user?.can_edit_donors === 1) && setEditingCell({ rowIdx, colName: c, value: String(val || '') })}
-                            title={(user?.role === 'super_admin' || user?.can_edit_donors === 1) ? "Double click to edit inline" : ""}
-                            className="max-w-[240px] truncate text-slate-200"
+                            onDoubleClick={(e) => {
+                              e.stopPropagation();
+                              if (canEdit) setEditingCell({ rowIdx, colName: c, value: String(val ?? '') });
+                            }}
+                            title={canEdit ? "Double click to edit cell" : ""}
+                            className="max-w-[240px] truncate text-slate-200 cursor-text hover:bg-white/5 transition-colors"
                           >
                             {val !== undefined && val !== null ? String(val) : ''}
                           </td>
                         );
                       })}
+
+                      {/* Actions Column */}
+                      <td className="whitespace-nowrap text-right pr-4">
+                        <div className="flex items-center justify-end gap-1.5" onClick={e => e.stopPropagation()}>
+                          <button
+                            type="button"
+                            onClick={() => onSelectDonor(donorKey)}
+                            className="p-1.5 rounded-lg text-cyan-400 hover:bg-cyan-500/15 transition-all cursor-pointer"
+                            title="View Donor Profile Drawer"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                          </button>
+                          {canEdit && (
+                            <button
+                              type="button"
+                              onClick={() => setEditingDonorModal({
+                                row,
+                                fields: {
+                                  'First Name': row['First Name'] || '',
+                                  'Last Name': row['Last Name'] || '',
+                                  'Email': row['Email'] || '',
+                                  'Campaign Name': row['Campaign Name'] || '',
+                                  'Heading': row['Heading'] || '',
+                                  'Sub-Heading': row['Sub-Heading'] || '',
+                                  'Country': row['Country'] || '',
+                                  'Code': row['Code'] || '',
+                                  'Zakat Eligibility': row['Zakat Eligibility'] || ''
+                                }
+                              })}
+                              className="p-1.5 rounded-lg text-emerald-400 hover:bg-emerald-500/15 transition-all cursor-pointer"
+                              title="Edit Donor Record Details"
+                            >
+                              <Edit3 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      </td>
                     </tr>
                   );
                 })}
