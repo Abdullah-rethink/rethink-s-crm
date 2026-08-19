@@ -142,42 +142,12 @@ def _get_payout_data_from_db(force_reload: bool = False):
             _CLASSIFIED_PAYOUTS_CACHE = df
             return _CLASSIFIED_PAYOUTS_CACHE
 
-        # Fallback to donations cache if payout_settlements table is empty
-        df_don = load_data()
-        if not df_don.empty:
-            p_mask = df_don.get("Platform", pd.Series("", index=df_don.index)).astype(str).str.lower().str.contains("payout") | df_don.get("Transfer ID", pd.Series(None, index=df_don.index)).notna()
-            df_sub = df_don[p_mask]
-            if not df_sub.empty:
-                df = df_sub.copy()
-                c_name = df.get("Campaign Name", pd.Series("Unassigned Campaign", index=df.index)).fillna("Unassigned Campaign")
-                df["campaign_name"] = c_name
-                df["Campaign Name"] = c_name
-                df["row_type"] = df.get("Type", df.get("Transaction Type", pd.Series("donation", index=df.index))).fillna("donation").astype(str).str.lower()
-                df["gross_amt"] = pd.to_numeric(df.get("Total Online Donation Gross Amount in Settled Currency", 0.0), errors="coerce").fillna(0.0)
-                df["fee_amt"] = pd.to_numeric(df.get("Total Processing Fees Paid by CC In Settled Currency", 0.0), errors="coerce").fillna(0.0)
-                df["net_amt"] = pd.to_numeric(df.get("Total Online Donations Net Amount in Settled Currency", 0.0), errors="coerce").fillna(0.0)
-                
-                t_ids = df.get("Transfer ID", pd.Series("N/A", index=df.index)).fillna("N/A").astype(str).str.replace(".0", "", regex=False).str.strip()
-                df["transfer_id"] = t_ids
-                df["Transfer ID"] = t_ids
-
-                valid_payout_mask = ~df["transfer_id"].str.lower().isin(["n/a", "nan", "none", ""]) & (df["campaign_name"] != "Unassigned Campaign")
-                df = df[valid_payout_mask].copy()
-
-                df["heading"] = df.get("Heading", pd.Series("Unassigned", index=df.index)).fillna("Unassigned").astype(str)
-                df["sub_heading"] = df.get("Sub-Heading", pd.Series("Unassigned", index=df.index)).fillna("Unassigned").astype(str)
-                df["country"] = df.get("Country", pd.Series("Unassigned", index=df.index)).fillna("Unassigned").astype(str)
-                df["code"] = df.get("Code", pd.Series("Unassigned", index=df.index)).fillna("Unassigned").astype(str)
-                df["zakat"] = df.get("Zakat Eligibility", pd.Series("Unassigned", index=df.index)).fillna("Unassigned").astype(str)
-                df["settlement_currency"] = df.get("Settlement Currency", pd.Series("GBP", index=df.index)).fillna("GBP").astype(str).str.strip().str.upper()
-                df["Settlement Currency"] = df["settlement_currency"]
-                _CLASSIFIED_PAYOUTS_CACHE = df
-                return _CLASSIFIED_PAYOUTS_CACHE
-
-        return pd.DataFrame()
+        _CLASSIFIED_PAYOUTS_CACHE = pd.DataFrame()
+        return _CLASSIFIED_PAYOUTS_CACHE
     except Exception as e:
         print(f"[Error] Reading cached payout data: {e}")
-        return pd.DataFrame()
+        _CLASSIFIED_PAYOUTS_CACHE = pd.DataFrame()
+        return _CLASSIFIED_PAYOUTS_CACHE
 
 
 def _generate_disbursement_summary(df_curr: pd.DataFrame, currency_name: str) -> Dict[str, Any]:
@@ -488,19 +458,19 @@ def get_campaign_payout_breakdown(
 
         search_val = str(search).strip().lower() if isinstance(search, str) else ""
 
-        # 1. Vectorized Aggregation per Campaign & Row Type
-        camp_agg = df.groupby(["campaign_name", "row_type"]).agg(
+        # 1. Vectorized Aggregation per (Campaign Name, Code) & Row Type
+        camp_agg = df.groupby(["campaign_name", "code", "row_type"]).agg(
             gross=("gross_amt", "sum"),
             fee=("fee_amt", "sum"),
             net=("net_amt", "sum"),
             count=("gross_amt", "count")
         ).reset_index()
 
-        meta = df.groupby("campaign_name").first()[["heading", "sub_heading", "country", "code", "zakat"]].to_dict('index')
+        meta = df.groupby(["campaign_name", "code"]).first()[["heading", "sub_heading", "country", "zakat"]].to_dict('index')
 
         campaign_records = []
-        for cname, g in camp_agg.groupby("campaign_name"):
-            c_meta = meta.get(cname, {})
+        for (cname, ccode), g in camp_agg.groupby(["campaign_name", "code"]):
+            c_meta = meta.get((cname, ccode), {})
             row_dict = {r["row_type"]: r for _, r in g.iterrows()}
             
             don = row_dict.get("donation", {})
@@ -538,7 +508,7 @@ def get_campaign_payout_breakdown(
                 "heading": str(c_meta.get("heading", "Unassigned")),
                 "sub_heading": str(c_meta.get("sub_heading", "Unassigned")),
                 "country": str(c_meta.get("country", "Unassigned")),
-                "code": str(c_meta.get("code", "Unassigned")),
+                "code": str(ccode),
                 "zakat": str(c_meta.get("zakat", "Unassigned")),
                 "donations_count": don_cnt if don_cnt > 0 else (ref_cnt if ref_cnt > 0 else 0)
             })

@@ -82,12 +82,127 @@ class DeleteRuleRequest(BaseModel):
     user_role: str
     platform: str
     campaign_name: str
+    code: Optional[str] = None
     community_name: Optional[str] = None
 
 
 class ClearPlatformRequest(BaseModel):
     user_role: str
     platform: str
+
+
+def _enrich_rules_metadata(df: pd.DataFrame) -> pd.DataFrame:
+    """Enriches rules DataFrame with variants_count, status ('single_code' | 'multi_code' | 'unassigned'), and is_primary boolean flag."""
+    if df.empty:
+        return df
+
+    # Normalize column is_primary
+    if "is_primary" not in df.columns:
+        df["is_primary"] = 0
+
+    # Count distinct valid codes per campaign name
+    c_series = df["Campaign Name"].astype(str).str.strip().str.lower()
+    code_series = df["Code"].astype(str).str.strip().str.upper()
+
+    camp_code_map = {}
+    for c_name, c_code in zip(c_series, code_series):
+        if c_name not in ["nan", "none", "n/a", ""]:
+            if c_name not in camp_code_map:
+                camp_code_map[c_name] = set()
+            if c_code not in ["UNASSIGNED", "N/A", "NONE", "NAN", ""]:
+                camp_code_map[c_name].add(c_code)
+
+    variants_counts = []
+    statuses = []
+    is_primary_flags = []
+    seen_camps_primary = set()
+
+    for idx, row in df.iterrows():
+        c_name = str(row.get("Campaign Name") or "").strip().lower()
+        c_code = str(row.get("Code") or "").strip().upper()
+        h_val = str(row.get("Heading") or "").strip().lower()
+
+        distinct_codes = camp_code_map.get(c_name, set())
+        v_count = len(distinct_codes)
+        variants_counts.append(v_count)
+
+        if h_val in ["unassigned", "nan", "none", ""] or c_code in ["UNASSIGNED", "N/A", "NONE", "NAN", ""]:
+            statuses.append("unassigned")
+        elif v_count > 1:
+            statuses.append("multi_code")
+        else:
+            statuses.append("single_code")
+
+        # Determine is_primary flag
+        raw_prim = row.get("is_primary")
+        is_prim = bool(raw_prim in [1, True, "1", "true", "True"])
+        if is_prim:
+            is_primary_flags.append(True)
+            seen_camps_primary.add(c_name)
+        elif c_name not in seen_camps_primary and c_code not in ["UNASSIGNED", "N/A", "NONE", "NAN", ""]:
+            is_primary_flags.append(True)
+            seen_camps_primary.add(c_name)
+        else:
+            is_primary_flags.append(False)
+
+    df["variants_count"] = variants_counts
+    df["status"] = statuses
+    df["is_primary"] = is_primary_flags
+    return df
+
+
+@router.get("/campaign-codes")
+def get_campaign_codes_lookup(platform: str = "all"):
+    """
+    Returns a fast lookup mapping every Campaign Name to its list of valid code variant objects:
+    { "ashbal orphanage": [ { "code": "GAZ-SPN-ORP", "heading": "Orphans", "sub_heading": "Gaza Orphan Sponsorship", "country": "Palestine", "zakat_eligibility": "Zakat", "is_primary": true } ] }
+    """
+    conn = sqlite3.connect(LOCAL_DB_PATH, timeout=10.0)
+    tables = ["campaign_classifications", "givebright_classifications", "paysuite_classifications", "rethink_website_classifications"]
+    if platform.lower() == "launchgood":
+        tables = ["campaign_classifications"]
+    elif platform.lower() == "givebright":
+        tables = ["givebright_classifications"]
+    elif platform.lower() == "paysuite":
+        tables = ["paysuite_classifications"]
+    elif platform.lower() in ["website", "rethink_website"]:
+        tables = ["rethink_website_classifications"]
+
+    lookup = {}
+    try:
+        for tbl in tables:
+            try:
+                df = pd.read_sql_query(f"SELECT * FROM {tbl}", conn)
+                for _, r in df.iterrows():
+                    c_name = sanitize_text(r.get("campaign_name", ""))
+                    c_code = sanitize_text(r.get("code", "Unassigned"))
+                    if not c_name or c_name.lower() in ["unassigned", "n/a", "none", "nan", ""]:
+                        continue
+                    if not c_code or c_code.lower() in ["unassigned", "n/a", "none", "nan", ""]:
+                        continue
+                    
+                    c_key = c_name.strip().lower()
+                    if c_key not in lookup:
+                        lookup[c_key] = []
+                    
+                    is_prim = bool(r.get("is_primary") in [1, True, "1", "true", "True"])
+                    
+                    if not any(item["code"].upper() == c_code.upper() for item in lookup[c_key]):
+                        lookup[c_key].append({
+                            "campaign_name": c_name,
+                            "code": c_code.upper(),
+                            "heading": sanitize_text(r.get("heading", "Unassigned")),
+                            "sub_heading": sanitize_text(r.get("sub_heading", "Unassigned")),
+                            "country": sanitize_text(r.get("country", "Unassigned")),
+                            "zakat_eligibility": sanitize_text(r.get("zakat_eligibility", "Unassigned")),
+                            "is_primary": is_prim
+                        })
+            except Exception:
+                pass
+    finally:
+        conn.close()
+
+    return lookup
 
 
 @router.get("/code-map")
@@ -107,19 +222,20 @@ def get_code_map():
 
 @router.get("/launchgood")
 def get_launchgood_matrix():
-    """Returns LaunchGood classification matrix rules in < 80ms."""
+    """Returns LaunchGood classification matrix rules with (Campaign Name, Code) granularity."""
     try:
         conn = sqlite3.connect(LOCAL_DB_PATH, timeout=10.0)
         df = pd.read_sql_query("""
             SELECT 
                 campaign_name as "Campaign Name",
+                COALESCE(code, 'Unassigned') as "Code",
                 COALESCE(campaign_url, '') as "Campaign URL",
                 COALESCE(community_name, 'N/A') as "Community Name",
                 COALESCE(heading, 'Unassigned') as "Heading",
                 COALESCE(sub_heading, 'Unassigned') as "Sub-Heading",
                 COALESCE(country, 'Unassigned') as "Country",
-                COALESCE(code, 'Unassigned') as "Code",
-                COALESCE(zakat_eligibility, 'Unassigned') as "Zakat Eligibility"
+                COALESCE(zakat_eligibility, 'Unassigned') as "Zakat Eligibility",
+                COALESCE(is_primary, 0) as "is_primary"
             FROM campaign_classifications
         """, conn)
         conn.close()
@@ -127,9 +243,9 @@ def get_launchgood_matrix():
         print(f"[LaunchGood Matrix Query Notice]: {e}")
         df = get_classification_matrix().fillna("Unassigned")
 
-
     df = sanitize_matrix_df(df)
-    unassigned_count = (df["Heading"] == "Unassigned").sum() if "Heading" in df.columns else 0
+    df = _enrich_rules_metadata(df)
+    unassigned_count = (df["status"] == "unassigned").sum() if "status" in df.columns else 0
     return {
         "platform": "LaunchGood",
         "total_campaigns": len(df),
@@ -141,18 +257,19 @@ def get_launchgood_matrix():
 
 @router.get("/givebright")
 def get_givebright_matrix():
-    """Returns GiveBright classification matrix rules in < 20ms."""
+    """Returns GiveBright classification matrix rules with (Campaign Name, Code) granularity."""
     try:
         conn = sqlite3.connect(LOCAL_DB_PATH, timeout=10.0)
         df = pd.read_sql_query("""
             SELECT 
                 campaign_name as "Campaign Name",
+                COALESCE(code, 'Unassigned') as "Code",
                 COALESCE(campaign_url, '') as "Campaign URL",
                 COALESCE(heading, 'Unassigned') as "Heading",
                 COALESCE(sub_heading, 'Unassigned') as "Sub-Heading",
                 COALESCE(country, 'Unassigned') as "Country",
-                COALESCE(code, 'Unassigned') as "Code",
-                COALESCE(zakat_eligibility, 'Unassigned') as "Zakat Eligibility"
+                COALESCE(zakat_eligibility, 'Unassigned') as "Zakat Eligibility",
+                COALESCE(is_primary, 0) as "is_primary"
             FROM givebright_classifications
         """, conn)
         conn.close()
@@ -174,7 +291,8 @@ def get_givebright_matrix():
                     df.loc[fill_mask, tc] = mapped_vals[fill_mask]
 
     df = sanitize_matrix_df(df)
-    unassigned_count = (df["Heading"] == "Unassigned").sum() if "Heading" in df.columns else 0
+    df = _enrich_rules_metadata(df)
+    unassigned_count = (df["status"] == "unassigned").sum() if "status" in df.columns else 0
     return {
         "platform": "GiveBright",
         "total_campaigns": len(df),
@@ -186,20 +304,21 @@ def get_givebright_matrix():
 
 @router.get("/paysuite")
 def get_paysuite_matrix():
-    """Returns Paysuite classification matrix rules in < 80ms."""
+    """Returns Paysuite classification matrix rules with (Campaign Name, Code) granularity."""
     try:
         conn = sqlite3.connect(LOCAL_DB_PATH, timeout=10.0)
         df = pd.read_sql_query("""
             SELECT 
                 campaign_name as "Campaign Name",
+                COALESCE(code, 'Unassigned') as "Code",
                 COALESCE(community_name, 'N/A') as "Community Name",
                 COALESCE(heading, 'Unassigned') as "Heading",
                 COALESCE(sub_heading, 'Unassigned') as "Sub-Heading",
                 COALESCE(country, 'Unassigned') as "Country",
-                COALESCE(code, 'Unassigned') as "Code",
                 COALESCE(zakat_eligibility, 'Unassigned') as "Zakat Eligibility",
                 COALESCE(donor_name, '') as "Donor Name",
-                COALESCE(donor_email, '') as "Donor Email"
+                COALESCE(donor_email, '') as "Donor Email",
+                COALESCE(is_primary, 0) as "is_primary"
             FROM paysuite_classifications
         """, conn)
         conn.close()
@@ -208,7 +327,8 @@ def get_paysuite_matrix():
         df = get_paysuite_classification_matrix().fillna("Unassigned")
 
     df = sanitize_matrix_df(df)
-    unassigned_count = (df["Heading"] == "Unassigned").sum() if "Heading" in df.columns else 0
+    df = _enrich_rules_metadata(df)
+    unassigned_count = (df["status"] == "unassigned").sum() if "status" in df.columns else 0
     return {
         "platform": "Paysuite",
         "total_campaigns": len(df),
@@ -221,18 +341,19 @@ def get_paysuite_matrix():
 
 @router.get("/website")
 def get_rethink_website_matrix():
-    """Returns Rethink Website classification matrix rules in < 80ms."""
+    """Returns Rethink Website classification matrix rules with (Campaign Name, Code) granularity."""
     try:
         conn = sqlite3.connect(LOCAL_DB_PATH, timeout=10.0)
         df = pd.read_sql_query("""
             SELECT 
                 campaign_name as "Campaign Name",
+                COALESCE(code, 'Unassigned') as "Code",
                 COALESCE(community_name, 'N/A') as "Community Name",
                 COALESCE(heading, 'Unassigned') as "Heading",
                 COALESCE(sub_heading, 'Unassigned') as "Sub-Heading",
                 COALESCE(country, 'Unassigned') as "Country",
-                COALESCE(code, 'Unassigned') as "Code",
-                COALESCE(zakat_eligibility, 'Unassigned') as "Zakat Eligibility"
+                COALESCE(zakat_eligibility, 'Unassigned') as "Zakat Eligibility",
+                COALESCE(is_primary, 0) as "is_primary"
             FROM rethink_website_classifications
         """, conn)
         conn.close()
@@ -241,7 +362,8 @@ def get_rethink_website_matrix():
         df = get_rethink_website_classification_matrix().fillna("Unassigned")
 
     df = sanitize_matrix_df(df)
-    unassigned_count = (df["Heading"] == "Unassigned").sum() if "Heading" in df.columns else 0
+    df = _enrich_rules_metadata(df)
+    unassigned_count = (df["status"] == "unassigned").sum() if "status" in df.columns else 0
     return {
         "platform": "Rethink Website",
         "total_campaigns": len(df),
@@ -323,48 +445,79 @@ def save_matrix_rules(payload: SaveRulesRequest):
             detail="Modifying campaign classification matrix rules is restricted to Super Admin accounts."
         )
 
+    # 1. Collect non-unassigned classification metadata for every Code from submitted payload and existing map
+    code_map = get_code_to_classification_map(force_reload=True).copy()
+    
+    for r in payload.rules:
+        code_str = str(r.get("Code") or r.get("code") or "").strip().lower()
+        if code_str and code_str not in ["unassigned", "nan", "none", "n/a", ""]:
+            h = sanitize_text(r.get("Heading") or r.get("heading", "Unassigned"))
+            sh = sanitize_text(r.get("Sub-Heading") or r.get("sub_heading", "Unassigned"))
+            c = sanitize_text(r.get("Country") or r.get("country", "Unassigned"))
+            z = sanitize_text(r.get("Zakat Eligibility") or r.get("zakat_eligibility", "Unassigned"))
+
+            if any(v != "Unassigned" for v in [h, sh, c, z]):
+                if code_str not in code_map:
+                    code_map[code_str] = {"Heading": "Unassigned", "Sub-Heading": "Unassigned", "Country": "Unassigned", "Zakat Eligibility": "Unassigned"}
+                if h != "Unassigned": code_map[code_str]["Heading"] = h
+                if sh != "Unassigned": code_map[code_str]["Sub-Heading"] = sh
+                if c != "Unassigned": code_map[code_str]["Country"] = c
+                if z != "Unassigned": code_map[code_str]["Zakat Eligibility"] = z
+
+    # 2. Build DataFrame and auto-fill any row that has a recognized Code
     rules_dict = []
     for r in payload.rules:
+        code_raw = sanitize_text(r.get("Code") or r.get("code", "Unassigned"))
+        code_lower = code_raw.strip().lower()
+        
+        h = sanitize_text(r.get("Heading") or r.get("heading", "Unassigned"))
+        sh = sanitize_text(r.get("Sub-Heading") or r.get("sub_heading", "Unassigned"))
+        c = sanitize_text(r.get("Country") or r.get("country", "Unassigned"))
+        z = sanitize_text(r.get("Zakat Eligibility") or r.get("zakat_eligibility", "Unassigned"))
+
+        if code_lower in code_map:
+            c_info = code_map[code_lower]
+            if h == "Unassigned" and c_info.get("Heading") != "Unassigned": h = c_info["Heading"]
+            if sh == "Unassigned" and c_info.get("Sub-Heading") != "Unassigned": sh = c_info["Sub-Heading"]
+            if c == "Unassigned" and c_info.get("Country") != "Unassigned": c = c_info["Country"]
+            if z == "Unassigned" and c_info.get("Zakat Eligibility") != "Unassigned": z = c_info["Zakat Eligibility"]
+
         rules_dict.append({
             "Campaign Name": sanitize_text(r.get("Campaign Name") or r.get("campaign_name", "N/A")),
             "Campaign URL": sanitize_text(r.get("Campaign URL") or r.get("campaign_url", "")),
             "Community Name": sanitize_text(r.get("Community Name") or r.get("community_name", "Unassigned")),
-            "Heading": sanitize_text(r.get("Heading") or r.get("heading", "Unassigned")),
-            "Sub-Heading": sanitize_text(r.get("Sub-Heading") or r.get("sub_heading", "Unassigned")),
-            "Country": sanitize_text(r.get("Country") or r.get("country", "Unassigned")),
-            "Code": sanitize_text(r.get("Code") or r.get("code", "N/A")),
-            "Zakat Eligibility": sanitize_text(r.get("Zakat Eligibility") or r.get("zakat_eligibility", "Unassigned"))
+            "Heading": h,
+            "Sub-Heading": sh,
+            "Country": c,
+            "Code": code_raw,
+            "Zakat Eligibility": z,
+            "is_primary": 1 if r.get("is_primary") in [1, True, "1", "true", "True"] else 0
         })
     matrix_df = pd.DataFrame(rules_dict)
 
     if payload.platform.lower() == "givebright":
-        # Strict mapping: Code -> Heading, Sub-Heading, Country, Zakat
-        code_map = get_code_to_classification_map()
-        for idx, row in matrix_df.iterrows():
-            code = str(row.get("Code") or "").strip().lower()
-            if code and code not in ["unassigned", "nan", "none", "n/a", ""]:
-                if code in code_map:
-                    c_info = code_map[code]
-                    for tc in ["Heading", "Sub-Heading", "Country", "Zakat Eligibility"]:
-                        matrix_df.at[idx, tc] = sanitize_text(c_info[tc])
-        
-        matrix_df = matrix_df.drop_duplicates(subset=["Campaign Name"], keep="last")
+        matrix_df = matrix_df.drop_duplicates(subset=["Campaign Name", "Code"], keep="last")
         n_saved = save_givebright_classification_matrix(matrix_df)
     elif payload.platform.lower() == "paysuite":
+        matrix_df = matrix_df.drop_duplicates(subset=["Campaign Name", "Code"], keep="last")
         n_saved = save_paysuite_classification_matrix(matrix_df)
         sync_matrix_classifications_to_donors(matrix_df)
     elif payload.platform.lower() in ["website", "rethink_website", "rethink website"]:
+        matrix_df = matrix_df.drop_duplicates(subset=["Campaign Name", "Code"], keep="last")
         n_saved = save_rethink_website_classification_matrix(matrix_df)
         sync_matrix_classifications_to_donors(matrix_df)
     else:
+        matrix_df = matrix_df.drop_duplicates(subset=["Campaign Name", "Code"], keep="last")
         n_saved = save_classification_matrix(matrix_df)
         sync_matrix_classifications_to_donors(matrix_df)
 
+    # Reload central code dictionary after save
+    get_code_to_classification_map(force_reload=True)
     invalidate_payouts_cache()
 
     return {
         "status": "success",
-        "message": f"Successfully saved {n_saved:,} {payload.platform} classification rules and updated matching donor records!"
+        "message": f"Successfully saved {n_saved:,} {payload.platform} classification rules and updated matching records in real time!"
     }
 
 
@@ -378,21 +531,21 @@ def delete_single_rule(payload: DeleteRuleRequest):
         )
 
     cname = sanitize_text(payload.campaign_name.strip())
+    code = sanitize_text(payload.code.strip()) if payload.code else None
     platform = payload.platform.lower()
 
     conn = sqlite3.connect(LOCAL_DB_PATH, timeout=30.0)
     try:
-        if platform == "givebright":
-            conn.execute("DELETE FROM givebright_classifications WHERE campaign_name = ?", (cname,))
-        elif platform == "paysuite":
-            conn.execute("DELETE FROM paysuite_classifications WHERE campaign_name = ?", (cname,))
-        elif platform in ["website", "rethink_website", "rethink website"]:
-            conn.execute("DELETE FROM rethink_website_classifications WHERE campaign_name = ?", (cname,))
+        tbl = (
+            "givebright_classifications" if platform == "givebright" else
+            "paysuite_classifications" if platform == "paysuite" else
+            "rethink_website_classifications" if platform in ["website", "rethink_website", "rethink website"] else
+            "campaign_classifications"
+        )
+        if code:
+            conn.execute(f"DELETE FROM {tbl} WHERE campaign_name = ? AND code = ?", (cname, code))
         else:
-            if payload.community_name:
-                conn.execute("DELETE FROM campaign_classifications WHERE campaign_name = ? AND community_name = ?", (cname, sanitize_text(payload.community_name)))
-            else:
-                conn.execute("DELETE FROM campaign_classifications WHERE campaign_name = ?", (cname,))
+            conn.execute(f"DELETE FROM {tbl} WHERE campaign_name = ?", (cname,))
         conn.commit()
     finally:
         conn.close()
@@ -403,6 +556,8 @@ def delete_single_rule(payload: DeleteRuleRequest):
             df = pd.read_parquet(PARQUET_PATH)
             if not df.empty and "Campaign Name" in df.columns:
                 mask = df["Campaign Name"].astype(str).str.strip().str.lower() == cname.lower()
+                if code and "Code" in df.columns:
+                    mask = mask & (df["Code"].astype(str).str.strip().str.lower() == code.lower())
                 if payload.community_name and "Community Name" in df.columns:
                     mask = mask & (df["Community Name"].astype(str).str.strip().str.lower() == payload.community_name.strip().lower())
                 
@@ -421,7 +576,7 @@ def delete_single_rule(payload: DeleteRuleRequest):
 
     return {
         "status": "success",
-        "message": f"Successfully deleted rule for '{cname}'!"
+        "message": f"Successfully deleted rule for '{cname}' ({code or 'all codes'})"
     }
 
 
