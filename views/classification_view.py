@@ -89,12 +89,17 @@ def save_givebright_classification_matrix(matrix_df):
 
     conn = sqlite3.connect(LOCAL_DB_PATH, timeout=30.0)
     for _, row in matrix_df.iterrows():
-        cname = str(row.get("Campaign Name", "Unassigned")).strip()
+        cname = str(row.get("Campaign Name", "Unassigned")).strip().replace("’", "'").replace("‘", "'")
         code = str(row.get("Code", "Unassigned")).strip()
         curl = str(row.get("Campaign URL") or row.get("campaign_url") or "")
-        if not cname or cname.lower() in ["nan", "none", "n/a", ""]:
+        if not cname or cname.lower() in ["nan", "none", "n/a", "", "campaign_name", "campaign name"]:
             continue
-        conn.execute("DELETE FROM givebright_classifications WHERE campaign_name = ? AND code = ?", (cname, code))
+
+        # If assigning a valid code, delete any leftover Unassigned row for this campaign
+        if code.lower() not in ["unassigned", "nan", "none", "n/a", ""]:
+            conn.execute("DELETE FROM givebright_classifications WHERE LOWER(campaign_name) = ? AND LOWER(code) IN ('unassigned', 'nan', 'none', 'n/a', '')", (cname.lower(),))
+
+        conn.execute("DELETE FROM givebright_classifications WHERE LOWER(campaign_name) = ? AND LOWER(code) = ?", (cname.lower(), code.lower()))
         conn.execute("""
             INSERT INTO givebright_classifications (campaign_name, code, campaign_url, heading, sub_heading, country, zakat_eligibility, is_primary)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)

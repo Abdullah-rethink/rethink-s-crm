@@ -148,7 +148,14 @@ export default function ExplorerView({ user, filters, onSelectDonor }) {
         new_value: String(newVal)
       })
     })
-      .then(r => r.json())
+      .then(async r => {
+        const text = await r.text();
+        try {
+          return JSON.parse(text);
+        } catch {
+          return { status: 'error', detail: text || `HTTP ${r.status}` };
+        }
+      })
       .then(res => {
         if (res?.status === 'success') {
           setCellMessage(`✅ Saved ${colName}!`);
@@ -183,7 +190,14 @@ export default function ExplorerView({ user, filters, onSelectDonor }) {
         updated_fields: editingDonorModal.fields
       })
     })
-      .then(r => r.json())
+      .then(async r => {
+        const text = await r.text();
+        try {
+          return JSON.parse(text);
+        } catch {
+          return { status: 'error', detail: text || `HTTP ${r.status}` };
+        }
+      })
       .then(res => {
         setEditModalSaving(false);
         if (res?.status === 'success') {

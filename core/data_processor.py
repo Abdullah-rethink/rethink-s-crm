@@ -725,7 +725,7 @@ def sync_donors_to_classification_matrix(df_raw=None):
 
                 cursor.execute("""
                     INSERT INTO rethink_website_classifications (campaign_name, code, community_name, heading, sub_heading, country, zakat_eligibility)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
                     ON CONFLICT(campaign_name, code) DO UPDATE SET
                         community_name = excluded.community_name,
                         heading = CASE WHEN excluded.heading != 'Unassigned' THEN excluded.heading ELSE rethink_website_classifications.heading END,
@@ -856,11 +856,16 @@ def save_classification_matrix(matrix_df):
 
     conn = sqlite3.connect(LOCAL_DB_PATH, timeout=30.0)
     for _, row in clean_matrix.iterrows():
-        cname = str(row.get("Campaign Name", "Unassigned")).strip()
+        cname = str(row.get("Campaign Name", "Unassigned")).strip().replace("’", "'").replace("‘", "'")
         code = str(row.get("Code", "Unassigned")).strip()
-        if not cname or cname.lower() in ["nan", "none", "n/a", ""]:
+        if not cname or cname.lower() in ["nan", "none", "n/a", "", "campaign_name", "campaign name"]:
             continue
-        conn.execute("DELETE FROM campaign_classifications WHERE campaign_name = ? AND code = ?", (cname, code))
+
+        # If a valid code is assigned, remove any obsolete unassigned rule for this campaign
+        if code.lower() not in ["unassigned", "nan", "none", "n/a", ""]:
+            conn.execute("DELETE FROM campaign_classifications WHERE LOWER(campaign_name) = ? AND LOWER(code) IN ('unassigned', 'nan', 'none', 'n/a', '')", (cname.lower(),))
+
+        conn.execute("DELETE FROM campaign_classifications WHERE LOWER(campaign_name) = ? AND LOWER(code) = ?", (cname.lower(), code.lower()))
         conn.execute("""
             INSERT INTO campaign_classifications (campaign_name, code, community_name, campaign_url, heading, sub_heading, country, zakat_eligibility, is_primary)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -957,11 +962,16 @@ def save_paysuite_classification_matrix(matrix_df):
         return 0
     conn = sqlite3.connect(LOCAL_DB_PATH, timeout=30.0)
     for _, row in matrix_df.iterrows():
-        cname = str(row.get("Campaign Name", "Unassigned")).strip()
+        cname = str(row.get("Campaign Name", "Unassigned")).strip().replace("’", "'").replace("‘", "'")
         code = str(row.get("Code", "Unassigned")).strip()
-        if not cname or cname.lower() in ["nan", "none", "n/a", ""]:
+        if not cname or cname.lower() in ["nan", "none", "n/a", "", "campaign_name", "campaign name"]:
             continue
-        conn.execute("DELETE FROM paysuite_classifications WHERE campaign_name = ? AND code = ?", (cname, code))
+
+        # If a valid code is assigned, remove any obsolete unassigned rule for this campaign
+        if code.lower() not in ["unassigned", "nan", "none", "n/a", ""]:
+            conn.execute("DELETE FROM paysuite_classifications WHERE LOWER(campaign_name) = ? AND LOWER(code) IN ('unassigned', 'nan', 'none', 'n/a', '')", (cname.lower(),))
+
+        conn.execute("DELETE FROM paysuite_classifications WHERE LOWER(campaign_name) = ? AND LOWER(code) = ?", (cname.lower(), code.lower()))
         conn.execute("""
             INSERT INTO paysuite_classifications (campaign_name, code, community_name, heading, sub_heading, country, zakat_eligibility, donor_name, donor_email, is_primary)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -1045,11 +1055,16 @@ def save_rethink_website_classification_matrix(matrix_df):
         return 0
     conn = sqlite3.connect(LOCAL_DB_PATH, timeout=30.0)
     for _, row in matrix_df.iterrows():
-        cname = str(row.get("Campaign Name", "Unassigned")).strip()
+        cname = str(row.get("Campaign Name", "Unassigned")).strip().replace("’", "'").replace("‘", "'")
         code = str(row.get("Code", "Unassigned")).strip()
-        if not cname or cname.lower() in ["nan", "none", "n/a", ""]:
+        if not cname or cname.lower() in ["nan", "none", "n/a", "", "campaign_name", "campaign name"]:
             continue
-        conn.execute("DELETE FROM rethink_website_classifications WHERE campaign_name = ? AND code = ?", (cname, code))
+
+        # If a valid code is assigned, remove any obsolete unassigned rule for this campaign
+        if code.lower() not in ["unassigned", "nan", "none", "n/a", ""]:
+            conn.execute("DELETE FROM rethink_website_classifications WHERE LOWER(campaign_name) = ? AND LOWER(code) IN ('unassigned', 'nan', 'none', 'n/a', '')", (cname.lower(),))
+
+        conn.execute("DELETE FROM rethink_website_classifications WHERE LOWER(campaign_name) = ? AND LOWER(code) = ?", (cname.lower(), code.lower()))
         conn.execute("""
             INSERT INTO rethink_website_classifications (campaign_name, code, community_name, heading, sub_heading, country, zakat_eligibility, is_primary)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
