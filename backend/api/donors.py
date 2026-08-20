@@ -137,6 +137,14 @@ def update_single_donor_record(payload: UpdateSingleDonorRequest):
         invalidate_data_cache()
         sync_donors_to_classification_matrix(df_raw)
 
+    try:
+        from backend.api.expenses import clear_expenses_cache
+        clear_expenses_cache()
+        from backend.api.events import broadcast_event_sync
+        broadcast_event_sync("DONORS_UPDATED", {"source": "single_edit", "column": payload.column_name})
+    except Exception:
+        pass
+
     return {
         "status": "success",
         "message": f"Successfully updated record #{target_idx}."
@@ -207,6 +215,14 @@ def bulk_edit_donors(payload: BulkEditDonorsRequest):
 
         from core.database import sync_to_cloud_async
         sync_to_cloud_async(df_raw, mode="replace")
+
+    try:
+        from backend.api.expenses import clear_expenses_cache
+        clear_expenses_cache()
+        from backend.api.events import broadcast_event_sync
+        broadcast_event_sync("DONORS_UPDATED", {"source": "bulk_edit", "columns": payload.target_columns})
+    except Exception:
+        pass
 
     return {
         "status": "success",

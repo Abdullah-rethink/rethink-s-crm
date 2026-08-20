@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { CreditCard, PlusCircle, Check, X, Mail, Filter, Wallet, Search, ChevronLeft, ChevronRight, LayoutGrid, List, Trash2, AlertTriangle, Settings, Eye, EyeOff, SendHorizonal, ChevronDown, ChevronUp, ShieldCheck, Wifi, WifiOff } from 'lucide-react';
+import { CreditCard, PlusCircle, Check, X, Mail, Filter, Wallet, Search, ChevronLeft, ChevronRight, LayoutGrid, List, Trash2, AlertTriangle, Settings, Eye, EyeOff, SendHorizonal, ChevronDown, ChevronUp, ShieldCheck, Wifi, WifiOff, RefreshCw } from 'lucide-react';
 import { API_BASE_URL } from '../config';
 
 export default function ExpenseView({ user }) {
@@ -141,8 +141,8 @@ export default function ExpenseView({ user }) {
       .catch(err => { setTestingEmail(false); setSettingsMsg('❌ ' + err.message); });
   };
 
-  const loadCodes = () => {
-    fetch(`${API_BASE_URL}/api/expenses/codes`)
+  const loadCodes = (force = false) => {
+    fetch(`${API_BASE_URL}/api/expenses/codes${force ? '?force_reload=true' : ''}`)
       .then(res => res.json())
       .then(data => setCodes(data))
       .catch(err => console.error('Error fetching project codes:', err));
@@ -163,7 +163,7 @@ export default function ExpenseView({ user }) {
   };
 
   useEffect(() => {
-    loadCodes();
+    loadCodes(true);
     if (isSuperAdmin) loadSettings();
 
     // WebSocket real-time events listener with HTTP polling fallback for Vercel Serverless
@@ -178,7 +178,7 @@ export default function ExpenseView({ user }) {
       if (!fallbackInterval) {
         fallbackInterval = setInterval(() => {
           loadExpenses();
-          loadCodes();
+          loadCodes(true);
         }, 15000);
       }
     };
@@ -188,9 +188,13 @@ export default function ExpenseView({ user }) {
       socket.onmessage = (event) => {
         try {
           const payload = JSON.parse(event.data);
-          if (['EXPENSE_SUBMITTED', 'EXPENSE_REVIEWED', 'EXPENSE_DELETED'].includes(payload?.event)) {
+          if ([
+            'EXPENSE_SUBMITTED', 'EXPENSE_REVIEWED', 'EXPENSE_DELETED',
+            'DONORS_UPDATED', 'DONOR_RECORD_UPDATED', 'BULK_DONORS_UPDATED',
+            'MATRIX_UPDATED', 'PAYOUTS_UPDATED'
+          ].includes(payload?.event)) {
             loadExpenses();
-            loadCodes();
+            loadCodes(true);
           }
         } catch (e) {}
       };
@@ -201,9 +205,16 @@ export default function ExpenseView({ user }) {
       startPollingFallback();
     }
 
+    const handleFocus = () => {
+      loadCodes(true);
+      loadExpenses();
+    };
+    window.addEventListener('focus', handleFocus);
+
     return () => {
       if (socket) socket.close();
       if (fallbackInterval) clearInterval(fallbackInterval);
+      window.removeEventListener('focus', handleFocus);
     };
   }, []);
 
@@ -388,7 +399,14 @@ export default function ExpenseView({ user }) {
 
         <div className="flex items-center gap-3">
           <button 
-            onClick={() => setShowSubmitModal(true)}
+            onClick={() => { loadCodes(true); loadExpenses(); }}
+            className="btn-secondary text-xs flex items-center gap-1.5"
+            title="Refresh live project codes and fund balances"
+          >
+            <RefreshCw className="w-3.5 h-3.5" /> Refresh Balances
+          </button>
+          <button 
+            onClick={() => { setShowSubmitModal(true); loadCodes(true); }}
             className="btn-primary text-xs flex items-center gap-1.5 shadow-lg shadow-cyan-500/20"
           >
             <PlusCircle className="w-4 h-4" /> Submit Expense Request
