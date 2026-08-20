@@ -520,6 +520,14 @@ def save_matrix_rules(payload: SaveRulesRequest):
     get_code_to_classification_map(force_reload=True)
     invalidate_payouts_cache()
 
+    try:
+        from backend.api.expenses import clear_expenses_cache
+        clear_expenses_cache()
+        from backend.api.events import broadcast_event_sync
+        broadcast_event_sync("MATRIX_UPDATED", {"platform": payload.platform})
+    except Exception:
+        pass
+
     return {
         "status": "success",
         "message": f"Successfully saved {n_saved:,} {payload.platform} classification rules and updated matching records in real time!"
@@ -578,6 +586,13 @@ def delete_single_rule(payload: DeleteRuleRequest):
             print(f"Error updating donors on delete: {e}")
 
     invalidate_payouts_cache()
+    try:
+        from backend.api.expenses import clear_expenses_cache
+        clear_expenses_cache()
+        from backend.api.events import broadcast_event_sync
+        broadcast_event_sync("MATRIX_UPDATED", {"platform": payload.platform, "action": "delete"})
+    except Exception:
+        pass
 
     return {
         "status": "success",
@@ -630,10 +645,17 @@ def clear_platform_rules(payload: ClearPlatformRequest):
             print(f"Error resetting donors on clear: {e}")
 
     invalidate_payouts_cache()
+    try:
+        from backend.api.expenses import clear_expenses_cache
+        clear_expenses_cache()
+        from backend.api.events import broadcast_event_sync
+        broadcast_event_sync("MATRIX_UPDATED", {"platform": payload.platform, "action": "clear"})
+    except Exception:
+        pass
 
     return {
         "status": "success",
-        "message": f"Successfully cleared all classification rules for {platform.capitalize()}!"
+        "message": f"Successfully wiped all classification rules and reset matching donor records for platform: {payload.platform}"
     }
 
 

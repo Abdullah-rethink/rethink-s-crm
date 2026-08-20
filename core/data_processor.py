@@ -868,6 +868,11 @@ def sync_matrix_classifications_to_donors(matrix_df):
     invalidate_data_cache()
     from core.data_processor import invalidate_payouts_cache
     invalidate_payouts_cache()
+    try:
+        from backend.api.expenses import clear_expenses_cache
+        clear_expenses_cache()
+    except Exception:
+        pass
     return updated_count
 
 
@@ -1964,6 +1969,14 @@ def process_payout_settlement_upload(df_raw, source_name="LaunchGood Payout.xlsx
     try:
         from backend.api.payouts import invalidate_payouts_cache
         invalidate_payouts_cache()
+    except Exception:
+        pass
+
+    try:
+        from backend.api.expenses import clear_expenses_cache
+        clear_expenses_cache()
+        from backend.api.events import broadcast_event_sync
+        broadcast_event_sync("PAYOUTS_UPDATED", {"source": "upload"})
     except Exception:
         pass
 

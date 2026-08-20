@@ -249,10 +249,10 @@ def clear_expenses_cache():
     _CODES_CACHE = None
 
 @router.get("/codes")
-def get_project_codes():
-    """Returns unique list of project codes with gross raised, approved expenses, and net balance instantly via caching."""
+def get_project_codes(force_reload: bool = False):
+    """Returns unique list of project codes with gross raised, approved expenses, and net balance aggregated across donations, payouts, and classifications in real-time."""
     global _CODES_CACHE
-    if _CODES_CACHE is not None:
+    if not force_reload and _CODES_CACHE is not None:
         return _CODES_CACHE
 
     init_expense_db()
@@ -262,60 +262,164 @@ def get_project_codes():
         
         # 1. Fetch approved expenses per code
         cur.execute("SELECT code, SUM(amount) FROM expense_requests WHERE status = 'APPROVED' GROUP BY code")
-        approved_expense_map = {row[0]: row[1] for row in cur.fetchall() if row[0]}
+        approved_expense_map = {str(row[0]).strip().upper(): float(row[1] or 0.0) for row in cur.fetchall() if row[0]}
         
-        # 2. Fetch gross raised and first metadata row per code directly from donations SQL table!
+        # 2. Fetch gross raised and first metadata row per code from donations table
         cur.execute("""
             SELECT 
-                Code, 
+                UPPER(TRIM(Code)) as code, 
                 Heading, 
                 [Sub-Heading], 
                 Country, 
                 [Campaign Name], 
                 SUM([Total Online Donations Net Amount in Settled Currency]) 
             FROM donations 
-            WHERE Code IS NOT NULL AND Code != '' AND Code NOT IN ('N/A', 'Unassigned', 'nan', 'None')
-            GROUP BY Code
+            WHERE Code IS NOT NULL AND TRIM(Code) != '' AND UPPER(TRIM(Code)) NOT IN ('N/A', 'UNASSIGNED', 'NAN', 'NONE', '')
+            GROUP BY UPPER(TRIM(Code))
         """)
-        rows = cur.fetchall()
+        don_rows = cur.fetchall()
+
+        # 3. Fetch gross raised and metadata from payout_settlements table
+        try:
+            cur.execute("""
+                SELECT 
+                    UPPER(TRIM(Code)) as code, 
+                    Heading, 
+                    [Sub-Heading], 
+                    Country, 
+                    [Campaign Name], 
+                    SUM([Total Online Donations Net Amount in Settled Currency]) 
+                FROM payout_settlements 
+                WHERE Code IS NOT NULL AND TRIM(Code) != '' AND UPPER(TRIM(Code)) NOT IN ('N/A', 'UNASSIGNED', 'NAN', 'NONE', '')
+                GROUP BY UPPER(TRIM(Code))
+            """)
+            pay_rows = cur.fetchall()
+        except Exception:
+            pay_rows = []
+
+        # 4. Fetch all codes defined across all classification tables
+        matrix_rows = []
+        for tbl in ["campaign_classifications", "givebright_classifications", "paysuite_classifications", "rethink_website_classifications"]:
+            try:
+                cur.execute(f"""
+                    SELECT UPPER(TRIM(code)) as code, heading, sub_heading, country, campaign_name 
+                    FROM {tbl} 
+                    WHERE code IS NOT NULL AND TRIM(code) != '' AND UPPER(TRIM(code)) NOT IN ('N/A', 'UNASSIGNED', 'NAN', 'NONE', '')
+                """)
+                matrix_rows.extend(cur.fetchall())
+            except Exception:
+                pass
     except Exception as e:
         print(f"Error fetching codes from DB: {e}")
         return []
     finally:
         conn.close()
 
-    # Get matrix to fill in missing metadata
-    df_raw = load_data()
-    matrix_df = get_classification_matrix(df_raw).fillna("Unassigned")
+    from core.data_processor import get_code_to_classification_map
+    central_map = get_code_to_classification_map()
 
     code_map = {}
-    for code_val, heading, sub_heading, country, campaign_name, gross in rows:
-        code_str = str(code_val).strip()
-        gross_raised = float(gross or 0.0)
-        app_expense = approved_expense_map.get(code_str, 0.0)
-        
-        code_map[code_str] = {
-            "code": code_str,
-            "heading": str(heading or "Unassigned"),
-            "sub_heading": str(sub_heading or "Unassigned"),
-            "country": str(country or "Unassigned"),
-            "campaign_name": str(campaign_name or "N/A"),
-            "gross_raised": round(gross_raised, 2),
-            "approved_expenses": round(app_expense, 2),
-            "net_balance": round(gross_raised - app_expense, 2)
-        }
 
-    # Overlay Matrix mappings
-    if not matrix_df.empty and "Code" in matrix_df.columns:
-        for _, r in matrix_df.iterrows():
-            code_str = str(r.get("Code", "")).strip()
-            if code_str and code_str in code_map:
-                if code_map[code_str]["heading"] == "Unassigned" and r.get("Heading") != "Unassigned":
-                    code_map[code_str]["heading"] = str(r.get("Heading"))
-                if code_map[code_str]["sub_heading"] == "Unassigned" and r.get("Sub-Heading") != "Unassigned":
-                    code_map[code_str]["sub_heading"] = str(r.get("Sub-Heading"))
-                if code_map[code_str]["country"] == "Unassigned" and r.get("Country") != "Unassigned":
-                    code_map[code_str]["country"] = str(r.get("Country"))
+    # A. Populate from classification tables (base metadata)
+    for code_val, heading, sub_heading, country, campaign_name in matrix_rows:
+        if not code_val: continue
+        code_str = str(code_val).strip().upper()
+        if code_str not in code_map:
+            code_map[code_str] = {
+                "code": code_str,
+                "heading": str(heading or "Unassigned"),
+                "sub_heading": str(sub_heading or "Unassigned"),
+                "country": str(country or "Unassigned"),
+                "campaign_name": str(campaign_name or "N/A"),
+                "gross_raised": 0.0,
+                "approved_expenses": approved_expense_map.get(code_str, 0.0),
+                "net_balance": -approved_expense_map.get(code_str, 0.0)
+            }
+
+    # B. Populate from central code map
+    for code_key, c_info in (central_map or {}).items():
+        code_str = str(code_key).strip().upper()
+        if not code_str or code_str in ['N/A', 'UNASSIGNED', 'NAN', 'NONE', '']: continue
+        if code_str not in code_map:
+            code_map[code_str] = {
+                "code": code_str,
+                "heading": str(c_info.get("Heading") or "Unassigned"),
+                "sub_heading": str(c_info.get("Sub-Heading") or "Unassigned"),
+                "country": str(c_info.get("Country") or "Unassigned"),
+                "campaign_name": "N/A",
+                "gross_raised": 0.0,
+                "approved_expenses": approved_expense_map.get(code_str, 0.0),
+                "net_balance": -approved_expense_map.get(code_str, 0.0)
+            }
+
+    # C. Populate / update from payout settlements
+    for code_val, heading, sub_heading, country, campaign_name, gross in pay_rows:
+        if not code_val: continue
+        code_str = str(code_val).strip().upper()
+        gross_val = float(gross or 0.0)
+        if code_str not in code_map:
+            code_map[code_str] = {
+                "code": code_str,
+                "heading": str(heading or "Unassigned"),
+                "sub_heading": str(sub_heading or "Unassigned"),
+                "country": str(country or "Unassigned"),
+                "campaign_name": str(campaign_name or "N/A"),
+                "gross_raised": round(gross_val, 2),
+                "approved_expenses": approved_expense_map.get(code_str, 0.0),
+                "net_balance": round(gross_val - approved_expense_map.get(code_str, 0.0), 2)
+            }
+        else:
+            if code_map[code_str]["gross_raised"] == 0.0:
+                code_map[code_str]["gross_raised"] = round(gross_val, 2)
+                code_map[code_str]["net_balance"] = round(gross_val - code_map[code_str]["approved_expenses"], 2)
+            if code_map[code_str]["heading"] == "Unassigned" and heading:
+                code_map[code_str]["heading"] = str(heading)
+            if code_map[code_str]["sub_heading"] == "Unassigned" and sub_heading:
+                code_map[code_str]["sub_heading"] = str(sub_heading)
+            if code_map[code_str]["country"] == "Unassigned" and country:
+                code_map[code_str]["country"] = str(country)
+
+    # D. Populate / update from donations (primary actual donor funds)
+    for code_val, heading, sub_heading, country, campaign_name, gross in don_rows:
+        if not code_val: continue
+        code_str = str(code_val).strip().upper()
+        gross_val = float(gross or 0.0)
+        if code_str not in code_map:
+            code_map[code_str] = {
+                "code": code_str,
+                "heading": str(heading or "Unassigned"),
+                "sub_heading": str(sub_heading or "Unassigned"),
+                "country": str(country or "Unassigned"),
+                "campaign_name": str(campaign_name or "N/A"),
+                "gross_raised": round(gross_val, 2),
+                "approved_expenses": approved_expense_map.get(code_str, 0.0),
+                "net_balance": round(gross_val - approved_expense_map.get(code_str, 0.0), 2)
+            }
+        else:
+            code_map[code_str]["gross_raised"] = round(gross_val, 2)
+            code_map[code_str]["net_balance"] = round(gross_val - code_map[code_str]["approved_expenses"], 2)
+            if heading and str(heading) != "Unassigned":
+                code_map[code_str]["heading"] = str(heading)
+            if sub_heading and str(sub_heading) != "Unassigned":
+                code_map[code_str]["sub_heading"] = str(sub_heading)
+            if country and str(country) != "Unassigned":
+                code_map[code_str]["country"] = str(country)
+            if campaign_name and str(campaign_name) not in ["N/A", "Unassigned"]:
+                code_map[code_str]["campaign_name"] = str(campaign_name)
+
+    # Also include any approved expense codes that might not have donations yet
+    for exp_code, exp_amt in approved_expense_map.items():
+        if exp_code not in code_map:
+            code_map[exp_code] = {
+                "code": exp_code,
+                "heading": "Unassigned",
+                "sub_heading": "Unassigned",
+                "country": "Unassigned",
+                "campaign_name": "N/A",
+                "gross_raised": 0.0,
+                "approved_expenses": round(exp_amt, 2),
+                "net_balance": round(-exp_amt, 2)
+            }
 
     sorted_codes = sorted(list(code_map.values()), key=lambda x: x["code"])
     _CODES_CACHE = sorted_codes
