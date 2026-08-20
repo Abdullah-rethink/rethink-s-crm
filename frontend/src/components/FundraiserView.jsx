@@ -4,7 +4,7 @@ import {
   TrendingUp, Users, DollarSign, Edit3, Trash2, Eye, X, Check, 
   RefreshCw, ChevronRight, BarChart3, Clock, AlertCircle, ShieldAlert,
   Layers, CheckCircle2, Award, ArrowUpRight, LayoutGrid, List, Sparkles,
-  Lock
+  Lock, ArrowRight, ExternalLink, Activity
 } from 'lucide-react';
 import { API_BASE_URL } from '../config';
 
@@ -97,7 +97,7 @@ export default function FundraiserView({ user, accentColor = 'cyan' }) {
       setCustomStartDate(start);
       setCustomEndDate('');
     } else if (mode === 'custom') {
-      // Keep existing custom inputs
+      // Keep custom inputs
     }
   };
 
@@ -249,7 +249,7 @@ export default function FundraiserView({ user, accentColor = 'cyan' }) {
     loadCampaignsList();
   };
 
-  // Toggle Campaign Assignment in Modal Form (Ensuring 1 campaign -> 1 fundraiser)
+  // Toggle Campaign Assignment in Modal Form
   const handleToggleCampaignAssignment = (camp) => {
     const isAssignedToOther = camp.is_assigned && camp.assigned_to?.fundraiser_id && (!editingFundraiser || camp.assigned_to.fundraiser_id !== editingFundraiser.id);
     
@@ -418,24 +418,34 @@ export default function FundraiserView({ user, accentColor = 'cyan' }) {
   const isDateFiltered = !!(appliedStartDate || appliedEndDate);
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-4">
       
       {/* ── Top Header & Actions ─────────────────────────────────── */}
-      <div className="flex items-center justify-between flex-wrap gap-4">
-        <div>
-          <h2 className="text-xl font-extrabold flex items-center gap-2" style={{ color: 'var(--text-main)' }}>
-            <HeartHandshake className="w-6 h-6 text-cyan-500" /> Fundraiser Tracking &amp; Campaign Attribution
-          </h2>
-          <p className="text-xs font-medium mt-0.5" style={{ color: 'var(--text-muted)' }}>
-            Attribution based on actual donor data timestamps with live date-range filtering (From Date X to Date Y).
-          </p>
+      <div className="flex items-center justify-between flex-wrap gap-3 pb-1">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-500/20 to-blue-500/20 border border-cyan-500/30 flex items-center justify-center text-cyan-500 shadow-sm shrink-0">
+            <HeartHandshake className="w-5 h-5" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h2 className="text-lg font-black tracking-tight" style={{ color: 'var(--text-main)' }}>
+                Fundraiser Tracking &amp; Campaign Attribution
+              </h2>
+              <span className="inline-flex items-center gap-1 text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-500/20">
+                <span className="w-1.5 h-1.5 rounded-full bg-cyan-500 animate-pulse" /> Live Inception
+              </span>
+            </div>
+            <p className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>
+              Real-time campaign attribution based on actual donor data timestamps with custom Date X to Date Y window filtering.
+            </p>
+          </div>
         </div>
 
-        <div className="flex items-center gap-2.5 flex-wrap">
+        <div className="flex items-center gap-2">
           <button
             onClick={() => loadFundraisers(false)}
             disabled={refreshing}
-            className="btn-secondary text-xs flex items-center gap-1.5 px-3 py-2"
+            className="btn-secondary text-xs flex items-center gap-1.5 px-3 py-1.5"
             title="Refresh live metrics from database"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} /> Refresh Live
@@ -444,83 +454,88 @@ export default function FundraiserView({ user, accentColor = 'cyan' }) {
           {isSuperAdmin && (
             <button
               onClick={handleOpenCreateModal}
-              className="btn-primary text-xs flex items-center gap-1.5 shadow-lg shadow-cyan-500/20 px-4 py-2"
+              className="btn-primary text-xs flex items-center gap-1.5 shadow-md shadow-cyan-500/20 px-3.5 py-1.5"
             >
-              <PlusCircle className="w-4 h-4" /> Add Fundraiser
+              <PlusCircle className="w-3.5 h-3.5" /> Add Fundraiser
             </button>
           )}
         </div>
       </div>
 
       {/* ── KPI Summary Cards ────────────────────────────────────── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
         {/* Card 1: Total Active Fundraisers */}
-        <div className="glass-panel p-4 flex items-center gap-4 relative overflow-hidden">
-          <div className="p-3 rounded-xl bg-cyan-500/10 text-cyan-500 border border-cyan-500/20">
-            <Users className="w-5 h-5" />
+        <div className="glass-panel p-3.5 flex items-center gap-3.5 relative overflow-hidden border-l-4 border-l-cyan-500">
+          <div className="p-2.5 rounded-xl bg-cyan-500/10 text-cyan-500 border border-cyan-500/20 shrink-0">
+            <Users className="w-4 h-4" />
           </div>
-          <div>
-            <div className="text-[11px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+          <div className="min-w-0 flex-1">
+            <div className="text-[10px] font-extrabold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
               Active Fundraisers
             </div>
-            <div className="text-2xl font-black mt-0.5" style={{ color: 'var(--text-main)' }}>
+            <div className="text-xl font-black mt-0.5 tracking-tight" style={{ color: 'var(--text-main)' }}>
               {summary.total_fundraisers || 0}
             </div>
-            <div className="text-[10px] text-cyan-500 font-semibold mt-0.5">
+            <div className="text-[10px] text-cyan-600 dark:text-cyan-400 font-semibold truncate">
               {filteredFundraisers.filter(f => f.status === 'ACTIVE').length} currently active
             </div>
           </div>
         </div>
 
         {/* Card 2: Raised in Selected Date Window */}
-        <div className="glass-panel p-4 flex items-center gap-4 relative overflow-hidden">
-          <div className="p-3 rounded-xl bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
-            <DollarSign className="w-5 h-5" />
+        <div className="glass-panel p-3.5 flex items-center gap-3.5 relative overflow-hidden border-l-4 border-l-emerald-500">
+          <div className="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 shrink-0">
+            <DollarSign className="w-4 h-4" />
           </div>
-          <div>
-            <div className="text-[11px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+          <div className="min-w-0 flex-1">
+            <div className="text-[10px] font-extrabold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
               {isDateFiltered ? 'Raised (Filtered Window)' : 'Raised (All-Time)'}
             </div>
-            <div className="text-2xl font-black text-emerald-500 mt-0.5">
+            <div className="text-xl font-black text-emerald-600 dark:text-emerald-400 mt-0.5 tracking-tight">
               £{(summary.total_raised_period || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </div>
-            <div className="text-[10px] font-semibold mt-0.5 truncate max-w-[200px]" style={{ color: 'var(--text-muted)' }}>
-              {isDateFiltered ? `${appliedStartDate || 'Start'} to ${appliedEndDate || 'Present'}` : 'Since first donor gift'}
+            <div className="text-[10px] font-semibold truncate" style={{ color: 'var(--text-muted)' }}>
+              {isDateFiltered ? `${appliedStartDate || 'Start'} → ${appliedEndDate || 'Present'}` : 'Since first donor gift'}
             </div>
           </div>
         </div>
 
         {/* Card 3: Total Lifetime Raised */}
-        <div className="glass-panel p-4 flex items-center gap-4 relative overflow-hidden">
-          <div className="p-3 rounded-xl bg-purple-500/10 text-purple-500 border border-purple-500/20">
-            <TrendingUp className="w-5 h-5" />
+        <div className="glass-panel p-3.5 flex items-center gap-3.5 relative overflow-hidden border-l-4 border-l-purple-500">
+          <div className="p-2.5 rounded-xl bg-purple-500/10 text-purple-500 border border-purple-500/20 shrink-0">
+            <TrendingUp className="w-4 h-4" />
           </div>
-          <div>
-            <div className="text-[11px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+          <div className="min-w-0 flex-1">
+            <div className="text-[10px] font-extrabold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
               All-Time Lifetime Raised
             </div>
-            <div className="text-2xl font-black text-purple-500 mt-0.5">
+            <div className="text-xl font-black text-purple-600 dark:text-purple-400 mt-0.5 tracking-tight">
               £{(summary.total_raised_all_time || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </div>
-            <div className="text-[10px] font-semibold mt-0.5" style={{ color: 'var(--text-muted)' }}>
+            <div className="text-[10px] font-semibold truncate" style={{ color: 'var(--text-muted)' }}>
               Across {summary.total_transactions || 0} total donations
             </div>
           </div>
         </div>
 
         {/* Card 4: Goal Achievement */}
-        <div className="glass-panel p-4 flex items-center gap-4 relative overflow-hidden">
-          <div className="p-3 rounded-xl bg-amber-500/10 text-amber-500 border border-amber-500/20">
-            <Target className="w-5 h-5" />
+        <div className="glass-panel p-3.5 flex items-center gap-3.5 relative overflow-hidden border-l-4 border-l-amber-500">
+          <div className="p-2.5 rounded-xl bg-amber-500/10 text-amber-500 border border-amber-500/20 shrink-0">
+            <Target className="w-4 h-4" />
           </div>
-          <div className="flex-1 min-w-0">
-            <div className="text-[11px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
-              Overall Goal Progress
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center justify-between">
+              <div className="text-[10px] font-extrabold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+                Goal Progress
+              </div>
+              <span className="text-xs font-black text-amber-600 dark:text-amber-400">
+                {summary.overall_progress_pct || 0}%
+              </span>
             </div>
-            <div className="text-2xl font-black text-amber-500 mt-0.5">
-              {summary.overall_progress_pct || 0}%
+            <div className="text-lg font-black text-amber-600 dark:text-amber-400 mt-0.5">
+              £{(summary.total_target_goal || 0).toLocaleString()} <span className="text-[10px] font-normal" style={{ color: 'var(--text-sub)' }}>target</span>
             </div>
-            <div className="w-full rounded-full h-1.5 mt-1.5 overflow-hidden" style={{ backgroundColor: 'var(--bg-card-inner)' }}>
+            <div className="w-full rounded-full h-1.5 mt-1 overflow-hidden" style={{ backgroundColor: 'var(--bg-card-inner)' }}>
               <div 
                 className="bg-gradient-to-r from-amber-500 to-emerald-500 h-full rounded-full transition-all duration-500"
                 style={{ width: `${Math.min(summary.overall_progress_pct || 0, 100)}%` }}
@@ -531,20 +546,20 @@ export default function FundraiserView({ user, accentColor = 'cyan' }) {
       </div>
 
       {/* ── Interactive Date Range Filter Toolbar ───────────────── */}
-      <div className="glass-panel p-4 flex flex-col gap-3">
+      <div className="glass-panel p-3.5 flex flex-col gap-2.5">
         
-        {/* Row 1: Search, Status, and View Mode */}
-        <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
-          <div className="flex items-center gap-3 flex-1 flex-wrap">
+        {/* Row 1: Search, Status, Presets and View Mode */}
+        <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-2.5">
+          <div className="flex items-center gap-2 flex-1 flex-wrap">
             {/* Search Box */}
-            <div className="relative flex-1 min-w-[220px]">
-              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <div className="relative flex-1 min-w-[200px]">
+              <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
                 type="text"
-                placeholder="Search by fundraiser name or campaign..."
+                placeholder="Search by fundraiser or campaign..."
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-3 py-2 text-xs rounded-xl focus:outline-none"
+                className="w-full pl-8 pr-3 py-1.5 text-xs rounded-lg focus:outline-none"
                 style={{ backgroundColor: 'var(--input-bg)', color: 'var(--input-text)', border: '1px solid var(--input-border)' }}
               />
             </div>
@@ -553,7 +568,7 @@ export default function FundraiserView({ user, accentColor = 'cyan' }) {
             <select
               value={statusFilter}
               onChange={e => setStatusFilter(e.target.value)}
-              className="px-3 py-2 text-xs rounded-xl focus:outline-none"
+              className="px-2.5 py-1.5 text-xs rounded-lg focus:outline-none"
               style={{ backgroundColor: 'var(--input-bg)', color: 'var(--input-text)', border: '1px solid var(--input-border)' }}
             >
               <option value="ALL">All Statuses</option>
@@ -563,94 +578,59 @@ export default function FundraiserView({ user, accentColor = 'cyan' }) {
             </select>
           </div>
 
-          {/* View Mode Toggle */}
-          <div className="flex items-center gap-1.5 self-end md:self-auto">
-            <button
-              onClick={() => setViewMode('grid')}
-              className={`p-2 rounded-xl transition-all ${viewMode === 'grid' ? 'bg-cyan-500/20 text-cyan-500 border border-cyan-500/30' : 'text-slate-400 hover:text-slate-200'}`}
-              title="Grid Cards View"
-            >
-              <LayoutGrid className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => setViewMode('table')}
-              className={`p-2 rounded-xl transition-all ${viewMode === 'table' ? 'bg-cyan-500/20 text-cyan-500 border border-cyan-500/30' : 'text-slate-400 hover:text-slate-200'}`}
-              title="Leaderboard Table View"
-            >
-              <List className="w-4 h-4" />
-            </button>
+          {/* Preset Buttons */}
+          <div className="flex items-center gap-1 flex-wrap">
+            <span className="text-[11px] font-bold flex items-center gap-1 mr-1" style={{ color: 'var(--text-muted)' }}>
+              <Calendar className="w-3 h-3 text-cyan-500" /> Period:
+            </span>
+
+            {[
+              { id: 'all', label: 'All-Time (First Gift)' },
+              { id: 'this_year', label: 'This Year' },
+              { id: 'last_year', label: 'Last Year' },
+              { id: 'last_30', label: 'Last 30 Days' },
+              { id: 'last_90', label: 'Last 90 Days' }
+            ].map(p => (
+              <button
+                key={p.id}
+                onClick={() => handleDatePresetChange(p.id)}
+                className={`px-2 py-1 rounded-md text-[11px] font-bold transition-all ${
+                  dateFilterMode === p.id 
+                    ? 'bg-cyan-500/20 text-cyan-600 dark:text-cyan-300 border border-cyan-500/30' 
+                    : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-200'
+                }`}
+              >
+                {p.label}
+              </button>
+            ))}
+
+            {/* View Mode Toggle */}
+            <div className="flex items-center gap-1 ml-2 pl-2 border-l" style={{ borderColor: 'var(--border-glass)' }}>
+              <button
+                onClick={() => setViewMode('grid')}
+                className={`p-1.5 rounded-lg transition-all ${viewMode === 'grid' ? 'bg-cyan-500/20 text-cyan-500 border border-cyan-500/30' : 'text-slate-400 hover:text-slate-200'}`}
+                title="Grid Cards View"
+              >
+                <LayoutGrid className="w-3.5 h-3.5" />
+              </button>
+              <button
+                onClick={() => setViewMode('table')}
+                className={`p-1.5 rounded-lg transition-all ${viewMode === 'table' ? 'bg-cyan-500/20 text-cyan-500 border border-cyan-500/30' : 'text-slate-400 hover:text-slate-200'}`}
+                title="Leaderboard Table View"
+              >
+                <List className="w-3.5 h-3.5" />
+              </button>
+            </div>
           </div>
         </div>
 
-        {/* Row 2: Date Filters & Custom Date Range Inputs */}
-        <div className="flex items-center justify-between flex-wrap gap-3 pt-3 border-t" style={{ borderColor: 'var(--border-glass)' }}>
-          
-          {/* Preset Buttons */}
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <span className="text-xs font-bold flex items-center gap-1 mr-1" style={{ color: 'var(--text-muted)' }}>
-              <Calendar className="w-3.5 h-3.5 text-cyan-500" /> Filter Period:
-            </span>
-
-            <button
-              onClick={() => handleDatePresetChange('all')}
-              className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
-                dateFilterMode === 'all' 
-                  ? 'bg-cyan-500/20 text-cyan-500 border border-cyan-500/30' 
-                  : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-200'
-              }`}
-            >
-              All-Time (First Gift)
-            </button>
-
-            <button
-              onClick={() => handleDatePresetChange('this_year')}
-              className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
-                dateFilterMode === 'this_year' 
-                  ? 'bg-cyan-500/20 text-cyan-500 border border-cyan-500/30' 
-                  : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-200'
-              }`}
-            >
-              This Year
-            </button>
-
-            <button
-              onClick={() => handleDatePresetChange('last_year')}
-              className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
-                dateFilterMode === 'last_year' 
-                  ? 'bg-cyan-500/20 text-cyan-500 border border-cyan-500/30' 
-                  : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-200'
-              }`}
-            >
-              Last Year
-            </button>
-
-            <button
-              onClick={() => handleDatePresetChange('last_30')}
-              className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
-                dateFilterMode === 'last_30' 
-                  ? 'bg-cyan-500/20 text-cyan-500 border border-cyan-500/30' 
-                  : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-200'
-              }`}
-            >
-              Last 30 Days
-            </button>
-
-            <button
-              onClick={() => handleDatePresetChange('last_90')}
-              className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
-                dateFilterMode === 'last_90' 
-                  ? 'bg-cyan-500/20 text-cyan-500 border border-cyan-500/30' 
-                  : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-200'
-              }`}
-            >
-              Last 90 Days
-            </button>
-          </div>
-
-          {/* Manual Date Range Inputs (From Date X to Date Y) */}
-          <form onSubmit={handleApplyCustomDateRange} className="flex items-center gap-2 flex-wrap">
-            <div className="flex items-center gap-1.5">
-              <span className="text-[11px] font-bold" style={{ color: 'var(--text-muted)' }}>From (X):</span>
+        {/* Row 2: Manual Date Range Inputs (From Date X to Date Y) */}
+        <div className="flex items-center justify-between flex-wrap gap-2 pt-2 border-t" style={{ borderColor: 'var(--border-glass)' }}>
+          <form onSubmit={handleApplyCustomDateRange} className="flex items-center gap-2 flex-wrap text-xs">
+            <span className="text-[11px] font-bold" style={{ color: 'var(--text-muted)' }}>Custom Range:</span>
+            
+            <div className="flex items-center gap-1">
+              <span className="text-[11px]" style={{ color: 'var(--text-sub)' }}>From (X):</span>
               <input
                 type="date"
                 value={customStartDate}
@@ -658,13 +638,13 @@ export default function FundraiserView({ user, accentColor = 'cyan' }) {
                   setCustomStartDate(e.target.value);
                   setDateFilterMode('custom');
                 }}
-                className="px-2 py-1 text-xs rounded-lg focus:outline-none"
+                className="px-2 py-1 text-xs rounded-md focus:outline-none"
                 style={{ backgroundColor: 'var(--input-bg)', color: 'var(--input-text)', border: '1px solid var(--input-border)' }}
               />
             </div>
 
-            <div className="flex items-center gap-1.5">
-              <span className="text-[11px] font-bold" style={{ color: 'var(--text-muted)' }}>To (Y):</span>
+            <div className="flex items-center gap-1">
+              <span className="text-[11px]" style={{ color: 'var(--text-sub)' }}>To (Y):</span>
               <input
                 type="date"
                 value={customEndDate}
@@ -672,14 +652,14 @@ export default function FundraiserView({ user, accentColor = 'cyan' }) {
                   setCustomEndDate(e.target.value);
                   setDateFilterMode('custom');
                 }}
-                className="px-2 py-1 text-xs rounded-lg focus:outline-none"
+                className="px-2 py-1 text-xs rounded-md focus:outline-none"
                 style={{ backgroundColor: 'var(--input-bg)', color: 'var(--input-text)', border: '1px solid var(--input-border)' }}
               />
             </div>
 
             <button
               type="submit"
-              className="btn-primary text-xs px-3 py-1 shadow-sm"
+              className="btn-primary text-xs px-2.5 py-1 shadow-sm font-bold"
             >
               Apply Filter
             </button>
@@ -688,57 +668,56 @@ export default function FundraiserView({ user, accentColor = 'cyan' }) {
               <button
                 type="button"
                 onClick={handleClearDateFilter}
-                className="p-1 rounded-lg hover:bg-rose-500/10 text-rose-500 text-xs flex items-center gap-1 transition-colors"
+                className="px-2 py-1 rounded-md hover:bg-rose-500/10 text-rose-500 text-xs font-bold flex items-center gap-1 transition-colors"
                 title="Clear date filter and view all-time"
               >
-                <X className="w-3.5 h-3.5" /> Reset
+                <X className="w-3 h-3" /> Reset
               </button>
             )}
           </form>
-        </div>
 
-        {/* Active Filter Indicator Badge */}
-        {isDateFiltered && (
-          <div className="flex items-center gap-2 text-xs font-bold px-3 py-1.5 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-700 dark:text-cyan-300">
-            <Clock className="w-3.5 h-3.5" />
-            <span>Active Filter Window:</span>
-            <span className="font-extrabold text-cyan-600 dark:text-cyan-400">
-              {appliedStartDate || 'Beginning'} &rarr; {appliedEndDate || 'Latest'}
-            </span>
-            <span className="text-[11px] opacity-75">• Showing exact amount raised within this period</span>
-          </div>
-        )}
+          {/* Active Filter Indicator Badge */}
+          {isDateFiltered && (
+            <div className="flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-lg bg-cyan-500/10 border border-cyan-500/20 text-cyan-700 dark:text-cyan-300">
+              <Clock className="w-3 h-3" />
+              <span>Window:</span>
+              <span className="font-extrabold text-cyan-600 dark:text-cyan-400">
+                {appliedStartDate || 'Beginning'} &rarr; {appliedEndDate || 'Latest'}
+              </span>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* ── Main Content: Grid / Table Views ─────────────────────── */}
       {loading ? (
-        <div className="glass-panel p-12 text-center flex flex-col items-center justify-center gap-3">
-          <RefreshCw className="w-8 h-8 text-cyan-500 animate-spin" />
-          <p className="text-sm font-semibold" style={{ color: 'var(--text-main)' }}>Loading live fundraiser analytics...</p>
+        <div className="glass-panel p-10 text-center flex flex-col items-center justify-center gap-2.5">
+          <RefreshCw className="w-7 h-7 text-cyan-500 animate-spin" />
+          <p className="text-xs font-semibold" style={{ color: 'var(--text-main)' }}>Loading live fundraiser analytics...</p>
         </div>
       ) : filteredFundraisers.length === 0 ? (
-        <div className="glass-panel p-12 text-center flex flex-col items-center justify-center gap-4">
-          <div className="p-4 rounded-2xl bg-cyan-500/10 text-cyan-500 border border-cyan-500/20">
-            <HeartHandshake className="w-10 h-10" />
+        <div className="glass-panel p-10 text-center flex flex-col items-center justify-center gap-3">
+          <div className="p-3 rounded-2xl bg-cyan-500/10 text-cyan-500 border border-cyan-500/20">
+            <HeartHandshake className="w-8 h-8" />
           </div>
           <div>
-            <h3 className="text-base font-bold" style={{ color: 'var(--text-main)' }}>No Fundraisers Found</h3>
-            <p className="text-xs mt-1 max-w-md mx-auto" style={{ color: 'var(--text-muted)' }}>
+            <h3 className="text-sm font-bold" style={{ color: 'var(--text-main)' }}>No Fundraisers Found</h3>
+            <p className="text-xs mt-0.5 max-w-md mx-auto" style={{ color: 'var(--text-muted)' }}>
               {searchQuery ? `No fundraisers match search "${searchQuery}".` : 'Create your first fundraiser and assign campaigns to start tracking live progress.'}
             </p>
           </div>
           {isSuperAdmin && (
             <button
               onClick={handleOpenCreateModal}
-              className="btn-primary text-xs flex items-center gap-1.5 px-4 py-2"
+              className="btn-primary text-xs flex items-center gap-1.5 px-3.5 py-1.5"
             >
-              <PlusCircle className="w-4 h-4" /> Create First Fundraiser
+              <PlusCircle className="w-3.5 h-3.5" /> Create First Fundraiser
             </button>
           )}
         </div>
       ) : viewMode === 'grid' ? (
-        /* ── Grid Cards View ─────────────────────────────────────── */
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+        /* ── Grid Cards View (Responsive 3/4 Column Layout) ───────── */
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
           {filteredFundraisers.map(f => {
             const hasGoal = f.target_goal > 0;
             const progress = f.progress_percentage || 0;
@@ -748,7 +727,7 @@ export default function FundraiserView({ user, accentColor = 'cyan' }) {
             return (
               <div 
                 key={f.id}
-                className="glass-panel p-5 flex flex-col justify-between gap-4 transition-all duration-300 hover:border-cyan-500/30 hover:shadow-xl group relative overflow-hidden"
+                className="glass-panel p-4 flex flex-col justify-between gap-3 transition-all duration-300 hover:border-cyan-500/30 hover:shadow-lg group relative overflow-hidden"
               >
                 {/* Status Indicator Bar */}
                 <div className={`absolute top-0 left-0 right-0 h-1 ${
@@ -757,24 +736,24 @@ export default function FundraiserView({ user, accentColor = 'cyan' }) {
 
                 {/* Card Top: Profile & Status */}
                 <div>
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500/20 to-blue-500/20 text-cyan-500 font-black flex items-center justify-center border border-cyan-500/30 text-sm">
+                  <div className="flex items-start justify-between gap-2.5">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-500/20 to-blue-500/20 text-cyan-500 font-black flex items-center justify-center border border-cyan-500/30 text-xs shrink-0">
                         {f.name.substring(0, 2).toUpperCase()}
                       </div>
-                      <div>
-                        <h4 className="text-sm font-extrabold group-hover:text-cyan-500 transition-colors" style={{ color: 'var(--text-main)' }}>
+                      <div className="min-w-0">
+                        <h4 className="text-xs font-black group-hover:text-cyan-500 transition-colors truncate" style={{ color: 'var(--text-main)' }}>
                           {f.name}
                         </h4>
-                        <div className="text-[11px] flex items-center gap-2 mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                          {f.email ? <span>{f.email}</span> : null}
+                        <div className="text-[10px] flex items-center gap-1.5 truncate" style={{ color: 'var(--text-muted)' }}>
+                          {f.email ? <span className="truncate">{f.email}</span> : null}
                           {f.phone ? <span>• {f.phone}</span> : null}
                         </div>
                       </div>
                     </div>
 
                     {/* Status Badge */}
-                    <span className={`px-2 py-0.5 rounded-md text-[10px] font-black border ${
+                    <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider shrink-0 border ${
                       f.status === 'ACTIVE' 
                         ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30' 
                         : f.status === 'COMPLETED'
@@ -785,36 +764,36 @@ export default function FundraiserView({ user, accentColor = 'cyan' }) {
                     </span>
                   </div>
 
-                  {/* ── Date Factor Prominent Banner ─────────────────── */}
+                  {/* ── Date Factor Hero Box ─────────────────────────── */}
                   <div 
-                    className="mt-3.5 p-2.5 rounded-xl border flex items-center justify-between text-xs"
+                    className="mt-3 p-2 rounded-lg border flex items-center justify-between text-xs"
                     style={{ backgroundColor: 'var(--bg-card-inner)', borderColor: 'var(--border-glass)' }}
                   >
-                    <div className="flex items-center gap-1.5" style={{ color: 'var(--text-muted)' }}>
-                      <Clock className="w-3.5 h-3.5 text-cyan-500 shrink-0" />
+                    <div className="flex items-center gap-1.5 min-w-0 text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                      <Clock className="w-3 h-3 text-cyan-500 shrink-0" />
                       {isDateFiltered ? (
-                        <span>Raised in window:</span>
+                        <span className="truncate">Period window:</span>
                       ) : (
-                        <span>Since first donation (<strong style={{ color: 'var(--text-main)' }}>{firstDate}</strong>):</span>
+                        <span className="truncate">Since first gift (<strong style={{ color: 'var(--text-main)' }}>{firstDate}</strong>):</span>
                       )}
                     </div>
-                    <span className="font-extrabold text-emerald-600 dark:text-emerald-400 text-sm">
+                    <span className="font-black text-emerald-600 dark:text-emerald-400 text-xs shrink-0 ml-2">
                       £{f.total_raised_period.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </span>
                   </div>
 
                   {/* Target Goal Progress */}
                   {hasGoal && (
-                    <div className="mt-3.5">
-                      <div className="flex items-center justify-between text-xs mb-1">
-                        <span className="text-[11px] font-bold" style={{ color: 'var(--text-muted)' }}>
+                    <div className="mt-2.5">
+                      <div className="flex items-center justify-between text-[11px] mb-1">
+                        <span className="font-semibold" style={{ color: 'var(--text-muted)' }}>
                           Target Goal: £{f.target_goal.toLocaleString()}
                         </span>
-                        <span className={`text-xs font-black ${isCompleted ? 'text-emerald-500' : 'text-cyan-500'}`}>
+                        <span className={`font-black ${isCompleted ? 'text-emerald-500' : 'text-cyan-500'}`}>
                           {progress}%
                         </span>
                       </div>
-                      <div className="w-full rounded-full h-2 overflow-hidden border" style={{ backgroundColor: 'var(--bg-card-inner)', borderColor: 'var(--border-glass)' }}>
+                      <div className="w-full rounded-full h-1.5 overflow-hidden border" style={{ backgroundColor: 'var(--bg-card-inner)', borderColor: 'var(--border-glass)' }}>
                         <div 
                           className={`h-full rounded-full transition-all duration-500 ${
                             isCompleted 
@@ -828,52 +807,52 @@ export default function FundraiserView({ user, accentColor = 'cyan' }) {
                   )}
 
                   {/* Metrics Grid */}
-                  <div className="grid grid-cols-3 gap-2 mt-4 pt-3 border-t" style={{ borderColor: 'var(--border-glass)' }}>
-                    <div className="text-center">
-                      <div className="text-[10px] uppercase font-bold" style={{ color: 'var(--text-muted)' }}>Lifetime</div>
-                      <div className="text-xs font-black mt-0.5 text-purple-600 dark:text-purple-400">
+                  <div className="grid grid-cols-3 gap-1.5 mt-3 pt-2.5 border-t" style={{ borderColor: 'var(--border-glass)' }}>
+                    <div className="text-center p-1 rounded-md" style={{ backgroundColor: 'var(--bg-card-inner)' }}>
+                      <div className="text-[9px] uppercase font-bold" style={{ color: 'var(--text-muted)' }}>Lifetime</div>
+                      <div className="text-[11px] font-black mt-0.5 text-purple-600 dark:text-purple-400 truncate">
                         £{f.total_raised_all_time.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                       </div>
                     </div>
-                    <div className="text-center">
-                      <div className="text-[10px] uppercase font-bold" style={{ color: 'var(--text-muted)' }}>
+                    <div className="text-center p-1 rounded-md" style={{ backgroundColor: 'var(--bg-card-inner)' }}>
+                      <div className="text-[9px] uppercase font-bold" style={{ color: 'var(--text-muted)' }}>
                         {isDateFiltered ? 'Period Donors' : 'Donors'}
                       </div>
-                      <div className="text-xs font-black mt-0.5" style={{ color: 'var(--text-main)' }}>
+                      <div className="text-[11px] font-black mt-0.5 truncate" style={{ color: 'var(--text-main)' }}>
                         {isDateFiltered ? f.period_donors : f.total_donors}
                       </div>
                     </div>
-                    <div className="text-center">
-                      <div className="text-[10px] uppercase font-bold" style={{ color: 'var(--text-muted)' }}>Avg Gift</div>
-                      <div className="text-xs font-black mt-0.5 text-cyan-600 dark:text-cyan-400">
+                    <div className="text-center p-1 rounded-md" style={{ backgroundColor: 'var(--bg-card-inner)' }}>
+                      <div className="text-[9px] uppercase font-bold" style={{ color: 'var(--text-muted)' }}>Avg Gift</div>
+                      <div className="text-[11px] font-black mt-0.5 text-cyan-600 dark:text-cyan-400 truncate">
                         £{f.avg_donation}
                       </div>
                     </div>
                   </div>
 
                   {/* Assigned Campaigns Badges */}
-                  <div className="mt-3.5">
-                    <div className="text-[10px] font-bold uppercase tracking-wider mb-1.5 flex items-center justify-between" style={{ color: 'var(--text-muted)' }}>
-                      <span>Assigned Campaigns ({f.assigned_campaigns?.length || 0})</span>
+                  <div className="mt-2.5">
+                    <div className="text-[9px] font-extrabold uppercase tracking-wider mb-1 flex items-center justify-between" style={{ color: 'var(--text-muted)' }}>
+                      <span>Assigned ({f.assigned_campaigns?.length || 0})</span>
                       {f.latest_donation_date && f.latest_donation_date !== 'N/A' && (
-                        <span className="text-[9px] font-normal" style={{ color: 'var(--text-sub)' }}>
+                        <span className="font-normal" style={{ color: 'var(--text-sub)' }}>
                           Latest: {f.latest_donation_date}
                         </span>
                       )}
                     </div>
-                    <div className="flex flex-wrap gap-1.5 max-h-20 overflow-y-auto custom-scrollbar">
+                    <div className="flex flex-wrap gap-1 max-h-16 overflow-y-auto custom-scrollbar">
                       {(f.assigned_campaigns || []).length === 0 ? (
-                        <span className="text-[11px] italic" style={{ color: 'var(--text-sub)' }}>No campaigns assigned yet.</span>
+                        <span className="text-[10px] italic" style={{ color: 'var(--text-sub)' }}>No campaigns assigned yet.</span>
                       ) : (
                         (f.assigned_campaigns || []).map((c, idx) => (
                           <span 
                             key={idx}
-                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-cyan-500/10 text-cyan-600 dark:text-cyan-300 border border-cyan-500/20 truncate max-w-[200px]"
+                            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-cyan-500/10 text-cyan-700 dark:text-cyan-300 border border-cyan-500/20 truncate max-w-[170px]"
                             title={`${c.campaign_name} [Code: ${c.code || 'ALL'}]`}
                           >
                             <span className="truncate">{c.campaign_name}</span>
                             {c.code && c.code !== 'ALL' && (
-                              <span className="px-1 rounded bg-cyan-500/20 text-cyan-700 dark:text-cyan-200 text-[9px] font-black shrink-0">
+                              <span className="px-1 rounded bg-cyan-500/20 text-cyan-800 dark:text-cyan-200 text-[8px] font-black shrink-0">
                                 {c.code}
                               </span>
                             )}
@@ -885,7 +864,7 @@ export default function FundraiserView({ user, accentColor = 'cyan' }) {
                 </div>
 
                 {/* Card Footer Actions */}
-                <div className="flex items-center justify-between pt-3 border-t mt-2" style={{ borderColor: 'var(--border-glass)' }}>
+                <div className="flex items-center justify-between pt-2 border-t mt-1" style={{ borderColor: 'var(--border-glass)' }}>
                   <button
                     onClick={() => {
                       setSelectedFundraiserId(f.id);
@@ -895,24 +874,24 @@ export default function FundraiserView({ user, accentColor = 'cyan' }) {
                     }}
                     className="text-xs font-bold text-cyan-600 dark:text-cyan-400 hover:text-cyan-500 flex items-center gap-1 transition-colors"
                   >
-                    <BarChart3 className="w-3.5 h-3.5" /> Campaign Breakdown <ArrowUpRight className="w-3 h-3" />
+                    <BarChart3 className="w-3 h-3" /> Breakdown <ArrowUpRight className="w-3 h-3" />
                   </button>
 
                   {isSuperAdmin && (
                     <div className="flex items-center gap-1">
                       <button
                         onClick={() => handleOpenEditModal(f)}
-                        className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700/40 text-slate-400 hover:text-cyan-500 transition-colors"
+                        className="p-1 rounded-md hover:bg-slate-200 dark:hover:bg-slate-700/40 text-slate-400 hover:text-cyan-500 transition-colors"
                         title="Edit Fundraiser &amp; Campaigns"
                       >
-                        <Edit3 className="w-3.5 h-3.5" />
+                        <Edit3 className="w-3 h-3" />
                       </button>
                       <button
                         onClick={() => setDeleteConfirm(f)}
-                        className="p-1.5 rounded-lg hover:bg-rose-500/10 text-slate-400 hover:text-rose-500 transition-colors"
+                        className="p-1 rounded-md hover:bg-rose-500/10 text-slate-400 hover:text-rose-500 transition-colors"
                         title="Delete Fundraiser"
                       >
-                        <Trash2 className="w-3.5 h-3.5" />
+                        <Trash2 className="w-3 h-3" />
                       </button>
                     </div>
                   )}
@@ -928,25 +907,25 @@ export default function FundraiserView({ user, accentColor = 'cyan' }) {
             <table className="w-full text-left text-xs border-collapse">
               <thead>
                 <tr className="border-b" style={{ borderColor: 'var(--border-glass)', backgroundColor: 'var(--table-header-bg)' }}>
-                  <th className="py-3 px-4 font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Fundraiser</th>
-                  <th className="py-3 px-4 font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>First Gift Date</th>
-                  <th className="py-3 px-4 font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+                  <th className="py-2.5 px-3.5 font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Fundraiser</th>
+                  <th className="py-2.5 px-3.5 font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>First Gift Date</th>
+                  <th className="py-2.5 px-3.5 font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
                     {isDateFiltered ? 'Period Raised' : 'Total Raised'}
                   </th>
-                  <th className="py-3 px-4 font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Lifetime Raised</th>
-                  <th className="py-3 px-4 font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Target Goal</th>
-                  <th className="py-3 px-4 font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Progress</th>
-                  <th className="py-3 px-4 font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Donors</th>
-                  <th className="py-3 px-4 font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Assigned Campaigns</th>
-                  <th className="py-3 px-4 font-bold uppercase tracking-wider text-right" style={{ color: 'var(--text-muted)' }}>Actions</th>
+                  <th className="py-2.5 px-3.5 font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Lifetime Raised</th>
+                  <th className="py-2.5 px-3.5 font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Target Goal</th>
+                  <th className="py-2.5 px-3.5 font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Progress</th>
+                  <th className="py-2.5 px-3.5 font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Donors</th>
+                  <th className="py-2.5 px-3.5 font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Assigned Campaigns</th>
+                  <th className="py-2.5 px-3.5 font-bold uppercase tracking-wider text-right" style={{ color: 'var(--text-muted)' }}>Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y" style={{ borderColor: 'var(--border-glass)' }}>
                 {filteredFundraisers.map(f => (
                   <tr key={f.id} className="hover:bg-slate-200/40 dark:hover:bg-slate-800/40 transition-colors">
-                    <td className="py-3 px-4 font-bold" style={{ color: 'var(--text-main)' }}>
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-7 h-7 rounded-lg bg-cyan-500/20 text-cyan-500 font-bold flex items-center justify-center text-xs">
+                    <td className="py-2.5 px-3.5 font-bold" style={{ color: 'var(--text-main)' }}>
+                      <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 rounded-md bg-cyan-500/20 text-cyan-500 font-bold flex items-center justify-center text-[10px]">
                           {f.name.substring(0, 2).toUpperCase()}
                         </div>
                         <div>
@@ -955,52 +934,52 @@ export default function FundraiserView({ user, accentColor = 'cyan' }) {
                         </div>
                       </div>
                     </td>
-                    <td className="py-3 px-4 font-semibold" style={{ color: 'var(--text-muted)' }}>
+                    <td className="py-2.5 px-3.5 font-semibold text-[11px]" style={{ color: 'var(--text-muted)' }}>
                       {f.first_donation_date && f.first_donation_date !== 'N/A' ? f.first_donation_date : (f.start_date || 'N/A')}
                     </td>
-                    <td className="py-3 px-4 font-extrabold text-emerald-600 dark:text-emerald-400">
+                    <td className="py-2.5 px-3.5 font-black text-emerald-600 dark:text-emerald-400">
                       £{f.total_raised_period.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </td>
-                    <td className="py-3 px-4 font-bold text-purple-600 dark:text-purple-400">
+                    <td className="py-2.5 px-3.5 font-bold text-purple-600 dark:text-purple-400">
                       £{f.total_raised_all_time.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </td>
-                    <td className="py-3 px-4 font-semibold" style={{ color: 'var(--text-main)' }}>
-                      {f.target_goal > 0 ? `£${f.target_goal.toLocaleString()}` : 'No Goal'}
+                    <td className="py-2.5 px-3.5 font-semibold" style={{ color: 'var(--text-main)' }}>
+                      {f.target_goal > 0 ? `£${f.target_goal.toLocaleString()}` : '—'}
                     </td>
-                    <td className="py-3 px-4">
+                    <td className="py-2.5 px-3.5">
                       {f.target_goal > 0 ? (
-                        <div className="flex items-center gap-2">
-                          <div className="w-16 rounded-full h-1.5 overflow-hidden" style={{ backgroundColor: 'var(--bg-card-inner)' }}>
+                        <div className="flex items-center gap-1.5">
+                          <div className="w-14 rounded-full h-1.5 overflow-hidden" style={{ backgroundColor: 'var(--bg-card-inner)' }}>
                             <div 
                               className="bg-cyan-500 h-full rounded-full"
                               style={{ width: `${Math.min(f.progress_percentage, 100)}%` }}
                             />
                           </div>
-                          <span className="font-bold text-[11px] text-cyan-600 dark:text-cyan-400">{f.progress_percentage}%</span>
+                          <span className="font-bold text-[10px] text-cyan-600 dark:text-cyan-400">{f.progress_percentage}%</span>
                         </div>
                       ) : (
-                        <span className="text-[11px]" style={{ color: 'var(--text-sub)' }}>—</span>
+                        <span className="text-[10px]" style={{ color: 'var(--text-sub)' }}>—</span>
                       )}
                     </td>
-                    <td className="py-3 px-4 font-semibold" style={{ color: 'var(--text-main)' }}>
-                      {isDateFiltered ? `${f.period_donors} (in window)` : f.total_donors}
+                    <td className="py-2.5 px-3.5 font-semibold" style={{ color: 'var(--text-main)' }}>
+                      {isDateFiltered ? `${f.period_donors} (period)` : f.total_donors}
                     </td>
-                    <td className="py-3 px-4">
-                      <div className="flex flex-wrap gap-1 max-w-[220px]">
+                    <td className="py-2.5 px-3.5">
+                      <div className="flex flex-wrap gap-1 max-w-[200px]">
                         {(f.assigned_campaigns || []).slice(0, 2).map((c, i) => (
-                          <span key={i} className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-cyan-500/10 text-cyan-600 dark:text-cyan-300 border border-cyan-500/20 truncate max-w-[120px]">
+                          <span key={i} className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-cyan-500/10 text-cyan-700 dark:text-cyan-300 border border-cyan-500/20 truncate max-w-[110px]">
                             {c.campaign_name}
                           </span>
                         ))}
                         {(f.assigned_campaigns || []).length > 2 && (
-                          <span className="text-[10px] font-bold self-center" style={{ color: 'var(--text-sub)' }}>
-                            +{f.assigned_campaigns.length - 2} more
+                          <span className="text-[9px] font-bold self-center" style={{ color: 'var(--text-sub)' }}>
+                            +{f.assigned_campaigns.length - 2}
                           </span>
                         )}
                       </div>
                     </td>
-                    <td className="py-3 px-4 text-right">
-                      <div className="flex items-center justify-end gap-1.5">
+                    <td className="py-2.5 px-3.5 text-right">
+                      <div className="flex items-center justify-end gap-1">
                         <button
                           onClick={() => {
                             setSelectedFundraiserId(f.id);
@@ -1011,7 +990,7 @@ export default function FundraiserView({ user, accentColor = 'cyan' }) {
                           className="p-1 rounded bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-500 transition-colors"
                           title="View Drilldown"
                         >
-                          <Eye className="w-3.5 h-3.5" />
+                          <Eye className="w-3 h-3" />
                         </button>
                         {isSuperAdmin && (
                           <>
@@ -1020,14 +999,14 @@ export default function FundraiserView({ user, accentColor = 'cyan' }) {
                               className="p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-700/60 text-slate-400 hover:text-cyan-500 transition-colors"
                               title="Edit Fundraiser"
                             >
-                              <Edit3 className="w-3.5 h-3.5" />
+                              <Edit3 className="w-3 h-3" />
                             </button>
                             <button
                               onClick={() => setDeleteConfirm(f)}
                               className="p-1 rounded bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 transition-colors"
                               title="Delete Fundraiser"
                             >
-                              <Trash2 className="w-3.5 h-3.5" />
+                              <Trash2 className="w-3 h-3" />
                             </button>
                           </>
                         )}
@@ -1049,41 +1028,41 @@ export default function FundraiserView({ user, accentColor = 'cyan' }) {
             style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-glass)', color: 'var(--text-main)' }}
           >
             {/* Modal Header */}
-            <div className="flex items-center justify-between p-5 border-b" style={{ borderColor: 'var(--border-glass)' }}>
+            <div className="flex items-center justify-between p-4 border-b" style={{ borderColor: 'var(--border-glass)' }}>
               <div className="flex items-center gap-2.5">
                 <div className="p-2 rounded-xl bg-cyan-500/15 text-cyan-500">
-                  <HeartHandshake className="w-5 h-5" />
+                  <HeartHandshake className="w-4 h-4" />
                 </div>
                 <div>
-                  <h3 className="text-base font-extrabold" style={{ color: 'var(--text-main)' }}>
+                  <h3 className="text-sm font-black" style={{ color: 'var(--text-main)' }}>
                     {editingFundraiser ? `Edit Fundraiser: ${editingFundraiser.name}` : 'Create New Fundraiser'}
                   </h3>
-                  <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                    Assign campaigns and codes. A campaign can only be assigned to one fundraiser.
+                  <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                    Assign campaigns &amp; multi-codes. A campaign can only be assigned to one fundraiser.
                   </p>
                 </div>
               </div>
               <button
                 onClick={() => setShowModal(false)}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors"
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4" />
               </button>
             </div>
 
             {/* Modal Body */}
-            <div className="flex-1 overflow-y-auto p-5 custom-scrollbar flex flex-col gap-4">
+            <div className="flex-1 overflow-y-auto p-4 custom-scrollbar flex flex-col gap-3.5">
               {formMsg && (
-                <div className={`p-3 rounded-xl text-xs font-bold border ${
+                <div className={`p-2.5 rounded-lg text-xs font-bold border ${
                   formMsg.startsWith('✅') ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30' : 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/30'
                 }`}>
                   {formMsg}
                 </div>
               )}
 
-              <form onSubmit={handleSubmitModal} id="fundraiser-form" className="flex flex-col gap-4">
+              <form onSubmit={handleSubmitModal} id="fundraiser-form" className="flex flex-col gap-3.5">
                 {/* Row 1: Name & Target Goal */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-bold mb-1" style={{ color: 'var(--text-main)' }}>
                       Fundraiser Name *
@@ -1094,7 +1073,7 @@ export default function FundraiserView({ user, accentColor = 'cyan' }) {
                       placeholder="e.g. Kamrul, Team Alpha, Fatima"
                       value={modalForm.name}
                       onChange={e => setModalForm(prev => ({ ...prev, name: e.target.value }))}
-                      className="w-full rounded-xl px-3 py-2 text-xs focus:outline-none"
+                      className="w-full rounded-lg px-3 py-1.5 text-xs focus:outline-none"
                       style={{ backgroundColor: 'var(--input-bg)', color: 'var(--input-text)', border: '1px solid var(--input-border)' }}
                     />
                   </div>
@@ -1110,14 +1089,14 @@ export default function FundraiserView({ user, accentColor = 'cyan' }) {
                       placeholder="e.g. 50000"
                       value={modalForm.target_goal}
                       onChange={e => setModalForm(prev => ({ ...prev, target_goal: e.target.value }))}
-                      className="w-full rounded-xl px-3 py-2 text-xs focus:outline-none"
+                      className="w-full rounded-lg px-3 py-1.5 text-xs focus:outline-none"
                       style={{ backgroundColor: 'var(--input-bg)', color: 'var(--input-text)', border: '1px solid var(--input-border)' }}
                     />
                   </div>
                 </div>
 
                 {/* Row 2: Status & Optional Manual Start Date */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-bold mb-1" style={{ color: 'var(--text-main)' }}>
                       Status
@@ -1125,7 +1104,7 @@ export default function FundraiserView({ user, accentColor = 'cyan' }) {
                     <select
                       value={modalForm.status}
                       onChange={e => setModalForm(prev => ({ ...prev, status: e.target.value }))}
-                      className="w-full rounded-xl px-3 py-2 text-xs focus:outline-none"
+                      className="w-full rounded-lg px-3 py-1.5 text-xs focus:outline-none"
                       style={{ backgroundColor: 'var(--input-bg)', color: 'var(--input-text)', border: '1px solid var(--input-border)' }}
                     >
                       <option value="ACTIVE">ACTIVE</option>
@@ -1136,13 +1115,13 @@ export default function FundraiserView({ user, accentColor = 'cyan' }) {
 
                   <div>
                     <label className="block text-xs font-bold mb-1" style={{ color: 'var(--text-main)' }}>
-                      <Calendar className="w-3.5 h-3.5 inline mr-1 text-cyan-500" /> Manual Start Date (Optional)
+                      <Calendar className="w-3 h-3 inline mr-1 text-cyan-500" /> Manual Start Date (Optional)
                     </label>
                     <input
                       type="date"
                       value={modalForm.start_date}
                       onChange={e => setModalForm(prev => ({ ...prev, start_date: e.target.value }))}
-                      className="w-full rounded-xl px-3 py-2 text-xs focus:outline-none"
+                      className="w-full rounded-lg px-3 py-1.5 text-xs focus:outline-none"
                       style={{ backgroundColor: 'var(--input-bg)', color: 'var(--input-text)', border: '1px solid var(--input-border)' }}
                     />
                     <span className="text-[10px] block mt-0.5" style={{ color: 'var(--text-sub)' }}>
@@ -1152,7 +1131,7 @@ export default function FundraiserView({ user, accentColor = 'cyan' }) {
                 </div>
 
                 {/* Row 3: Email & Phone (Optional) */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-bold mb-1" style={{ color: 'var(--text-main)' }}>
                       Contact Email (Optional)
@@ -1162,7 +1141,7 @@ export default function FundraiserView({ user, accentColor = 'cyan' }) {
                       placeholder="fundraiser@example.com"
                       value={modalForm.email}
                       onChange={e => setModalForm(prev => ({ ...prev, email: e.target.value }))}
-                      className="w-full rounded-xl px-3 py-2 text-xs focus:outline-none"
+                      className="w-full rounded-lg px-3 py-1.5 text-xs focus:outline-none"
                       style={{ backgroundColor: 'var(--input-bg)', color: 'var(--input-text)', border: '1px solid var(--input-border)' }}
                     />
                   </div>
@@ -1176,18 +1155,18 @@ export default function FundraiserView({ user, accentColor = 'cyan' }) {
                       placeholder="+44 7123 456789"
                       value={modalForm.phone}
                       onChange={e => setModalForm(prev => ({ ...prev, phone: e.target.value }))}
-                      className="w-full rounded-xl px-3 py-2 text-xs focus:outline-none"
+                      className="w-full rounded-lg px-3 py-1.5 text-xs focus:outline-none"
                       style={{ backgroundColor: 'var(--input-bg)', color: 'var(--input-text)', border: '1px solid var(--input-border)' }}
                     />
                   </div>
                 </div>
 
                 {/* ── Campaign & Code Assignment Section ──────────────── */}
-                <div className="mt-2 border-t pt-4" style={{ borderColor: 'var(--border-glass)' }}>
-                  <div className="flex items-center justify-between mb-2">
+                <div className="mt-1 border-t pt-3" style={{ borderColor: 'var(--border-glass)' }}>
+                  <div className="flex items-center justify-between mb-1.5">
                     <div>
-                      <label className="block text-xs font-extrabold flex items-center gap-1.5" style={{ color: 'var(--text-main)' }}>
-                        <Layers className="w-4 h-4 text-cyan-500" /> Assign Campaigns &amp; Multi-Codes *
+                      <label className="block text-xs font-black flex items-center gap-1.5" style={{ color: 'var(--text-main)' }}>
+                        <Layers className="w-3.5 h-3.5 text-cyan-500" /> Assign Campaigns &amp; Multi-Codes *
                       </label>
                       <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
                         Select the campaigns belonging to this fundraiser ({modalForm.assigned_campaigns.length} assigned)
@@ -1198,15 +1177,15 @@ export default function FundraiserView({ user, accentColor = 'cyan' }) {
                   {/* Selected Badges */}
                   {modalForm.assigned_campaigns.length > 0 && (
                     <div 
-                      className="p-3 rounded-xl border mb-3 flex flex-wrap gap-1.5 max-h-28 overflow-y-auto custom-scrollbar"
+                      className="p-2.5 rounded-lg border mb-2.5 flex flex-wrap gap-1 max-h-24 overflow-y-auto custom-scrollbar"
                       style={{ backgroundColor: 'var(--bg-card-inner)', borderColor: 'var(--border-glass)' }}
                     >
                       {modalForm.assigned_campaigns.map((c, i) => (
                         <span 
                           key={i}
-                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-cyan-500/15 text-cyan-700 dark:text-cyan-300 border border-cyan-500/30"
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold bg-cyan-500/15 text-cyan-700 dark:text-cyan-300 border border-cyan-500/30"
                         >
-                          <span className="truncate max-w-[200px]">{c.campaign_name}</span>
+                          <span className="truncate max-w-[180px]">{c.campaign_name}</span>
                           <span className="px-1 rounded bg-cyan-500/25 text-cyan-900 dark:text-white text-[9px] font-black">
                             {c.code || 'ALL'}
                           </span>
@@ -1224,14 +1203,14 @@ export default function FundraiserView({ user, accentColor = 'cyan' }) {
 
                   {/* Search, Platform Filter, and Assignment Filter Toolbar */}
                   <div className="flex items-center gap-2 mb-2 flex-wrap">
-                    <div className="relative flex-1 min-w-[180px]">
-                      <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <div className="relative flex-1 min-w-[160px]">
+                      <Search className="w-3 h-3 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
                       <input
                         type="text"
                         placeholder="Search available campaigns..."
                         value={campaignSearch}
                         onChange={e => setCampaignSearch(e.target.value)}
-                        className="w-full pl-8 pr-3 py-1.5 text-xs rounded-lg focus:outline-none"
+                        className="w-full pl-7 pr-3 py-1.5 text-xs rounded-lg focus:outline-none"
                         style={{ backgroundColor: 'var(--input-bg)', color: 'var(--input-text)', border: '1px solid var(--input-border)' }}
                       />
                     </div>
@@ -1239,7 +1218,7 @@ export default function FundraiserView({ user, accentColor = 'cyan' }) {
                     <select
                       value={platformFilter}
                       onChange={e => setPlatformFilter(e.target.value)}
-                      className="px-2.5 py-1.5 text-xs rounded-lg focus:outline-none"
+                      className="px-2 py-1.5 text-xs rounded-lg focus:outline-none"
                       style={{ backgroundColor: 'var(--input-bg)', color: 'var(--input-text)', border: '1px solid var(--input-border)' }}
                     >
                       <option value="ALL">All Platforms</option>
@@ -1252,7 +1231,7 @@ export default function FundraiserView({ user, accentColor = 'cyan' }) {
                     <select
                       value={assignmentFilter}
                       onChange={e => setAssignmentFilter(e.target.value)}
-                      className="px-2.5 py-1.5 text-xs rounded-lg focus:outline-none"
+                      className="px-2 py-1.5 text-xs rounded-lg focus:outline-none"
                       style={{ backgroundColor: 'var(--input-bg)', color: 'var(--input-text)', border: '1px solid var(--input-border)' }}
                     >
                       <option value="ALL">All Campaigns</option>
@@ -1263,7 +1242,7 @@ export default function FundraiserView({ user, accentColor = 'cyan' }) {
 
                   {/* Available Campaigns Multi-Select List */}
                   <div 
-                    className="border rounded-xl p-2 max-h-48 overflow-y-auto custom-scrollbar flex flex-col gap-1"
+                    className="border rounded-lg p-1.5 max-h-44 overflow-y-auto custom-scrollbar flex flex-col gap-1"
                     style={{ borderColor: 'var(--border-glass)', backgroundColor: 'var(--bg-card-inner)' }}
                   >
                     {filteredAvailableCampaigns.length === 0 ? (
@@ -1282,7 +1261,7 @@ export default function FundraiserView({ user, accentColor = 'cyan' }) {
                           <div
                             key={idx}
                             onClick={() => !isAssignedToOther && handleToggleCampaignAssignment(camp)}
-                            className={`p-2 rounded-lg text-xs flex items-center justify-between gap-2 transition-colors ${
+                            className={`p-1.5 rounded-md text-xs flex items-center justify-between gap-2 transition-colors ${
                               isAssignedToOther 
                                 ? 'opacity-60 cursor-not-allowed bg-slate-500/5' 
                                 : isAssignedToThis
@@ -1293,19 +1272,19 @@ export default function FundraiserView({ user, accentColor = 'cyan' }) {
                             title={isAssignedToOther ? `Already assigned to ${camp.assigned_to?.fundraiser_name}` : undefined}
                           >
                             <div className="flex items-center gap-2 min-w-0">
-                              <div className={`w-4 h-4 rounded flex items-center justify-center text-[10px] font-bold shrink-0 ${
+                              <div className={`w-3.5 h-3.5 rounded flex items-center justify-center text-[9px] font-bold shrink-0 ${
                                 isAssignedToOther 
                                   ? 'bg-amber-500/20 text-amber-600 border border-amber-500/30'
                                   : isAssignedToThis 
                                   ? 'bg-cyan-500 text-white' 
                                   : 'border border-slate-400'
                               }`}>
-                                {isAssignedToOther ? <Lock className="w-2.5 h-2.5" /> : isAssignedToThis ? <Check className="w-3 h-3 stroke-[3]" /> : null}
+                                {isAssignedToOther ? <Lock className="w-2.5 h-2.5" /> : isAssignedToThis ? <Check className="w-2.5 h-2.5 stroke-[3]" /> : null}
                               </div>
                               <div className="truncate">
-                                <span className="font-semibold">{camp.campaign_name}</span>
+                                <span className="font-semibold text-xs">{camp.campaign_name}</span>
                                 <span 
-                                  className="ml-2 px-1.5 py-0.5 rounded text-[10px] font-mono border"
+                                  className="ml-1.5 px-1 py-0.5 rounded text-[9px] font-mono border"
                                   style={{ backgroundColor: 'var(--bg-card)', color: 'var(--accent-cyan)', borderColor: 'var(--border-glass)' }}
                                 >
                                   {camp.code}
@@ -1315,8 +1294,8 @@ export default function FundraiserView({ user, accentColor = 'cyan' }) {
 
                             <div className="flex items-center gap-2 shrink-0">
                               {isAssignedToOther && (
-                                <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30 flex items-center gap-1">
-                                  <Lock className="w-2.5 h-2.5" /> {camp.assigned_to?.fundraiser_name}
+                                <span className="px-1.5 py-0.2 rounded text-[8px] font-bold bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30 flex items-center gap-1">
+                                  <Lock className="w-2 h-2" /> {camp.assigned_to?.fundraiser_name}
                                 </span>
                               )}
                               <span className="text-[10px]" style={{ color: 'var(--text-sub)' }}>
@@ -1333,11 +1312,11 @@ export default function FundraiserView({ user, accentColor = 'cyan' }) {
             </div>
 
             {/* Modal Footer */}
-            <div className="p-4 border-t flex items-center justify-end gap-3" style={{ borderColor: 'var(--border-glass)' }}>
+            <div className="p-3.5 border-t flex items-center justify-end gap-2.5" style={{ borderColor: 'var(--border-glass)' }}>
               <button
                 type="button"
                 onClick={() => setShowModal(false)}
-                className="btn-secondary text-xs px-4 py-2"
+                className="btn-secondary text-xs px-3.5 py-1.5"
               >
                 Cancel
               </button>
@@ -1345,9 +1324,9 @@ export default function FundraiserView({ user, accentColor = 'cyan' }) {
                 type="submit"
                 form="fundraiser-form"
                 disabled={submitting}
-                className="btn-primary text-xs flex items-center gap-1.5 px-5 py-2 shadow-lg shadow-cyan-500/20"
+                className="btn-primary text-xs flex items-center gap-1.5 px-4 py-1.5 shadow-md shadow-cyan-500/20 font-bold"
               >
-                {submitting ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
+                {submitting ? <RefreshCw className="w-3 h-3 animate-spin" /> : <CheckCircle2 className="w-3 h-3" />}
                 {editingFundraiser ? 'Save Changes' : 'Create Fundraiser'}
               </button>
             </div>
@@ -1359,12 +1338,12 @@ export default function FundraiserView({ user, accentColor = 'cyan' }) {
       {deleteConfirm && isSuperAdmin && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
           <div 
-            className="glass-panel max-w-md w-full p-6 rounded-2xl border shadow-2xl animate-in zoom-in-95"
+            className="glass-panel max-w-md w-full p-5 rounded-2xl border shadow-2xl animate-in zoom-in-95"
             style={{ backgroundColor: 'var(--bg-card)', borderColor: 'rgba(244,63,94,0.3)', color: 'var(--text-main)' }}
           >
-            <div className="flex items-center gap-3 text-rose-500 mb-3">
-              <ShieldAlert className="w-6 h-6" />
-              <h3 className="text-base font-extrabold">Confirm Delete Fundraiser</h3>
+            <div className="flex items-center gap-2.5 text-rose-500 mb-2.5">
+              <ShieldAlert className="w-5 h-5" />
+              <h3 className="text-sm font-extrabold">Confirm Delete Fundraiser</h3>
             </div>
             <p className="text-xs" style={{ color: 'var(--text-main)' }}>
               Are you sure you want to delete fundraiser <strong style={{ color: 'var(--text-main)' }}>"{deleteConfirm.name}"</strong>?
@@ -1372,19 +1351,19 @@ export default function FundraiserView({ user, accentColor = 'cyan' }) {
             <p className="text-[11px] mt-1" style={{ color: 'var(--text-sub)' }}>
               This will remove the fundraiser profile and all campaign assignments. Underlying donor transactions will not be deleted.
             </p>
-            <div className="flex items-center justify-end gap-3 mt-6">
+            <div className="flex items-center justify-end gap-2.5 mt-5">
               <button
                 onClick={() => setDeleteConfirm(null)}
-                className="btn-secondary text-xs px-4 py-2"
+                className="btn-secondary text-xs px-3.5 py-1.5"
               >
                 Cancel
               </button>
               <button
                 onClick={() => handleDeleteFundraiser(deleteConfirm.id)}
                 disabled={deleting}
-                className="px-4 py-2 rounded-xl text-xs font-bold bg-rose-500 hover:bg-rose-600 text-white transition-colors flex items-center gap-1.5 shadow-lg shadow-rose-500/20"
+                className="px-3.5 py-1.5 rounded-lg text-xs font-bold bg-rose-500 hover:bg-rose-600 text-white transition-colors flex items-center gap-1.5 shadow-md shadow-rose-500/20"
               >
-                {deleting ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                {deleting ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
                 Delete Permanently
               </button>
             </div>
@@ -1396,21 +1375,21 @@ export default function FundraiserView({ user, accentColor = 'cyan' }) {
       {selectedFundraiserId && (
         <div className="fixed inset-0 z-50 flex justify-end bg-black/60 backdrop-blur-sm animate-in fade-in">
           <div 
-            className="w-full max-w-3xl h-full glass-panel border-l shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-right duration-300 rounded-none" 
+            className="w-full max-w-2xl h-full glass-panel border-l shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-right duration-300 rounded-none" 
             style={{ backgroundColor: 'var(--drawer-bg)', borderColor: 'var(--border-glass)', color: 'var(--text-main)' }}
           >
             
             {/* Drawer Header */}
-            <div className="p-5 border-b flex items-center justify-between gap-4" style={{ borderColor: 'var(--border-glass)' }}>
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-cyan-500/20 text-cyan-500 font-black flex items-center justify-center text-sm border border-cyan-500/30">
+            <div className="p-4 border-b flex items-center justify-between gap-3" style={{ borderColor: 'var(--border-glass)' }}>
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-cyan-500/20 text-cyan-500 font-black flex items-center justify-center text-xs border border-cyan-500/30">
                   {drilldownData?.fundraiser?.name?.substring(0, 2).toUpperCase() || 'FR'}
                 </div>
                 <div>
-                  <h3 className="text-base font-extrabold" style={{ color: 'var(--text-main)' }}>
+                  <h3 className="text-sm font-black" style={{ color: 'var(--text-main)' }}>
                     {drilldownData?.fundraiser?.name || 'Fundraiser Performance'}
                   </h3>
-                  <div className="text-xs flex items-center gap-2 flex-wrap" style={{ color: 'var(--text-muted)' }}>
+                  <div className="text-[11px] flex items-center gap-2 flex-wrap" style={{ color: 'var(--text-muted)' }}>
                     <span>First Gift: <strong>{drilldownData?.fundraiser?.first_donation_date || drilldownData?.fundraiser?.start_date || 'N/A'}</strong></span>
                     {drilldownData?.fundraiser?.latest_donation_date && drilldownData?.fundraiser?.latest_donation_date !== 'N/A' && (
                       <span>• Latest: <strong>{drilldownData?.fundraiser?.latest_donation_date}</strong></span>
@@ -1424,23 +1403,23 @@ export default function FundraiserView({ user, accentColor = 'cyan' }) {
                   setSelectedFundraiserId(null);
                   setDrilldownData(null);
                 }}
-                className="p-2 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors"
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4" />
               </button>
             </div>
 
             {/* Drawer Filter Sub-bar */}
-            <div className="p-3 border-b flex items-center justify-between gap-3 flex-wrap text-xs" style={{ backgroundColor: 'var(--bg-card-inner)', borderColor: 'var(--border-glass)' }}>
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="font-bold flex items-center gap-1" style={{ color: 'var(--text-muted)' }}>
-                  <Calendar className="w-3.5 h-3.5 text-cyan-500" /> Filter Drilldown Period:
+            <div className="p-2.5 border-b flex items-center justify-between gap-2 flex-wrap text-xs" style={{ backgroundColor: 'var(--bg-card-inner)', borderColor: 'var(--border-glass)' }}>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="font-bold flex items-center gap-1 text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                  <Calendar className="w-3 h-3 text-cyan-500" /> Filter:
                 </span>
                 <input
                   type="date"
                   value={drilldownStartDate}
                   onChange={e => setDrilldownStartDate(e.target.value)}
-                  className="px-2 py-1 text-xs rounded-lg focus:outline-none"
+                  className="px-2 py-0.5 text-xs rounded-md focus:outline-none"
                   style={{ backgroundColor: 'var(--input-bg)', color: 'var(--input-text)', border: '1px solid var(--input-border)' }}
                 />
                 <span style={{ color: 'var(--text-sub)' }}>&rarr;</span>
@@ -1448,12 +1427,12 @@ export default function FundraiserView({ user, accentColor = 'cyan' }) {
                   type="date"
                   value={drilldownEndDate}
                   onChange={e => setDrilldownEndDate(e.target.value)}
-                  className="px-2 py-1 text-xs rounded-lg focus:outline-none"
+                  className="px-2 py-0.5 text-xs rounded-md focus:outline-none"
                   style={{ backgroundColor: 'var(--input-bg)', color: 'var(--input-text)', border: '1px solid var(--input-border)' }}
                 />
                 <button
                   onClick={() => loadDrilldown(selectedFundraiserId, drilldownStartDate, drilldownEndDate)}
-                  className="btn-primary text-xs px-2.5 py-1"
+                  className="btn-primary text-[11px] px-2 py-0.5 font-bold"
                 >
                   Apply
                 </button>
@@ -1464,16 +1443,16 @@ export default function FundraiserView({ user, accentColor = 'cyan' }) {
                       setDrilldownEndDate('');
                       loadDrilldown(selectedFundraiserId, '', '');
                     }}
-                    className="text-rose-500 font-bold hover:underline ml-1"
+                    className="text-rose-500 font-bold hover:underline text-[11px] ml-1"
                   >
                     Reset
                   </button>
                 )}
               </div>
 
-              <div className="font-extrabold text-emerald-600 dark:text-emerald-400">
+              <div className="font-black text-emerald-600 dark:text-emerald-400 text-xs">
                 {(drilldownStartDate || drilldownEndDate) ? (
-                  <span>Period Raised: £{drilldownData?.fundraiser?.total_raised_period?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                  <span>Period: £{drilldownData?.fundraiser?.total_raised_period?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                 ) : (
                   <span>All-Time: £{drilldownData?.fundraiser?.total_raised_all_time?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                 )}
@@ -1481,55 +1460,55 @@ export default function FundraiserView({ user, accentColor = 'cyan' }) {
             </div>
 
             {/* Drawer Body */}
-            <div className="flex-1 overflow-y-auto p-5 custom-scrollbar flex flex-col gap-6">
+            <div className="flex-1 overflow-y-auto p-4 custom-scrollbar flex flex-col gap-4">
               {loadingDrilldown ? (
-                <div className="text-center py-12 flex flex-col items-center justify-center gap-3">
-                  <RefreshCw className="w-8 h-8 text-cyan-500 animate-spin" />
+                <div className="text-center py-10 flex flex-col items-center justify-center gap-2">
+                  <RefreshCw className="w-7 h-7 text-cyan-500 animate-spin" />
                   <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Loading campaign breakdown...</p>
                 </div>
               ) : (
                 <>
                   {/* Campaign Breakdown Table */}
                   <div>
-                    <h4 className="text-xs font-extrabold uppercase tracking-wider mb-3 flex items-center gap-1.5" style={{ color: 'var(--text-muted)' }}>
-                      <BarChart3 className="w-4 h-4 text-cyan-500" /> Assigned Campaign Performance
+                    <h4 className="text-xs font-extrabold uppercase tracking-wider mb-2 flex items-center gap-1.5" style={{ color: 'var(--text-muted)' }}>
+                      <BarChart3 className="w-3.5 h-3.5 text-cyan-500" /> Assigned Campaign Performance
                     </h4>
-                    <div className="border rounded-xl overflow-hidden" style={{ borderColor: 'var(--border-glass)' }}>
+                    <div className="border rounded-lg overflow-hidden" style={{ borderColor: 'var(--border-glass)' }}>
                       <table className="w-full text-left text-xs border-collapse">
                         <thead>
                           <tr className="border-b" style={{ backgroundColor: 'var(--table-header-bg)', borderColor: 'var(--border-glass)' }}>
-                            <th className="py-2.5 px-3 font-bold" style={{ color: 'var(--text-muted)' }}>Campaign</th>
-                            <th className="py-2.5 px-3 font-bold" style={{ color: 'var(--text-muted)' }}>Code</th>
-                            <th className="py-2.5 px-3 font-bold" style={{ color: 'var(--text-muted)' }}>Category</th>
-                            <th className="py-2.5 px-3 font-bold text-right" style={{ color: 'var(--text-muted)' }}>
+                            <th className="py-2 px-3 font-bold" style={{ color: 'var(--text-muted)' }}>Campaign</th>
+                            <th className="py-2 px-3 font-bold" style={{ color: 'var(--text-muted)' }}>Code</th>
+                            <th className="py-2 px-3 font-bold" style={{ color: 'var(--text-muted)' }}>Category</th>
+                            <th className="py-2 px-3 font-bold text-right" style={{ color: 'var(--text-muted)' }}>
                               {(drilldownStartDate || drilldownEndDate) ? 'Period Raised' : 'Gross Raised'}
                             </th>
-                            <th className="py-2.5 px-3 font-bold text-right" style={{ color: 'var(--text-muted)' }}>Donors</th>
+                            <th className="py-2 px-3 font-bold text-right" style={{ color: 'var(--text-muted)' }}>Donors</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y" style={{ borderColor: 'var(--border-glass)' }}>
                           {(drilldownData?.campaign_breakdown || []).length === 0 ? (
                             <tr>
-                              <td colSpan={5} className="py-4 text-center" style={{ color: 'var(--text-sub)' }}>
+                              <td colSpan={5} className="py-3 text-center" style={{ color: 'var(--text-sub)' }}>
                                 No donation activity recorded for assigned campaigns yet.
                               </td>
                             </tr>
                           ) : (
                             drilldownData.campaign_breakdown.map((cb, i) => (
                               <tr key={i} className="hover:bg-slate-200/40 dark:hover:bg-slate-800/40 transition-colors">
-                                <td className="py-2.5 px-3 font-bold max-w-[200px] truncate" style={{ color: 'var(--text-main)' }} title={cb.campaign_name}>
+                                <td className="py-2 px-3 font-bold max-w-[180px] truncate" style={{ color: 'var(--text-main)' }} title={cb.campaign_name}>
                                   {cb.campaign_name}
                                 </td>
-                                <td className="py-2.5 px-3 font-mono text-cyan-600 dark:text-cyan-400 font-bold text-[11px]">
+                                <td className="py-2 px-3 font-mono text-cyan-600 dark:text-cyan-400 font-bold text-[10px]">
                                   {cb.code}
                                 </td>
-                                <td className="py-2.5 px-3 text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                                <td className="py-2 px-3 text-[10px]" style={{ color: 'var(--text-muted)' }}>
                                   {cb.heading}
                                 </td>
-                                <td className="py-2.5 px-3 font-extrabold text-emerald-600 dark:text-emerald-400 text-right">
+                                <td className="py-2 px-3 font-black text-emerald-600 dark:text-emerald-400 text-right">
                                   £{cb.gross_raised.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                 </td>
-                                <td className="py-2.5 px-3 text-right font-semibold" style={{ color: 'var(--text-main)' }}>
+                                <td className="py-2 px-3 text-right font-semibold" style={{ color: 'var(--text-main)' }}>
                                   {cb.total_donors}
                                 </td>
                               </tr>
@@ -1543,18 +1522,18 @@ export default function FundraiserView({ user, accentColor = 'cyan' }) {
                   {/* Monthly Timeline */}
                   {(drilldownData?.monthly_timeline || []).length > 0 && (
                     <div>
-                      <h4 className="text-xs font-extrabold uppercase tracking-wider mb-3 flex items-center gap-1.5" style={{ color: 'var(--text-muted)' }}>
-                        <TrendingUp className="w-4 h-4 text-purple-500" /> Monthly Growth Breakdown
+                      <h4 className="text-xs font-extrabold uppercase tracking-wider mb-2 flex items-center gap-1.5" style={{ color: 'var(--text-muted)' }}>
+                        <TrendingUp className="w-3.5 h-3.5 text-purple-500" /> Monthly Growth Breakdown
                       </h4>
                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                         {drilldownData.monthly_timeline.map((m, i) => (
                           <div 
                             key={i} 
-                            className="p-2.5 rounded-xl border text-center transition-all"
+                            className="p-2 rounded-lg border text-center transition-all"
                             style={{ backgroundColor: 'var(--bg-card-inner)', borderColor: 'var(--border-glass)' }}
                           >
-                            <div className="text-[10px] font-bold uppercase" style={{ color: 'var(--text-sub)' }}>{m.month}</div>
-                            <div className="text-xs font-black text-purple-600 dark:text-purple-400 mt-0.5">
+                            <div className="text-[9px] font-bold uppercase" style={{ color: 'var(--text-sub)' }}>{m.month}</div>
+                            <div className="text-[11px] font-black text-purple-600 dark:text-purple-400 mt-0.5">
                               £{m.amount.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                             </div>
                           </div>
@@ -1565,26 +1544,26 @@ export default function FundraiserView({ user, accentColor = 'cyan' }) {
 
                   {/* Recent Donations Log */}
                   <div>
-                    <h4 className="text-xs font-extrabold uppercase tracking-wider mb-3 flex items-center gap-1.5" style={{ color: 'var(--text-muted)' }}>
-                      <Clock className="w-4 h-4 text-cyan-500" /> Recent Transactions ({drilldownData?.recent_transactions?.length || 0})
+                    <h4 className="text-xs font-extrabold uppercase tracking-wider mb-2 flex items-center gap-1.5" style={{ color: 'var(--text-muted)' }}>
+                      <Clock className="w-3.5 h-3.5 text-cyan-500" /> Recent Transactions ({drilldownData?.recent_transactions?.length || 0})
                     </h4>
-                    <div className="border rounded-xl overflow-hidden max-h-60 overflow-y-auto custom-scrollbar" style={{ borderColor: 'var(--border-glass)' }}>
+                    <div className="border rounded-lg overflow-hidden max-h-52 overflow-y-auto custom-scrollbar" style={{ borderColor: 'var(--border-glass)' }}>
                       <table className="w-full text-left text-xs border-collapse">
                         <thead>
                           <tr className="border-b" style={{ backgroundColor: 'var(--table-header-bg)', borderColor: 'var(--border-glass)' }}>
-                            <th className="py-2 px-3 font-bold" style={{ color: 'var(--text-muted)' }}>Date</th>
-                            <th className="py-2 px-3 font-bold" style={{ color: 'var(--text-muted)' }}>Donor</th>
-                            <th className="py-2 px-3 font-bold" style={{ color: 'var(--text-muted)' }}>Campaign</th>
-                            <th className="py-2 px-3 font-bold text-right" style={{ color: 'var(--text-muted)' }}>Amount</th>
+                            <th className="py-1.5 px-2.5 font-bold" style={{ color: 'var(--text-muted)' }}>Date</th>
+                            <th className="py-1.5 px-2.5 font-bold" style={{ color: 'var(--text-muted)' }}>Donor</th>
+                            <th className="py-1.5 px-2.5 font-bold" style={{ color: 'var(--text-muted)' }}>Campaign</th>
+                            <th className="py-1.5 px-2.5 font-bold text-right" style={{ color: 'var(--text-muted)' }}>Amount</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y" style={{ borderColor: 'var(--border-glass)' }}>
                           {(drilldownData?.recent_transactions || []).map((tx, i) => (
                             <tr key={i} className="hover:bg-slate-200/40 dark:hover:bg-slate-800/40 transition-colors">
-                              <td className="py-2 px-3 text-[11px]" style={{ color: 'var(--text-sub)' }}>{tx.date}</td>
-                              <td className="py-2 px-3 font-bold" style={{ color: 'var(--text-main)' }}>{tx.donor_name}</td>
-                              <td className="py-2 px-3 truncate max-w-[150px]" style={{ color: 'var(--text-muted)' }}>{tx.campaign_name}</td>
-                              <td className="py-2 px-3 font-bold text-emerald-600 dark:text-emerald-400 text-right">£{tx.amount.toFixed(2)}</td>
+                              <td className="py-1.5 px-2.5 text-[10px]" style={{ color: 'var(--text-sub)' }}>{tx.date}</td>
+                              <td className="py-1.5 px-2.5 font-bold" style={{ color: 'var(--text-main)' }}>{tx.donor_name}</td>
+                              <td className="py-1.5 px-2.5 truncate max-w-[140px]" style={{ color: 'var(--text-muted)' }}>{tx.campaign_name}</td>
+                              <td className="py-1.5 px-2.5 font-bold text-emerald-600 dark:text-emerald-400 text-right">£{tx.amount.toFixed(2)}</td>
                             </tr>
                           ))}
                         </tbody>
