@@ -247,22 +247,47 @@ export default function DonorDrawer({ donorId, onClose }) {
                       <thead className="sticky top-0 z-10 bg-slate-900 border-b border-white/10">
                         <tr>
                           <th>Date (UTC)</th>
-                          <th>Campaign</th>
+                          <th>Platform</th>
+                          <th>Campaign / Ref</th>
                           <th>Category Heading</th>
                           <th>Sub-Heading</th>
                           <th>Net Settled Amount</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {historyRecords.map((txn, i) => (
-                          <tr key={i}>
-                            <td className="text-xs text-slate-400 font-mono">{txn['Created Date (UTC)'] ? String(txn['Created Date (UTC)']).split('T')[0] : 'N/A'}</td>
-                            <td className="text-xs font-bold text-slate-200 max-w-[160px] truncate">{txn['Campaign Name'] || 'N/A'}</td>
-                            <td className="text-xs text-cyan-400 font-semibold">{txn['Heading'] || 'Unassigned'}</td>
-                            <td className="text-xs text-purple-300">{txn['Sub-Heading'] || 'Unassigned'}</td>
-                            <td className="text-xs font-black text-cyan-400">£{txn['Total Online Donations Net Amount in Settled Currency']?.toFixed(2) || '0.00'}</td>
-                          </tr>
-                        ))}
+                        {historyRecords.map((txn, i) => {
+                          const isPaysuite = (txn['Platform'] || '').toLowerCase() === 'paysuite' || String(txn['Campaign Name'] || '').startsWith('REC-');
+                          const platName = txn['Platform'] || (isPaysuite ? 'Paysuite' : 'LaunchGood');
+                          return (
+                            <tr key={i}>
+                              <td className="text-xs text-slate-400 font-mono whitespace-nowrap">{txn['Created Date (UTC)'] ? String(txn['Created Date (UTC)']).split('T')[0] : 'N/A'}</td>
+                              <td className="text-xs whitespace-nowrap">
+                                <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                                  isPaysuite ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30' :
+                                  platName === 'GiveBright' ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' :
+                                  'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
+                                }`}>
+                                  {platName}
+                                </span>
+                              </td>
+                              <td className="text-xs font-bold text-slate-200 max-w-[200px]" title={txn['Campaign Name']}>
+                                {isPaysuite ? (
+                                  <div className="flex items-center gap-1.5 truncate">
+                                    <span className="font-mono text-purple-200 truncate">{txn['Campaign Name']}</span>
+                                    <span className="text-[9px] px-1 py-0.2 rounded bg-purple-950 text-purple-300 border border-purple-500/40 shrink-0 font-sans">
+                                      Bank Ref
+                                    </span>
+                                  </div>
+                                ) : (
+                                  <div className="truncate">{txn['Campaign Name'] || 'N/A'}</div>
+                                )}
+                              </td>
+                              <td className="text-xs text-cyan-400 font-semibold">{txn['Heading'] || 'Unassigned'}</td>
+                              <td className="text-xs text-purple-300">{txn['Sub-Heading'] || 'Unassigned'}</td>
+                              <td className="text-xs font-black text-cyan-400">£{txn['Total Online Donations Net Amount in Settled Currency']?.toFixed(2) || '0.00'}</td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   )}

@@ -758,51 +758,68 @@ def sync_matrix_classifications_to_donors(matrix_df):
     campaign_series = df_raw["Campaign Name"].astype(str).str.strip().str.lower()
     code_series = df_raw["Code"].astype(str).str.strip().str.lower() if "Code" in df_raw.columns else pd.Series("unassigned", index=df_raw.index)
 
-    # Precalculate number of distinct rules per campaign name to support auto-assignment on unassigned code
-    rules_per_cname = {}
+    # Group rules by campaign_name to accurately handle single-rule vs multi-rule campaigns
+    cname_to_rules = {}
     for _, row in matrix_df.iterrows():
         cname = str(row.get("Campaign Name", "")).strip().lower()
         if cname and cname not in ["n/a", "none", "nan", ""]:
-            rules_per_cname[cname] = rules_per_cname.get(cname, 0) + 1
+            if cname not in cname_to_rules:
+                cname_to_rules[cname] = []
+            cname_to_rules[cname].append(row)
 
-    for _, row in matrix_df.iterrows():
-        cname = str(row.get("Campaign Name", "")).strip().lower()
-        code = str(row.get("Code", "")).strip().lower()
-        if not cname or cname in ["n/a", "none", "nan", ""]:
+    for cname, rules_list in cname_to_rules.items():
+        c_mask = (campaign_series == cname)
+        if not c_mask.any():
             continue
 
-        rules = {
-            "Heading": str(row.get("Heading", "Unassigned")),
-            "Sub-Heading": str(row.get("Sub-Heading", "Unassigned")),
-            "Country": str(row.get("Country", "Unassigned")),
-            "Code": str(row.get("Code", "Unassigned")),
-            "Zakat Eligibility": str(row.get("Zakat Eligibility", "Unassigned")),
-        }
-        if "Campaign URL" in row and str(row.get("Campaign URL") or "").strip():
-            rules["Campaign URL"] = str(row.get("Campaign URL")).strip()
+        if len(rules_list) == 1:
+            # Single-rule campaign: update ALL records for this campaign unconditionally
+            row = rules_list[0]
+            col_vals = {
+                "Heading": str(row.get("Heading", "Unassigned")),
+                "Sub-Heading": str(row.get("Sub-Heading", "Unassigned")),
+                "Country": str(row.get("Country", "Unassigned")),
+                "Code": str(row.get("Code", "Unassigned")),
+                "Zakat Eligibility": str(row.get("Zakat Eligibility", "Unassigned")),
+            }
+            if "Campaign URL" in row and str(row.get("Campaign URL") or "").strip():
+                col_vals["Campaign URL"] = str(row.get("Campaign URL")).strip()
 
-        # Strict match by (Campaign Name + Code)
-        is_prim = bool(row.get("is_primary") in [1, True, "1", "true", "True"])
-        if code and code not in ["unassigned", "nan", "none", "n/a", ""]:
-            mask = (campaign_series == cname) & (code_series == code)
-            # Fallback: if this rule is marked Primary (or only rule for campaign), auto-assign records with unassigned code
-            if is_prim or rules_per_cname.get(cname, 0) == 1:
-                mask |= (campaign_series == cname) & code_series.isin(["", "unassigned", "nan", "none", "n/a"])
-        else:
-            mask = (campaign_series == cname)
-
-        if mask.any():
-            updated_count += int(mask.sum())
-            for col_name, col_val in rules.items():
+            for col_name, col_val in col_vals.items():
                 if col_name in df_raw.columns:
-                    df_raw.loc[mask, col_name] = col_val
+                    df_raw.loc[c_mask, col_name] = col_val
+            updated_count += int(c_mask.sum())
+        else:
+            # Multi-code campaign:
+            primary_row = next((r for r in rules_list if bool(r.get("is_primary") in [1, True, "1", "true", "True"])), rules_list[0])
+            valid_codes = [str(r.get("Code", "")).strip().lower() for r in rules_list if str(r.get("Code", "")).strip().lower() not in ["", "unassigned", "nan", "none", "n/a"]]
+
+            # 1. Update matching exact code rows
+            for row in rules_list:
+                code = str(row.get("Code", "")).strip().lower()
+                if not code or code in ["unassigned", "nan", "none", "n/a"]:
+                    continue
+                code_mask = c_mask & (code_series == code)
+                if code_mask.any():
+                    for col in ["Heading", "Sub-Heading", "Country", "Code", "Zakat Eligibility"]:
+                        if col in df_raw.columns:
+                            df_raw.loc[code_mask, col] = str(row.get(col, "Unassigned"))
+                    updated_count += int(code_mask.sum())
+
+            # 2. Update any leftover or unassigned transactions of this campaign to the Primary variant
+            leftover_mask = c_mask & (~code_series.isin(valid_codes))
+            if leftover_mask.any():
+                for col in ["Heading", "Sub-Heading", "Country", "Code", "Zakat Eligibility"]:
+                    if col in df_raw.columns:
+                        df_raw.loc[leftover_mask, col] = str(primary_row.get(col, "Unassigned"))
+                updated_count += int(leftover_mask.sum())
 
     df_raw = sanitize_df_dtypes_for_parquet(df_raw)
     df_raw.to_parquet(PARQUET_PATH, index=False)
     conn = sqlite3.connect(LOCAL_DB_PATH, timeout=30.0)
     df_raw.to_sql("donations", con=conn, if_exists="replace", index=False)
 
-    # Also update payouts_cache.parquet & payout_settlements table in SQLite if available
+    # Also update payouts_cache.parquet & payout_settlements table in SQLite
     try:
         from config.settings import PAYOUTS_PARQUET_PATH
         if os.path.exists(PAYOUTS_PARQUET_PATH):
@@ -810,21 +827,37 @@ def sync_matrix_classifications_to_donors(matrix_df):
             if not pdf.empty:
                 p_cname = pdf.get("Campaign Name", pdf.get("Project Name", pd.Series("", index=pdf.index))).astype(str).str.strip().str.lower()
                 p_code = pdf.get("Code", pd.Series("unassigned", index=pdf.index)).astype(str).str.strip().str.lower()
-                
-                for _, row in matrix_df.iterrows():
-                    cname = str(row.get("Campaign Name", "")).strip().lower()
-                    code = str(row.get("Code", "")).strip().lower()
-                    if not cname:
+
+                for cname, rules_list in cname_to_rules.items():
+                    pc_mask = (p_cname == cname)
+                    if not pc_mask.any():
                         continue
-                    if code and code not in ["unassigned", "nan", "none", "n/a", ""]:
-                        p_mask = (p_cname == cname) & (p_code == code)
-                    else:
-                        p_mask = (p_cname == cname)
-                    if p_mask.any():
-                        for col in ["Heading", "Sub-Heading", "Country", "Zakat Eligibility"]:
+
+                    if len(rules_list) == 1:
+                        row = rules_list[0]
+                        for col in ["Heading", "Sub-Heading", "Country", "Code", "Zakat Eligibility"]:
                             if col in pdf.columns:
-                                pdf.loc[p_mask, col] = str(row.get(col, "Unassigned"))
-                
+                                pdf.loc[pc_mask, col] = str(row.get(col, "Unassigned"))
+                    else:
+                        primary_row = next((r for r in rules_list if bool(r.get("is_primary") in [1, True, "1", "true", "True"])), rules_list[0])
+                        valid_codes = [str(r.get("Code", "")).strip().lower() for r in rules_list if str(r.get("Code", "")).strip().lower() not in ["", "unassigned", "nan", "none", "n/a"]]
+
+                        for row in rules_list:
+                            code = str(row.get("Code", "")).strip().lower()
+                            if not code or code in ["unassigned", "nan", "none", "n/a"]:
+                                continue
+                            pcode_mask = pc_mask & (p_code == code)
+                            if pcode_mask.any():
+                                for col in ["Heading", "Sub-Heading", "Country", "Code", "Zakat Eligibility"]:
+                                    if col in pdf.columns:
+                                        pdf.loc[pcode_mask, col] = str(row.get(col, "Unassigned"))
+
+                        leftover_pmask = pc_mask & (~p_code.isin(valid_codes))
+                        if leftover_pmask.any():
+                            for col in ["Heading", "Sub-Heading", "Country", "Code", "Zakat Eligibility"]:
+                                if col in pdf.columns:
+                                    pdf.loc[leftover_pmask, col] = str(primary_row.get(col, "Unassigned"))
+
                 pdf = sanitize_df_dtypes_for_parquet(pdf)
                 pdf.to_parquet(PAYOUTS_PARQUET_PATH, index=False)
                 pdf.to_sql("payout_settlements", con=conn, if_exists="replace", index=False)
@@ -833,6 +866,8 @@ def sync_matrix_classifications_to_donors(matrix_df):
 
     conn.close()
     invalidate_data_cache()
+    from core.data_processor import invalidate_payouts_cache
+    invalidate_payouts_cache()
     return updated_count
 
 
@@ -855,15 +890,24 @@ def save_classification_matrix(matrix_df):
     clean_matrix["Community Name"] = clean_matrix["Community Name"].astype(str).fillna("N/A").replace({'nan': 'N/A', '': 'N/A', 'None': 'N/A'})
 
     conn = sqlite3.connect(LOCAL_DB_PATH, timeout=30.0)
+
+    # 1. Reconcile codes per campaign: remove any codes in DB that are NOT in the submitted matrix for these campaigns
+    cname_to_codes = {}
+    for _, row in clean_matrix.iterrows():
+        cname = str(row.get("Campaign Name", "Unassigned")).strip().replace("’", "'").replace("‘", "'")
+        code = str(row.get("Code", "Unassigned")).strip()
+        if cname and cname.lower() not in ["nan", "none", "n/a", "", "campaign_name", "campaign name"]:
+            cname_to_codes.setdefault(cname.lower(), set()).add(code.lower())
+
+    for cname_lower, codes in cname_to_codes.items():
+        placeholders = ','.join(['?'] * len(codes))
+        conn.execute(f"DELETE FROM campaign_classifications WHERE LOWER(campaign_name) = ? AND LOWER(code) NOT IN ({placeholders})", [cname_lower] + list(codes))
+
     for _, row in clean_matrix.iterrows():
         cname = str(row.get("Campaign Name", "Unassigned")).strip().replace("’", "'").replace("‘", "'")
         code = str(row.get("Code", "Unassigned")).strip()
         if not cname or cname.lower() in ["nan", "none", "n/a", "", "campaign_name", "campaign name"]:
             continue
-
-        # If a valid code is assigned, remove any obsolete unassigned rule for this campaign
-        if code.lower() not in ["unassigned", "nan", "none", "n/a", ""]:
-            conn.execute("DELETE FROM campaign_classifications WHERE LOWER(campaign_name) = ? AND LOWER(code) IN ('unassigned', 'nan', 'none', 'n/a', '')", (cname.lower(),))
 
         conn.execute("DELETE FROM campaign_classifications WHERE LOWER(campaign_name) = ? AND LOWER(code) = ?", (cname.lower(), code.lower()))
         conn.execute("""
@@ -961,15 +1005,37 @@ def save_paysuite_classification_matrix(matrix_df):
     if matrix_df.empty:
         return 0
     conn = sqlite3.connect(LOCAL_DB_PATH, timeout=30.0)
+
+    # 1. Reconcile codes per campaign: remove any codes in DB that are NOT in the submitted matrix for these campaigns
+    cname_to_codes = {}
+    for _, row in matrix_df.iterrows():
+        cname = str(row.get("Campaign Name", "Unassigned")).strip().replace("’", "'").replace("‘", "'")
+        code = str(row.get("Code", "Unassigned")).strip()
+        if cname and cname.lower() not in ["nan", "none", "n/a", "", "campaign_name", "campaign name"]:
+            cname_to_codes.setdefault(cname.lower(), set()).add(code.lower())
+
+    for cname_lower, codes in cname_to_codes.items():
+        placeholders = ','.join(['?'] * len(codes))
+        conn.execute(f"DELETE FROM paysuite_classifications WHERE LOWER(campaign_name) = ? AND LOWER(code) NOT IN ({placeholders})", [cname_lower] + list(codes))
+
     for _, row in matrix_df.iterrows():
         cname = str(row.get("Campaign Name", "Unassigned")).strip().replace("’", "'").replace("‘", "'")
         code = str(row.get("Code", "Unassigned")).strip()
         if not cname or cname.lower() in ["nan", "none", "n/a", "", "campaign_name", "campaign name"]:
             continue
 
-        # If a valid code is assigned, remove any obsolete unassigned rule for this campaign
-        if code.lower() not in ["unassigned", "nan", "none", "n/a", ""]:
-            conn.execute("DELETE FROM paysuite_classifications WHERE LOWER(campaign_name) = ? AND LOWER(code) IN ('unassigned', 'nan', 'none', 'n/a', '')", (cname.lower(),))
+        d_name = str(row.get("Donor Name") or "").strip()
+        d_email = str(row.get("Donor Email") or "").strip()
+
+        # If donor name or email is blank in the incoming row, preserve existing values from DB
+        if not d_name or not d_email or d_name.lower() == 'n/a' or d_email.lower() == 'n/a':
+            cur = conn.execute("SELECT donor_name, donor_email FROM paysuite_classifications WHERE LOWER(campaign_name) = ? AND donor_name != '' AND donor_name != 'N/A' LIMIT 1", (cname.lower(),))
+            res = cur.fetchone()
+            if res:
+                if (not d_name or d_name.lower() == 'n/a') and res[0]:
+                    d_name = res[0]
+                if (not d_email or d_email.lower() == 'n/a') and res[1]:
+                    d_email = res[1]
 
         conn.execute("DELETE FROM paysuite_classifications WHERE LOWER(campaign_name) = ? AND LOWER(code) = ?", (cname.lower(), code.lower()))
         conn.execute("""
@@ -983,8 +1049,8 @@ def save_paysuite_classification_matrix(matrix_df):
             str(row.get("Sub-Heading", "Unassigned")),
             str(row.get("Country", "Unassigned")),
             str(row.get("Zakat Eligibility", "Unassigned")),
-            str(row.get("Donor Name", "")),
-            str(row.get("Donor Email", "")),
+            d_name,
+            d_email,
             1 if row.get("is_primary") in [1, True, "1", "true", "True"] else 0
         ))
     conn.commit()
@@ -1054,15 +1120,24 @@ def save_rethink_website_classification_matrix(matrix_df):
     if matrix_df.empty:
         return 0
     conn = sqlite3.connect(LOCAL_DB_PATH, timeout=30.0)
+
+    # 1. Reconcile codes per campaign: remove any codes in DB that are NOT in the submitted matrix for these campaigns
+    cname_to_codes = {}
+    for _, row in matrix_df.iterrows():
+        cname = str(row.get("Campaign Name", "Unassigned")).strip().replace("’", "'").replace("‘", "'")
+        code = str(row.get("Code", "Unassigned")).strip()
+        if cname and cname.lower() not in ["nan", "none", "n/a", "", "campaign_name", "campaign name"]:
+            cname_to_codes.setdefault(cname.lower(), set()).add(code.lower())
+
+    for cname_lower, codes in cname_to_codes.items():
+        placeholders = ','.join(['?'] * len(codes))
+        conn.execute(f"DELETE FROM rethink_website_classifications WHERE LOWER(campaign_name) = ? AND LOWER(code) NOT IN ({placeholders})", [cname_lower] + list(codes))
+
     for _, row in matrix_df.iterrows():
         cname = str(row.get("Campaign Name", "Unassigned")).strip().replace("’", "'").replace("‘", "'")
         code = str(row.get("Code", "Unassigned")).strip()
         if not cname or cname.lower() in ["nan", "none", "n/a", "", "campaign_name", "campaign name"]:
             continue
-
-        # If a valid code is assigned, remove any obsolete unassigned rule for this campaign
-        if code.lower() not in ["unassigned", "nan", "none", "n/a", ""]:
-            conn.execute("DELETE FROM rethink_website_classifications WHERE LOWER(campaign_name) = ? AND LOWER(code) IN ('unassigned', 'nan', 'none', 'n/a', '')", (cname.lower(),))
 
         conn.execute("DELETE FROM rethink_website_classifications WHERE LOWER(campaign_name) = ? AND LOWER(code) = ?", (cname.lower(), code.lower()))
         conn.execute("""
@@ -1381,7 +1456,10 @@ def _enrich_dataframe(df, platform="auto"):
             df["Billing Country"] = df["Billing Country"].apply(safe_country)
 
         if "created_at" in df.columns:
-            parsed = pd.to_datetime(df["created_at"], errors="coerce")
+            parsed = pd.to_datetime(df["created_at"], errors="coerce", dayfirst=True)
+            if parsed.isna().sum() > 0:
+                parsed_fallback = pd.to_datetime(df["created_at"][parsed.isna()], errors="coerce", format="mixed")
+                parsed.update(parsed_fallback)
             df["Created Date (UTC)"] = parsed.dt.date.astype(str)
             df["Created Time (UTC)"] = parsed.dt.time.astype(str)
 

@@ -859,13 +859,16 @@ def get_donor_360_profile(donor_id_or_email: str):
     timeline_cols = [c for c in [
         "Created Date (UTC)", "Campaign Name", "Heading", "Sub-Heading", 
         "Donation Currency (DC)", "Donation Amount (in Donation Currency)", 
-        col_amount, "Payment Frequency", "Source"
+        col_amount, "Payment Frequency", "Platform", "Source"
     ] if c in donor_txns.columns]
 
     timeline_df = donor_txns[timeline_cols].copy()
     if "Created Date (UTC)" in timeline_df.columns:
-        timeline_df["Created Date (UTC)"] = pd.to_datetime(timeline_df["Created Date (UTC)"], errors="coerce")
-        timeline_df = timeline_df.sort_values(by="Created Date (UTC)", ascending=False)
+        parsed_dates = pd.to_datetime(timeline_df["Created Date (UTC)"], errors="coerce", format="mixed")
+        timeline_df["_sort_date"] = parsed_dates
+        timeline_df = timeline_df.sort_values(by="_sort_date", ascending=False)
+        timeline_df["Created Date (UTC)"] = timeline_df["_sort_date"].dt.strftime("%Y-%m-%d").fillna("N/A")
+        timeline_df = timeline_df.drop(columns=["_sort_date"], errors="ignore")
 
     timeline_df = timeline_df.fillna("N/A")
     if col_amount in timeline_df.columns:
@@ -922,13 +925,16 @@ def get_donor_history_paginated(
     timeline_cols = [c for c in [
         "Created Date (UTC)", "Campaign Name", "Heading", "Sub-Heading", 
         "Donation Currency (DC)", "Donation Amount (in Donation Currency)", 
-        col_amount, "Payment Frequency", "Source"
+        col_amount, "Payment Frequency", "Platform", "Source"
     ] if c in donor_txns.columns]
 
     timeline_df = donor_txns[timeline_cols].copy()
     if "Created Date (UTC)" in timeline_df.columns:
-        timeline_df["Created Date (UTC)"] = pd.to_datetime(timeline_df["Created Date (UTC)"], errors="coerce")
-        timeline_df = timeline_df.sort_values(by="Created Date (UTC)", ascending=False)
+        parsed_dates = pd.to_datetime(timeline_df["Created Date (UTC)"], errors="coerce", format="mixed")
+        timeline_df["_sort_date"] = parsed_dates
+        timeline_df = timeline_df.sort_values(by="_sort_date", ascending=False)
+        timeline_df["Created Date (UTC)"] = timeline_df["_sort_date"].dt.strftime("%Y-%m-%d").fillna("N/A")
+        timeline_df = timeline_df.drop(columns=["_sort_date"], errors="ignore")
 
     timeline_df = timeline_df.fillna("N/A")
     if col_amount in timeline_df.columns:
