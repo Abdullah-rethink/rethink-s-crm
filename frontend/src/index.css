@@ -67,6 +67,11 @@
   --badge-amber-border: rgba(217, 119, 6, 0.2);
 }
 
+html {
+  font-size: 14px;
+  -webkit-text-size-adjust: 100%;
+}
+
 * {
   box-sizing: border-box;
   margin: 0;
@@ -79,6 +84,8 @@ body {
   font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
   min-height: 100vh;
   overflow-x: hidden;
+  font-size: 0.925rem;
+  line-height: 1.45;
   transition: background-color 0.25s ease, color 0.25s ease;
 }
 
