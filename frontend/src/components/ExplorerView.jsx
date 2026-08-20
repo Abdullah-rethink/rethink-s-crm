@@ -811,6 +811,9 @@ export default function ExplorerView({ user, filters, onSelectDonor }) {
             <table className="crm-table">
               <thead className="sticky top-0 z-20 backdrop-blur-md bg-slate-900/90 border-b border-white/10">
                 <tr>
+                  <th className="whitespace-nowrap font-extrabold tracking-wider text-center pl-4 w-20">
+                    Actions
+                  </th>
                   {selectedColumns.map(c => {
                     const isSorted = sortBy === c;
                     return (
@@ -845,9 +848,6 @@ export default function ExplorerView({ user, filters, onSelectDonor }) {
                       </th>
                     );
                   })}
-                  <th className="whitespace-nowrap font-extrabold tracking-wider text-right pr-4">
-                    Actions
-                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5">
@@ -858,154 +858,9 @@ export default function ExplorerView({ user, filters, onSelectDonor }) {
                       key={rowIdx} 
                       className="hover:bg-cyan-500/5 transition-colors group"
                     >
-                      {selectedColumns.map(c => {
-                        const val = row[c];
-                        const isEditingThis = editingCell?.rowIdx === rowIdx && editingCell?.colName === c;
-
-                        if (isEditingThis) {
-                          const rowCName = (row['Campaign Name'] || '').trim().toLowerCase();
-                          const rowVariants = (rowCName && campaignCodesLookup[rowCName]) || [];
-                          return (
-                            <td key={c} className="p-1">
-                              <div className="flex items-center gap-1 inline-edit-input" onClick={e => e.stopPropagation()}>
-                                <input 
-                                  autoFocus
-                                  type="text" 
-                                  list={c === 'Code' ? `explorer-inline-codes-${rowIdx}` : undefined}
-                                  value={editingCell.value} 
-                                  onChange={e => setEditingCell({ ...editingCell, value: e.target.value })}
-                                  onKeyDown={e => {
-                                    if (e.key === 'Enter') handleInlineSave(row, c, editingCell.value);
-                                    if (e.key === 'Escape') setEditingCell(null);
-                                  }}
-                                  className="bg-slate-900 border border-cyan-400 rounded-lg px-2 py-1 text-xs text-white w-full focus:outline-none"
-                                />
-                                {c === 'Code' && (
-                                  <datalist id={`explorer-inline-codes-${rowIdx}`}>
-                                    {rowVariants.map(v => (
-                                      <option key={v.code} value={v.code}>{v.code} - {v.heading} ({v.country})</option>
-                                    ))}
-                                    {Object.keys(codeMap).map(k => (
-                                      <option key={k} value={k.toUpperCase()} />
-                                    ))}
-                                  </datalist>
-                                )}
-                                <button 
-                                  onClick={() => handleInlineSave(row, c, editingCell.value)}
-                                  className="p-1 rounded-lg bg-emerald-500 text-slate-950 hover:bg-emerald-400 transition-all font-bold text-xs cursor-pointer"
-                                  title="Save (Enter)"
-                                >
-                                  <Check className="w-3.5 h-3.5" />
-                                </button>
-                                <button 
-                                  onClick={() => setEditingCell(null)}
-                                  className="p-1 rounded-lg bg-slate-800 text-slate-400 hover:text-white transition-all text-xs cursor-pointer"
-                                  title="Cancel (Esc)"
-                                >
-                                  <X className="w-3.5 h-3.5" />
-                                </button>
-                              </div>
-                            </td>
-                          );
-                        }
-
-                        if (c === 'First Name' || c === 'Display Name') {
-                          const isSettled = String(row['Payout Settled'] || row['payout_settled'] || '').toLowerCase() === 'yes';
-                          return (
-                            <td 
-                              key={c} 
-                              onDoubleClick={(e) => {
-                                e.stopPropagation();
-                                if (canEdit) setEditingCell({ rowIdx, colName: c, value: String(val || '') });
-                              }}
-                              title={canEdit ? "Double-click to edit name" : ""}
-                              className="whitespace-nowrap font-medium"
-                            >
-                              <div className="flex items-center gap-2">
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    onSelectDonor(donorKey);
-                                  }}
-                                  className="text-cyan-400 hover:text-cyan-300 font-bold hover:underline flex items-center gap-1.5 cursor-pointer text-left"
-                                  title="Click to view donor detail side view"
-                                >
-                                  <Eye className="w-3 h-3 opacity-60 group-hover:opacity-100" />
-                                  <span>{val || 'Unnamed Donor'}</span>
-                                </button>
-                                {isSettled && (
-                                  <span className="text-[10px] px-2 py-0.5 rounded-full font-extrabold uppercase bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 shadow-sm" title="Donor transaction settled in payout bank transfer">
-                                    Settled
-                                  </span>
-                                )}
-                              </div>
-                            </td>
-                          );
-                        }
-                        if (c === 'Total Online Donations Net Amount in Settled Currency' || typeof val === 'number') {
-                          return (
-                            <td 
-                              key={c} 
-                              onDoubleClick={(e) => {
-                                e.stopPropagation();
-                                if (canEdit) setEditingCell({ rowIdx, colName: c, value: String(val ?? '') });
-                              }}
-                              title={canEdit ? "Double-click to edit amount" : ""}
-                              className="font-mono text-cyan-400 font-extrabold whitespace-nowrap"
-                            >
-                              £{typeof val === 'number' ? val.toFixed(2) : parseFloat(val || 0).toFixed(2)}
-                            </td>
-                          );
-                        }
-                        if (c === 'Lifetime Donor Classification' || c === 'Transaction Donor Classification') {
-                          return (
-                            <td 
-                              key={c} 
-                              onDoubleClick={(e) => {
-                                e.stopPropagation();
-                                if (canEdit) setEditingCell({ rowIdx, colName: c, value: String(val ?? '') });
-                              }}
-                              title={canEdit ? "Double-click to edit tier" : ""}
-                              className="whitespace-nowrap"
-                            >
-                              <span className={`badge ${getTierBadgeClass(val)}`}>{val || 'Unassigned'}</span>
-                            </td>
-                          );
-                        }
-                        if (c === 'Created Date (UTC)') {
-                          return (
-                            <td 
-                              key={c} 
-                              onDoubleClick={(e) => {
-                                e.stopPropagation();
-                                if (canEdit) setEditingCell({ rowIdx, colName: c, value: String(val ?? '') });
-                              }}
-                              title={canEdit ? "Double-click to edit date" : ""}
-                              className="text-slate-400 text-xs font-mono whitespace-nowrap"
-                            >
-                              {formatDate(val)}
-                            </td>
-                          );
-                        }
-                        return (
-                          <td 
-                            key={c} 
-                            onDoubleClick={(e) => {
-                              e.stopPropagation();
-                              if (canEdit) setEditingCell({ rowIdx, colName: c, value: String(val ?? '') });
-                            }}
-                            title={canEdit ? "Double click to edit cell" : ""}
-                            className="max-w-[240px] truncate text-slate-200 cursor-text hover:bg-white/5 transition-colors"
-                          >
-                            {val !== undefined && val !== null ? String(val) : ''}
-                          </td>
-                        );
-                      })}
-
-                      {/* Actions Column */}
-                      <td className="whitespace-nowrap text-right pr-4">
-                        <div className="flex items-center justify-end gap-1.5" onClick={e => e.stopPropagation()}>
+                      {/* Actions Column on Extreme Left */}
+                      <td className="whitespace-nowrap text-center pl-4 w-20">
+                        <div className="flex items-center justify-center gap-1.5" onClick={e => e.stopPropagation()}>
                           <button
                             type="button"
                             onClick={() => onSelectDonor(donorKey)}
@@ -1039,6 +894,78 @@ export default function ExplorerView({ user, filters, onSelectDonor }) {
                           )}
                         </div>
                       </td>
+
+                      {selectedColumns.map(c => {
+                        const val = row[c];
+
+                        if (c === 'First Name' || c === 'Display Name') {
+                          const isSettled = String(row['Payout Settled'] || row['payout_settled'] || '').toLowerCase() === 'yes';
+                          return (
+                            <td 
+                              key={c} 
+                              className="whitespace-nowrap font-medium"
+                            >
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    onSelectDonor(donorKey);
+                                  }}
+                                  className="text-cyan-400 hover:text-cyan-300 font-bold hover:underline flex items-center gap-1.5 cursor-pointer text-left"
+                                  title="Click to view donor detail side view"
+                                >
+                                  <Eye className="w-3 h-3 opacity-60 group-hover:opacity-100" />
+                                  <span>{val || 'Unnamed Donor'}</span>
+                                </button>
+                                {isSettled && (
+                                  <span className="text-[10px] px-2 py-0.5 rounded-full font-extrabold uppercase bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 shadow-sm" title="Donor transaction settled in payout bank transfer">
+                                    Settled
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+                          );
+                        }
+                        if (c === 'Total Online Donations Net Amount in Settled Currency' || typeof val === 'number') {
+                          return (
+                            <td 
+                              key={c} 
+                              className="font-mono text-cyan-400 font-extrabold whitespace-nowrap"
+                            >
+                              £{typeof val === 'number' ? val.toFixed(2) : parseFloat(val || 0).toFixed(2)}
+                            </td>
+                          );
+                        }
+                        if (c === 'Lifetime Donor Classification' || c === 'Transaction Donor Classification') {
+                          return (
+                            <td 
+                              key={c} 
+                              className="whitespace-nowrap"
+                            >
+                              <span className={`badge ${getTierBadgeClass(val)}`}>{val || 'Unassigned'}</span>
+                            </td>
+                          );
+                        }
+                        if (c === 'Created Date (UTC)') {
+                          return (
+                            <td 
+                              key={c} 
+                              className="text-slate-400 text-xs font-mono whitespace-nowrap"
+                            >
+                              {formatDate(val)}
+                            </td>
+                          );
+                        }
+                        return (
+                          <td 
+                            key={c} 
+                            className="max-w-[240px] truncate text-slate-200"
+                          >
+                            {val !== undefined && val !== null ? String(val) : ''}
+                          </td>
+                        );
+                      })}
                     </tr>
                   );
                 })}

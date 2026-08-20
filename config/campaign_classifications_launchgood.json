@@ -72,7 +72,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/ashbl_afghan_deployment",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -270,7 +270,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/safwan__ashbl_deployment",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -495,24 +495,13 @@
     "is_primary": 0
   },
   {
-    "Campaign Name": "Farhan - Ashb\u0101\u0641l Deployment",
-    "Code": "ALL-GFN",
-    "Community Name": "Ashb\u0101\u0641l Al-Ummah",
-    "campaign_url": "https://www.launchgood.com/v4/campaign/farhan__ashbl_deployment",
-    "Heading": "General Fund",
-    "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "General / Multi-Country",
-    "Zakat Eligibility": "Non-Zakat",
-    "is_primary": 0
-  },
-  {
     "Campaign Name": "30 Day Challenge  Goal",
     "Code": "ALL-GFN",
     "Community Name": "Syrian & Gazan Challenge",
     "campaign_url": "https://www.launchgood.com/v4/campaign/30_day_challenge__goal",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Gaza,Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -534,7 +523,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/5pillars",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -563,7 +552,7 @@
   {
     "Campaign Name": "A Roof of Mercy: Give Shelter to a Returning Refugee Family",
     "Code": "AFG-INF-HOU",
-    "Community Name": "Ashb\u0101\u0641l Al-Ummah",
+    "Community Name": "Ashb\u00c4\u0641l Al-Ummah",
     "campaign_url": "https://www.launchgood.com/v4/campaign/a_roof_of_mercy_give_shelter_to_a_returning_refugee_family",
     "Heading": "Infrastructure",
     "Sub-Heading": "Standalone Houses",
@@ -585,11 +574,11 @@
   {
     "Campaign Name": "A decent life for more than 1200 poor Egyptian families",
     "Code": "ALL-GFN",
-    "Community Name": "N/A",
+    "Community Name": "nan",
     "campaign_url": "https://www.launchgood.com/v4/campaign/a_decent_life_for_more_than_1200_poor_egyptian_families",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -611,7 +600,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/aahrayyk_2__9313",
     "Heading": "Sponsorships",
     "Sub-Heading": "Orphan Sponsorship",
-    "Country": "Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Zakat",
     "is_primary": 0
   },
@@ -677,14 +666,14 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/aj_1",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza,Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
   {
     "Campaign Name": "AJ Quran Challenge",
     "Code": "SYR-QRN",
-    "Community Name": "Ashb\u0101\u0641l Al-Ummah",
+    "Community Name": "Ashb\u00c4\u0641l Al-Ummah",
     "campaign_url": "https://www.launchgood.com/v4/campaign/aj",
     "Heading": "Quran Distribution",
     "Sub-Heading": "Quran Distribution",
@@ -820,7 +809,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/abdul_hamid_faruki_for_the_liberated_lands",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza,Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -871,7 +860,7 @@
   {
     "Campaign Name": "Abdul Shohid - Hifdh sponsorship (1yr)",
     "Code": "SYR-SPN-HUF",
-    "Community Name": "Ashb\u0101\u0641l Al-Ummah",
+    "Community Name": "Ashb\u00c4\u0641l Al-Ummah",
     "campaign_url": "https://www.launchgood.com/v4/campaign/abdulshohid",
     "Heading": "Sponsorships",
     "Sub-Heading": "Huffaz Sponsorships",
@@ -930,14 +919,14 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/abdullah_adeel",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza,Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
   {
     "Campaign Name": "Abdullah Wahid - Quran Challenge",
     "Code": "ALL-GFN",
-    "Community Name": "Ashb\u0101\u0641l Al-Ummah",
+    "Community Name": "Ashb\u00c4\u0641l Al-Ummah",
     "campaign_url": "https://www.launchgood.com/v4/campaign/abdullahwahid",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
@@ -963,7 +952,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/abdullah4ummah",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -981,11 +970,11 @@
   {
     "Campaign Name": "Abdur Rahman - Hifdh sponsorship (1yr)",
     "Code": "ALL-GFN",
-    "Community Name": "Ashb\u0101\u0641l Al-Ummah",
+    "Community Name": "Ashb\u00c4\u0641l Al-Ummah",
     "campaign_url": "https://www.launchgood.com/v4/campaign/abdurrahman",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -1047,7 +1036,7 @@
   {
     "Campaign Name": "Abu Ahmed",
     "Code": "SYR-SPN-ORP",
-    "Community Name": "Ashb\u0101\u0641l Al-Ummah",
+    "Community Name": "Ashb\u00c4\u0641l Al-Ummah",
     "campaign_url": "https://www.launchgood.com/v4/campaign/abuahmed",
     "Heading": "Sponsorships",
     "Sub-Heading": "Orphan Sponsorship",
@@ -1091,11 +1080,11 @@
   {
     "Campaign Name": "Abu Ismail - Hifdh Sponsorship [1yr]",
     "Code": "ALL-GFN",
-    "Community Name": "Ashb\u0101\u0641l Al-Ummah",
+    "Community Name": "Ashb\u00c4\u0641l Al-Ummah",
     "campaign_url": "https://www.launchgood.com/v4/campaign/abuismail",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -1113,7 +1102,7 @@
   {
     "Campaign Name": "Abu Ismail Friday Challenge!",
     "Code": "ALL-GFN",
-    "Community Name": "Ashb\u0101\u0641l Al-Ummah",
+    "Community Name": "Ashb\u00c4\u0641l Al-Ummah",
     "campaign_url": "https://www.launchgood.com/v4/campaign/abuismail_5",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
@@ -1124,7 +1113,7 @@
   {
     "Campaign Name": "Abu Ismail Quran Challenge",
     "Code": "SYR-SPN-HUF",
-    "Community Name": "Ashb\u0101\u0641l Al-Ummah",
+    "Community Name": "Ashb\u00c4\u0641l Al-Ummah",
     "campaign_url": "https://www.launchgood.com/v4/campaign/abu_ismail_1",
     "Heading": "Sponsorships",
     "Sub-Heading": "Hifdh/Hafiz Student Sponsorship",
@@ -1135,7 +1124,7 @@
   {
     "Campaign Name": "Abu Ismail Quran Challenge!",
     "Code": "AFG-SPN-HUF",
-    "Community Name": "Ashb\u0101\u0641l Al-Ummah",
+    "Community Name": "Ashb\u00c4\u0641l Al-Ummah",
     "campaign_url": "https://www.launchgood.com/v4/campaign/abuismail_6",
     "Heading": "Sponsorships",
     "Sub-Heading": "Huffaz Sponsorships",
@@ -1157,7 +1146,7 @@
   {
     "Campaign Name": "Abu Khalid - Hifdh Sponsorship [1yr]",
     "Code": "SYR-SPN-HUF",
-    "Community Name": "Ashb\u0101\u0641l Al-Ummah",
+    "Community Name": "Ashb\u00c4\u0641l Al-Ummah",
     "campaign_url": "https://www.launchgood.com/v4/campaign/abukhalid_2",
     "Heading": "Sponsorships",
     "Sub-Heading": "Huffaz Sponsorships",
@@ -1168,18 +1157,18 @@
   {
     "Campaign Name": "Abu Khalid - Hifdh sponsorship [2yrs]",
     "Code": "ALL-GFN",
-    "Community Name": "Ashb\u0101\u0641l Al-Ummah",
+    "Community Name": "Ashb\u00c4\u0641l Al-Ummah",
     "campaign_url": "https://www.launchgood.com/v4/campaign/abukhalidhafiz",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
   {
     "Campaign Name": "Abu Khalid - Orphan Sponsorship [1yr]",
     "Code": "GAZ-SPN-ORP",
-    "Community Name": "Ashb\u0101\u0641l Al-Ummah",
+    "Community Name": "Ashb\u00c4\u0641l Al-Ummah",
     "campaign_url": "https://www.launchgood.com/v4/campaign/abukhalid",
     "Heading": "Sponsorships",
     "Sub-Heading": "Orphan Sponsorship",
@@ -1366,7 +1355,7 @@
   {
     "Campaign Name": "Afghan Classroom in Kunar",
     "Code": "ALL-GFN",
-    "Community Name": "Ashb\u0101\u0641l Al-Ummah",
+    "Community Name": "Ashb\u00c4\u0641l Al-Ummah",
     "campaign_url": "https://www.launchgood.com/v4/campaign/yahyadeployment",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
@@ -1414,7 +1403,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/afzal_family_for_syria",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -1454,7 +1443,7 @@
   {
     "Campaign Name": "Ahmed - Widow & Orphan",
     "Code": "AFG-SPN-WID",
-    "Community Name": "Ashb\u0101\u0641l Al-Ummah",
+    "Community Name": "Ashb\u00c4\u0641l Al-Ummah",
     "campaign_url": "https://www.launchgood.com/v4/campaign/ahmed__widow__orphan",
     "Heading": "Sponsorships",
     "Sub-Heading": "Widow Sponsorship",
@@ -1524,7 +1513,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/aisha_syria__gaza_appeal",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -1619,7 +1608,7 @@
   {
     "Campaign Name": "Ajwad - Orphan Sponsorship [1yr]",
     "Code": "SYR-SPN-ORP",
-    "Community Name": "Ashb\u0101\u0641l Al-Ummah",
+    "Community Name": "Ashb\u00c4\u0641l Al-Ummah",
     "campaign_url": "https://www.launchgood.com/v4/campaign/ajwad",
     "Heading": "Sponsorships",
     "Sub-Heading": "Orphan Sponsorship",
@@ -1652,7 +1641,7 @@
   {
     "Campaign Name": "Akhtar Ayub - Sadaqah Jariyah",
     "Code": "AFG-WAT-WEL",
-    "Community Name": "Ashb\u0101\u0641l Al-Ummah",
+    "Community Name": "Ashb\u00c4\u0641l Al-Ummah",
     "campaign_url": "https://www.launchgood.com/v4/campaign/akhtar_ayub__sadaqah_jariyah",
     "Heading": "Water",
     "Sub-Heading": "Water Wells",
@@ -1689,7 +1678,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/alkauthar",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -1799,7 +1788,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/amatullah",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza,Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -1843,7 +1832,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/ameenah_for_the_liberated_lands",
     "Heading": "General Fund",
     "Sub-Heading": "General Fund",
-    "Country": "Syria,Afghanistan,Gaza",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Zakat",
     "is_primary": 0
   },
@@ -1876,7 +1865,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/amina_for_the_liberated_lands",
     "Heading": "General Fund",
     "Sub-Heading": "General Fund",
-    "Country": "Syria,Afghanistan,Gaza",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Zakat",
     "is_primary": 0
   },
@@ -1986,7 +1975,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/ammara",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Gaza,Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -1997,7 +1986,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/ammarah_hiba",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -2085,7 +2074,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/anees_for_the_liberated_lands",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza,Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -2147,7 +2136,7 @@
   {
     "Campaign Name": "Anis - Support Widows & Orphans",
     "Code": "ALL-GFN",
-    "Community Name": "Ashb\u0101\u0641l Al-Ummah",
+    "Community Name": "Ashb\u00c4\u0641l Al-Ummah",
     "campaign_url": "https://www.launchgood.com/v4/campaign/anis__support_widows__orphans",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
@@ -2224,7 +2213,7 @@
   {
     "Campaign Name": "Aqiqah - Isa",
     "Code": "ALL-SEA-AQI",
-    "Community Name": "Ashb\u0101\u0641l Al-Ummah",
+    "Community Name": "Ashb\u00c4\u0641l Al-Ummah",
     "campaign_url": "https://www.launchgood.com/v4/campaign/aqiqah__isa",
     "Heading": "Seasonal & Annual Campaigns",
     "Sub-Heading": "Aqiqah",
@@ -2239,7 +2228,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/arabic_gems__the_liberated_lands",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza,Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -2301,7 +2290,7 @@
   {
     "Campaign Name": "Asad - Hifdh Sponsorships",
     "Code": "AFG-SPN-HUF",
-    "Community Name": "Ashb\u0101\u0641l Al-Ummah",
+    "Community Name": "Ashb\u00c4\u0641l Al-Ummah",
     "campaign_url": "https://www.launchgood.com/v4/campaign/asad__hifdh_sponsorships",
     "Heading": "Sponsorships",
     "Sub-Heading": "Huffaz Sponsorships",
@@ -2312,7 +2301,7 @@
   {
     "Campaign Name": "Asad - Widows Sponsorship",
     "Code": "AFG-SPN-WID",
-    "Community Name": "Ashb\u0101\u0641l Al-Ummah",
+    "Community Name": "Ashb\u00c4\u0641l Al-Ummah",
     "campaign_url": "https://www.launchgood.com/v4/campaign/asad__widows_sponsorship",
     "Heading": "Sponsorships",
     "Sub-Heading": "Widow Sponsorship",
@@ -2349,7 +2338,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/ash",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza,Afghanistan,General / Multi-Country",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -2389,7 +2378,7 @@
   {
     "Campaign Name": "Ashbal Deployment Restoring Hope Building Futures",
     "Code": "AFG-SPN-WID",
-    "Community Name": "Ashb\u0101\u0641l Al-Ummah",
+    "Community Name": "Ashb\u00c4\u0641l Al-Ummah",
     "campaign_url": "https://www.launchgood.com/v4/campaign/empower_widows__orphans",
     "Heading": "Sponsorships",
     "Sub-Heading": "Widow Sponsorship",
@@ -2488,7 +2477,7 @@
   {
     "Campaign Name": "Ashura - 3rd Hifdh Sponsorship!",
     "Code": "AFG-SPN-HUF",
-    "Community Name": "Ashb\u0101\u0641l Al-Ummah",
+    "Community Name": "Ashb\u00c4\u0641l Al-Ummah",
     "campaign_url": "https://www.launchgood.com/v4/campaign/abuismail_3",
     "Heading": "Sponsorships",
     "Sub-Heading": "Huffaz Sponsorships",
@@ -2499,7 +2488,7 @@
   {
     "Campaign Name": "Ashurah Appeal: Build the Centre. Empower the Future.",
     "Code": "AFG-SPN-WID",
-    "Community Name": "Ashb\u0101\u0641l Al-Ummah",
+    "Community Name": "Ashb\u00c4\u0641l Al-Ummah",
     "campaign_url": "https://www.launchgood.com/v4/campaign/ashurah_appeal_build_the_centre_empower_the_future",
     "Heading": "Sponsorships",
     "Sub-Heading": "Widow Sponsorship",
@@ -2514,7 +2503,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/asia_3",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -2646,7 +2635,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/asma_1",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Gaza",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -2701,7 +2690,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/assist_a_widow_in_syria",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -2712,7 +2701,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/sp_astracia",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Gaza,Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -2767,7 +2756,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/atia_rafiq_for_the_greater_shaam_project",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -2822,7 +2811,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/sp_attia",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Gaza,Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -2844,14 +2833,14 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/ayaz",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
   {
     "Campaign Name": "Ayesha Azad - Sadaqah Jariyah",
     "Code": "AFG-WAT-WEL",
-    "Community Name": "Ashb\u0101\u0641l Al-Ummah",
+    "Community Name": "Ashb\u00c4\u0641l Al-Ummah",
     "campaign_url": "https://www.launchgood.com/v4/campaign/ayesha_azad__sadaqah_jariyah",
     "Heading": "Water",
     "Sub-Heading": "Water Wells",
@@ -2888,7 +2877,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/ayman7g_for_the_liberated_lands",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza,Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -2932,7 +2921,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/beyond_survival",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -2994,7 +2983,7 @@
   {
     "Campaign Name": "Barber Chop",
     "Code": "AFG-SPN-ORP",
-    "Community Name": "Ashb\u0101\u0641l Al-Ummah",
+    "Community Name": "Ashb\u00c4\u0641l Al-Ummah",
     "campaign_url": "https://www.launchgood.com/v4/campaign/orphan_sponsorship_58",
     "Heading": "Sponsorships",
     "Sub-Heading": "Orphan Sponsorship",
@@ -3005,7 +2994,7 @@
   {
     "Campaign Name": "Barking Muslim Sisters",
     "Code": "AFG-SPN-WID",
-    "Community Name": "Ashb\u0101\u0641l Al-Ummah",
+    "Community Name": "Ashb\u00c4\u0641l Al-Ummah",
     "campaign_url": "https://www.launchgood.com/v4/campaign/barking_muslim_sisters",
     "Heading": "Sponsorships",
     "Sub-Heading": "Widow Sponsorship",
@@ -3020,7 +3009,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/basilah",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza,Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -3141,7 +3130,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/abna_ashaam",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -3163,7 +3152,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/build_a_village_build_a_nation",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -3218,7 +3207,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/building_a_new_syria_together2025",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -3262,7 +3251,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/captoirs_studio",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza,Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -3273,7 +3262,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/caring_muslima_4_syria__gaza",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -3346,18 +3335,18 @@
   {
     "Campaign Name": "Coming Soon...",
     "Code": "ALL-GFN",
-    "Community Name": "N/A",
+    "Community Name": "nan",
     "campaign_url": "https://www.launchgood.com/v4/campaign/gazasudan",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
   {
     "Campaign Name": "Cricket Field - Afghanistan",
     "Code": "AFG-INF",
-    "Community Name": "Ashb\u0101\u0641l Al-Ummah",
+    "Community Name": "Ashb\u00c4\u0641l Al-Ummah",
     "campaign_url": "https://www.launchgood.com/v4/campaign/cricket_field__afghanistan",
     "Heading": "Infrastructure",
     "Sub-Heading": "General Infrastructure",
@@ -3482,7 +3471,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/daniaal",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -3515,7 +3504,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/dawud7g_for_the_liberated_lands",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza,Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -3537,7 +3526,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/eid_7",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -3577,11 +3566,11 @@
   {
     "Campaign Name": "Dilwar - Afghanistan deployment",
     "Code": "ALL-GFN",
-    "Community Name": "Ashb\u0101\u0641l Al-Ummah",
+    "Community Name": "Ashb\u00c4\u0641l Al-Ummah",
     "campaign_url": "https://www.launchgood.com/v4/campaign/dilwardeployment",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -3614,7 +3603,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/donate_to_a_revolutionary_project_in_shaam",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -3625,7 +3614,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/donate_your_interest_money",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -3724,7 +3713,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/sp_ever_so_special",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Gaza,Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -3735,7 +3724,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/hmr",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -3779,7 +3768,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/educate_a_child_7",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -3929,7 +3918,7 @@
   {
     "Campaign Name": "Empower Widows",
     "Code": "AFG-SPN-WID",
-    "Community Name": "Ashb\u0101\u0641l Al-Ummah",
+    "Community Name": "Ashb\u00c4\u0641l Al-Ummah",
     "campaign_url": "https://www.launchgood.com/v4/campaign/empower_widows",
     "Heading": "Sponsorships",
     "Sub-Heading": "Widow Sponsorship",
@@ -3940,7 +3929,7 @@
   {
     "Campaign Name": "Empower Widows & Orphan",
     "Code": "AFG-SPN-WID",
-    "Community Name": "Ashb\u0101\u0641l Al-Ummah",
+    "Community Name": "Ashb\u00c4\u0641l Al-Ummah",
     "campaign_url": "https://www.launchgood.com/v4/campaign/empower_widows__orphan",
     "Heading": "Sponsorships",
     "Sub-Heading": "Widow Sponsorship",
@@ -3955,7 +3944,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/empower_our_syrian_brothers_and_sisters",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -3966,7 +3955,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/enam_1",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -3977,7 +3966,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/esfand",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza,Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -4039,7 +4028,7 @@
   {
     "Campaign Name": "Fahim - Orphan Sponsorship [1yr]",
     "Code": "SYR-SPN-ORP",
-    "Community Name": "Ashb\u0101\u0641l Al-Ummah",
+    "Community Name": "Ashb\u00c4\u0641l Al-Ummah",
     "campaign_url": "https://www.launchgood.com/v4/campaign/fahim_1",
     "Heading": "Sponsorships",
     "Sub-Heading": "Orphan Sponsorship",
@@ -4054,7 +4043,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/jeddahdot",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza,Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -4065,7 +4054,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/sp_farah",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Gaza,Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -4131,7 +4120,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/farhad",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -4171,7 +4160,7 @@
   {
     "Campaign Name": "Farhan - Hifdh Sponsorhip (1yr)",
     "Code": "SYR-SPN-HUF",
-    "Community Name": "Ashb\u0101\u0641l Al-Ummah",
+    "Community Name": "Ashb\u00c4\u0641l Al-Ummah",
     "campaign_url": "https://www.launchgood.com/v4/campaign/farhan_2",
     "Heading": "Sponsorships",
     "Sub-Heading": "Huffaz Sponsorships",
@@ -4296,7 +4285,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/sp_fatimah",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Gaza,Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -4340,7 +4329,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/fayez",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza,Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -4428,7 +4417,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/fitrana_and_fidya",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -4450,7 +4439,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/for_the_children_of_gaza_8",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Gaza",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -4472,7 +4461,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/forhad_sobur",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -4505,7 +4494,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/fundraising_for_gaza_refugees_in_egypt",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Gaza,Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -4516,7 +4505,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/gateway_to_jannah",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -4615,7 +4604,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/give_and_reap_this_ramadan",
     "Heading": "General Fund",
     "Sub-Heading": "General Fund",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Zakat",
     "is_primary": 0
   },
@@ -4626,7 +4615,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/greater_shaam_project_15",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -4637,7 +4626,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/greater_shaam_with_rawflow",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "United Kingdom",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -4659,7 +4648,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/hm__tdm3",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -4758,7 +4747,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/hafsah_for_the_liberated_lands",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza,Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -4791,7 +4780,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/sp_sportsclub",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -4813,7 +4802,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/hamdaan",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -5044,14 +5033,14 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/younus_1",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza,Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
   {
     "Campaign Name": "Help Bring Light to the Future of Islamic Scholars in Kabul!",
     "Code": "AFG-INF-SOL",
-    "Community Name": "Ashb\u0101\u0641l Al-Ummah",
+    "Community Name": "Ashb\u00c4\u0641l Al-Ummah",
     "campaign_url": "https://www.launchgood.com/v4/campaign/solarpanels",
     "Heading": "Infrastructure",
     "Sub-Heading": "Solar Panels",
@@ -5099,7 +5088,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/help_isa_raise_for_the_greater_shaam_project_this_ramadan",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -5117,11 +5106,11 @@
   {
     "Campaign Name": "Help Rebuild Kunar after the Earthquake!",
     "Code": "ALL-GFN",
-    "Community Name": "Ashb\u0101\u0641l Al-Ummah",
+    "Community Name": "Ashb\u00c4\u0641l Al-Ummah",
     "campaign_url": "https://www.launchgood.com/v4/campaign/earthquake_11",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -5143,7 +5132,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/help_rebuild_syriapalestineafghanistan",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza,Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -5220,7 +5209,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/help_syrians_and_gazans",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -5264,7 +5253,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/help_me_fundraise_to_support_an_orphan_for_a_full_year",
     "Heading": "Sponsorships",
     "Sub-Heading": "Orphan Sponsorship",
-    "Country": "Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Zakat",
     "is_primary": 0
   },
@@ -5286,7 +5275,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/help_raise_funds_this_ramadan_with_zayn_and_khala_nadia",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza,Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -5308,7 +5297,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/help_the_families_and_children_of_war_in_syria",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -5319,7 +5308,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/help_the_needed_in_palestine_and_syria",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Gaza,Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -5330,7 +5319,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/moyn",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza,Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -5429,7 +5418,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/homeschooling_with_husseins_greater_shaam_project",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -5484,7 +5473,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/hussam_1",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza,Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -5550,7 +5539,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/sp_ibby",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Gaza,Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -5656,7 +5645,7 @@
   {
     "Campaign Name": "Idris and Dawud Orphan Sponsorship (1 yr)",
     "Code": "SYR-SPN-ORP",
-    "Community Name": "Ashb\u0101\u0641l Al-Ummah",
+    "Community Name": "Ashb\u00c4\u0641l Al-Ummah",
     "campaign_url": "https://www.launchgood.com/v4/campaign/idrisdawud",
     "Heading": "Sponsorships",
     "Sub-Heading": "Orphan Sponsorship",
@@ -5678,7 +5667,7 @@
   {
     "Campaign Name": "Iftar 4 Orphans & Widows",
     "Code": "AFG-SPN-WID",
-    "Community Name": "Ashb\u0101\u0641l Al-Ummah",
+    "Community Name": "Ashb\u00c4\u0641l Al-Ummah",
     "campaign_url": "https://www.launchgood.com/v4/campaign/iftar_4_orphans__widows",
     "Heading": "Seasonal & Annual Campaigns",
     "Sub-Heading": "Iftar",
@@ -5726,7 +5715,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/ilyas",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -5748,7 +5737,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/imran_1",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza,Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -5770,7 +5759,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/imthiaz_for_the_liberated_lands",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza,Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -5781,7 +5770,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/sp_inayah",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -5803,7 +5792,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/quran_15",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -5814,7 +5803,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/iqbal",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -5825,7 +5814,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/the_greater_shaam_project_29",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -5836,7 +5825,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/iqra_for_the_liberated_lands",
     "Heading": "General Fund",
     "Sub-Heading": "General Fund",
-    "Country": "Syria,Afghanistan,Gaza",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Zakat",
     "is_primary": 0
   },
@@ -5869,7 +5858,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/irfan_4",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -5931,7 +5920,7 @@
   {
     "Campaign Name": "Islamic Classroom Kunar Mountain",
     "Code": "AFG-SPN-ORP",
-    "Community Name": "Ashb\u0101\u0641l Al-Ummah",
+    "Community Name": "Ashb\u00c4\u0641l Al-Ummah",
     "campaign_url": "https://www.launchgood.com/v4/campaign/classroomkunar",
     "Heading": "Sponsorships",
     "Sub-Heading": "Orphan Sponsorship",
@@ -5946,25 +5935,25 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/ismaeel_binyamin_fatimah_zainab_yusuf_mariam_juwairiah__yunus",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
   {
     "Campaign Name": "Ismail - Hifdh sponsorship (1yr)",
     "Code": "ALL-GFN",
-    "Community Name": "Ashb\u0101\u0641l Al-Ummah",
+    "Community Name": "Ashb\u00c4\u0641l Al-Ummah",
     "campaign_url": "https://www.launchgood.com/v4/campaign/ismailhifdh",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
   {
     "Campaign Name": "Ismail - Orphan sponsorship (1yr)",
     "Code": "SYR-SPN-ORP",
-    "Community Name": "Ashb\u0101\u0641l Al-Ummah",
+    "Community Name": "Ashb\u00c4\u0641l Al-Ummah",
     "campaign_url": "https://www.launchgood.com/v4/campaign/ismail_orphans",
     "Heading": "Sponsorships",
     "Sub-Heading": "Orphan Sponsorship",
@@ -5997,7 +5986,7 @@
   {
     "Campaign Name": "Ismail Orphan Sponsorship",
     "Code": "SYR-SPN-ORP",
-    "Community Name": "Ashb\u0101\u0641l Al-Ummah",
+    "Community Name": "Ashb\u00c4\u0641l Al-Ummah",
     "campaign_url": "https://www.launchgood.com/v4/campaign/ismail_1",
     "Heading": "Sponsorships",
     "Sub-Heading": "Orphan Sponsorship",
@@ -6155,7 +6144,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/jannah_umm_ishaaqseedsofjannahuk",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -6188,7 +6177,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/jav_stage4",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -6210,7 +6199,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/jihadelmasri_syria",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -6232,7 +6221,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/jubair",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -6287,7 +6276,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/jumel",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza,Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -6331,7 +6320,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/kamrul",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -6349,7 +6338,7 @@
   {
     "Campaign Name": "Kamrul Quran Challenge",
     "Code": "SYR-SPN-HUF",
-    "Community Name": "Ashb\u0101\u0641l Al-Ummah",
+    "Community Name": "Ashb\u00c4\u0641l Al-Ummah",
     "campaign_url": "https://www.launchgood.com/v4/campaign/kamrul_2",
     "Heading": "Sponsorships",
     "Sub-Heading": "Hifdh/Hafiz Student Sponsorship",
@@ -6375,7 +6364,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/kanwals_syria__gaza_fundraiser",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -6397,7 +6386,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/sp_kauser",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Gaza,Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -6485,7 +6474,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/khalifa_family__friends",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -6529,7 +6518,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/khizar__nusaybah_support_the_super_village",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -6551,7 +6540,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/khizar_for_the_liberated_lands",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza,Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -6606,7 +6595,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/ldn4syria_3",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "ALL",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -6639,7 +6628,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/lg_for_syria_1",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -6672,7 +6661,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/laveeza7g_for_the_liberated_lands",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Palestine,Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -6705,7 +6694,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/liberate_the_lands_together",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza,Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -6716,7 +6705,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/liberated_lands_challenge",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza,Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -6727,7 +6716,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/sd_9",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza,Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -6738,7 +6727,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/lighting_the_path_for_a_brighter_future_with_misbah",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -6760,7 +6749,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/live_in_bilaad_as_shaam_specials",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -6815,7 +6804,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/mk4syria",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza,Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -6859,7 +6848,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/mahir_ahmed_for_the_liberated_lands",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza,Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -6980,7 +6969,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/sp_maria_sumayyah",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -7013,7 +7002,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/sp_maryam",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Gaza,Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -7024,7 +7013,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/maryam_alimohamed_j__umm_fatimah_challenge",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -7090,7 +7079,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/maryamp",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza,Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -7141,7 +7130,7 @@
   {
     "Campaign Name": "Masjid in Afghanistan - Sadaqah Jariyah Razzak Ahmed",
     "Code": "AFG-MAS-CON",
-    "Community Name": "Ashb\u0101\u0641l Al-Ummah",
+    "Community Name": "Ashb\u00c4\u0641l Al-Ummah",
     "campaign_url": "https://www.launchgood.com/v4/campaign/masjid_in_afghanistan__sadaqah_jariyah_razzak_ahmed",
     "Heading": "Masjid General",
     "Sub-Heading": "Masjid Construction",
@@ -7178,7 +7167,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/maya_for_syria",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -7262,7 +7251,7 @@
   {
     "Campaign Name": "Mihad Tutors - Hifdh Sponsorship [1yr]",
     "Code": "SYR-SPN-HUF",
-    "Community Name": "Ashb\u0101\u0641l Al-Ummah",
+    "Community Name": "Ashb\u00c4\u0641l Al-Ummah",
     "campaign_url": "https://www.launchgood.com/v4/campaign/mihadtutors",
     "Heading": "Sponsorships",
     "Sub-Heading": "Huffaz Sponsorships",
@@ -7321,7 +7310,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/misbahdaya",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza,Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -7354,7 +7343,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/moazzam_for_the_liberated_lands",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Palestine,Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -7409,7 +7398,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/mohammad_riyadh_for_the_liberated_lands",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza,Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -7420,14 +7409,14 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/mohammed_abdussalam_for_the_liberated_lands",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza,Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
   {
     "Campaign Name": "Mohammed Alaman Choudhury - Sadaqah Jariyah",
     "Code": "AFG-WAT-WEL",
-    "Community Name": "Ashb\u0101\u0641l Al-Ummah",
+    "Community Name": "Ashb\u00c4\u0641l Al-Ummah",
     "campaign_url": "https://www.launchgood.com/v4/campaign/mohammed_alaman_choudhury__sadaqah_jariyah",
     "Heading": "Water",
     "Sub-Heading": "Water Wells",
@@ -7453,7 +7442,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/mohammed_for_the_liberated_lands",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza,Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -7475,7 +7464,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/mohammod_ikram_for_the_liberated_lands",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza,Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -7574,7 +7563,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/mr_and_mrs_bashir",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -7629,7 +7618,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/muhammad_ajwad_for_the_liberated_lands",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza,Afghanistan,General / Multi-Country",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -7640,7 +7629,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/muhammadtrc",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -7695,7 +7684,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/muhidinrebuildshaam",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -7739,7 +7728,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/mumtaz",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza,Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -7772,7 +7761,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/muneesa_fundraise_for_our_brothers_and_sisters_in_gaza_and_syria",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Gaza,Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -7849,7 +7838,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/musasharif",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza,Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -7893,7 +7882,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/muslims_in_need_6",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -7948,7 +7937,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/sp_naheeda",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -7999,7 +7988,7 @@
   {
     "Campaign Name": "Nahida - Widows & Orphans",
     "Code": "AFG-SPN-WID",
-    "Community Name": "Ashb\u0101\u0641l Al-Ummah",
+    "Community Name": "Ashb\u00c4\u0641l Al-Ummah",
     "campaign_url": "https://www.launchgood.com/v4/campaign/nahida__widows__orphans",
     "Heading": "Sponsorships",
     "Sub-Heading": "Widow Sponsorship",
@@ -8025,7 +8014,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/najma",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza,Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -8036,7 +8025,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/nakib_for_the_biggest_school_in_syria__d2s",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -8047,7 +8036,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/nargis_bakes_syria__gaza_fundraiser",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -8069,7 +8058,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/sp_nasrine",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Gaza,Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -8146,7 +8135,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/nazia_for_the_liberated_lands_1",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -8245,7 +8234,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/nazmul_for_the_liberated_lands",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza,Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -8344,7 +8333,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/noreengazaappeal_2",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Gaza",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -8355,7 +8344,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/noreenayah_ramadan_2025",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza,Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -8454,7 +8443,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/nusaybah_for_the_liberated_lands",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "ALL",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -8487,7 +8476,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/sp_nusaybah",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Gaza,Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -8509,7 +8498,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/ocs",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza,Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -8520,7 +8509,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/ocs_syrian__gazan_challenge",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -8531,7 +8520,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/olc_boys",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -8542,7 +8531,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/olcgirls_1",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Gaza,Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -8659,7 +8648,7 @@
   {
     "Campaign Name": "Osama and Rayyan",
     "Code": "SYR-SPN-ORP",
-    "Community Name": "Ashb\u0101\u0641l Al-Ummah",
+    "Community Name": "Ashb\u00c4\u0641l Al-Ummah",
     "campaign_url": "https://www.launchgood.com/v4/campaign/osamarayyan",
     "Heading": "Sponsorships",
     "Sub-Heading": "Orphan Sponsorship",
@@ -8670,11 +8659,11 @@
   {
     "Campaign Name": "Osman Quran Challenge",
     "Code": "ALL-GFN",
-    "Community Name": "Ashb\u0101\u0641l Al-Ummah",
+    "Community Name": "Ashb\u00c4\u0641l Al-Ummah",
     "campaign_url": "https://www.launchgood.com/v4/campaign/osman",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -8685,7 +8674,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/share_the_khair",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Palestine,Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -8707,7 +8696,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/our_al_shaam_affair_1",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -8729,7 +8718,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/our_jannah",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -8740,7 +8729,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/our_jannah_a__a",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -8751,7 +8740,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/our_jannah_aa",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -8769,7 +8758,7 @@
   {
     "Campaign Name": "Oxford Quran",
     "Code": "AFG-SPN-HUF",
-    "Community Name": "Ashb\u0101\u0641l Al-Ummah",
+    "Community Name": "Ashb\u00c4\u0641l Al-Ummah",
     "campaign_url": "https://www.launchgood.com/v4/campaign/oxfordquran",
     "Heading": "Sponsorships",
     "Sub-Heading": "Huffaz Sponsorships",
@@ -8780,7 +8769,7 @@
   {
     "Campaign Name": "Oxford Quran (2nd Student)",
     "Code": "ALL-GFN",
-    "Community Name": "Ashb\u0101\u0641l Al-Ummah",
+    "Community Name": "Ashb\u00c4\u0641l Al-Ummah",
     "campaign_url": "https://www.launchgood.com/v4/campaign/oxfordquran_1",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
@@ -8791,7 +8780,7 @@
   {
     "Campaign Name": "Oxford Quran (3rd Student)",
     "Code": "AFG-SPN-HUF",
-    "Community Name": "Ashb\u0101\u0641l Al-Ummah",
+    "Community Name": "Ashb\u00c4\u0641l Al-Ummah",
     "campaign_url": "https://www.launchgood.com/v4/campaign/oxfordquran_2",
     "Heading": "Sponsorships",
     "Sub-Heading": "Huffaz Sponsorships",
@@ -8802,7 +8791,7 @@
   {
     "Campaign Name": "Oxford Quran (4th Student!)",
     "Code": "ALL-GFN",
-    "Community Name": "Ashb\u0101\u0641l Al-Ummah",
+    "Community Name": "Ashb\u00c4\u0641l Al-Ummah",
     "campaign_url": "https://www.launchgood.com/v4/campaign/oxfordquran_3",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
@@ -8813,7 +8802,7 @@
   {
     "Campaign Name": "Oxford Quran (5th Student!)",
     "Code": "SYR-SPN-HUF",
-    "Community Name": "Ashb\u0101\u0641l Al-Ummah",
+    "Community Name": "Ashb\u00c4\u0641l Al-Ummah",
     "campaign_url": "https://www.launchgood.com/v4/campaign/oxford_quran",
     "Heading": "Sponsorships",
     "Sub-Heading": "Huffaz Sponsorships",
@@ -8824,7 +8813,7 @@
   {
     "Campaign Name": "Oxford Sponsorship [6th Child]",
     "Code": "AFG-SPN-HUF",
-    "Community Name": "Ashb\u0101\u0641l Al-Ummah",
+    "Community Name": "Ashb\u00c4\u0641l Al-Ummah",
     "campaign_url": "https://www.launchgood.com/v4/campaign/oxford_sponsorship_6th_child",
     "Heading": "Sponsorships",
     "Sub-Heading": "Huffaz Sponsorships",
@@ -8835,7 +8824,7 @@
   {
     "Campaign Name": "Oxford Sponsorship [7th Child]",
     "Code": "AFG-SPN-HUF",
-    "Community Name": "Ashb\u0101\u0641l Al-Ummah",
+    "Community Name": "Ashb\u00c4\u0641l Al-Ummah",
     "campaign_url": "https://www.launchgood.com/v4/campaign/oxford_sponsorship_7th_child",
     "Heading": "Sponsorships",
     "Sub-Heading": "Huffaz Sponsorships",
@@ -8846,7 +8835,7 @@
   {
     "Campaign Name": "Oxford Sponsorship [8th Child]",
     "Code": "AFG-SPN-HUF",
-    "Community Name": "Ashb\u0101\u0641l Al-Ummah",
+    "Community Name": "Ashb\u00c4\u0641l Al-Ummah",
     "campaign_url": "https://www.launchgood.com/v4/campaign/oxford_sponsorship_8th_child",
     "Heading": "Sponsorships",
     "Sub-Heading": "Huffaz Sponsorships",
@@ -8883,7 +8872,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/path_to_jannah_2",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -8894,7 +8883,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/plant_a_tree_for_jannah",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -8945,7 +8934,7 @@
   {
     "Campaign Name": "Provide Light to the Scholars of Tomorrow",
     "Code": "AFG-INF-SOL",
-    "Community Name": "Ashb\u0101\u0641l Al-Ummah",
+    "Community Name": "Ashb\u00c4\u0641l Al-Ummah",
     "campaign_url": "https://www.launchgood.com/v4/campaign/provide_light_to_the_scholars_of_tomorrow",
     "Heading": "Infrastructure",
     "Sub-Heading": "Solar Panels",
@@ -9000,7 +8989,7 @@
   {
     "Campaign Name": "Qais Kiani - Hifdh Sponsorship [1yr]",
     "Code": "SYR-SPN-HUF",
-    "Community Name": "Ashb\u0101\u0641l Al-Ummah",
+    "Community Name": "Ashb\u00c4\u0641l Al-Ummah",
     "campaign_url": "https://www.launchgood.com/v4/campaign/qais",
     "Heading": "Sponsorships",
     "Sub-Heading": "Huffaz Sponsorships",
@@ -9015,7 +9004,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/sp_qanwal",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Gaza,Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -9055,7 +9044,7 @@
   {
     "Campaign Name": "Quran Friday Challenge",
     "Code": "AFG-QRN",
-    "Community Name": "Ashb\u0101\u0641l Al-Ummah",
+    "Community Name": "Ashb\u00c4\u0641l Al-Ummah",
     "campaign_url": "https://www.launchgood.com/v4/campaign/quran_friday_challenge",
     "Heading": "Quran Distribution",
     "Sub-Heading": "Quran Distribution",
@@ -9066,7 +9055,7 @@
   {
     "Campaign Name": "Quran Hifdh Sponsorship [1yr]",
     "Code": "AFG-SPN-HUF",
-    "Community Name": "Ashb\u0101\u0641l Al-Ummah",
+    "Community Name": "Ashb\u00c4\u0641l Al-Ummah",
     "campaign_url": "https://www.launchgood.com/v4/campaign/quran_hifdh_sponsorship_1yr",
     "Heading": "Sponsorships",
     "Sub-Heading": "Huffaz Sponsorships",
@@ -9125,7 +9114,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/sudan_21",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -9180,7 +9169,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/rabius_sunii",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -9213,7 +9202,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/rafi_uddin",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza,Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -9224,7 +9213,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/rafiullah_for_the_biggest_school_in_syria__d2s",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -9301,7 +9290,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/raihan_for_the_liberated_lands",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza,Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -9356,7 +9345,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/ramadan_challenge_27",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -9367,7 +9356,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/the_greater_shaam_project_7",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -9378,7 +9367,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/ramadan_container_appeal_2024",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -9400,7 +9389,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/ramadan_fundraiser_for_syria",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -9422,7 +9411,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/rashida4shaam",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -9455,7 +9444,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/rebuilding_syria_4",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "ALL",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -9605,7 +9594,7 @@
   {
     "Campaign Name": "Rethink Friday Challenge #1",
     "Code": "ALL-GFN",
-    "Community Name": "Ashb\u0101\u0641l Al-Ummah",
+    "Community Name": "Ashb\u00c4\u0641l Al-Ummah",
     "campaign_url": "https://www.launchgood.com/v4/campaign/challenge_1",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
@@ -9616,7 +9605,7 @@
   {
     "Campaign Name": "Rethink Friday Challenge #2",
     "Code": "ALL-GFN",
-    "Community Name": "Ashb\u0101\u0641l Al-Ummah",
+    "Community Name": "Ashb\u00c4\u0641l Al-Ummah",
     "campaign_url": "https://www.launchgood.com/v4/campaign/challenge_2",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
@@ -9642,7 +9631,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/rethink_village_pledge",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -9682,7 +9671,7 @@
   {
     "Campaign Name": "Reviving The Ummah",
     "Code": "SYR-SPN-HUF",
-    "Community Name": "Ashb\u0101\u0641l Al-Ummah",
+    "Community Name": "Ashb\u00c4\u0641l Al-Ummah",
     "campaign_url": "https://www.launchgood.com/v4/campaign/reviving",
     "Heading": "Sponsorships",
     "Sub-Heading": "Hifdh/Hafiz Student Sponsorship",
@@ -9730,7 +9719,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/pb_team",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -9884,7 +9873,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/ruhi_for_school_in_shaam",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -9928,7 +9917,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/sp_sama",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -9955,10 +9944,10 @@
     "is_primary": 0
   },
   {
-    "Campaign Name": "School in Shaam",
+    "Campaign Name": "SCHOOL IN SHAAM",
     "Code": "SYR-VIL-SCH",
-    "Community Name": "Educate & Empower",
-    "campaign_url": "https://www.launchgood.com/v4/campaign/school_in_shaam_1",
+    "Community Name": "Empower Through Education SP",
+    "campaign_url": "https://www.launchgood.com/v4/campaign/school_in_shaam",
     "Heading": "Village Project",
     "Sub-Heading": "Village School",
     "Country": "Syria",
@@ -10005,7 +9994,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/nada_2026_1",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Gaza,Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -10060,7 +10049,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/sabana7g_for_the_liberated_lands",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza,Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -10104,7 +10093,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/sp_sabreena",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Gaza,Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -10144,7 +10133,7 @@
   {
     "Campaign Name": "Sadaqah Jariya for the Parents of Yasin Uddin& Helena Begum",
     "Code": "AFG-WAT-WEL",
-    "Community Name": "Ashb\u0101\u0641l Al-Ummah",
+    "Community Name": "Ashb\u00c4\u0641l Al-Ummah",
     "campaign_url": "https://www.launchgood.com/v4/campaign/sadaqah_jariya_for_the_parents_of_yasin_uddin_helena_begum",
     "Heading": "Water",
     "Sub-Heading": "Water Wells",
@@ -10181,7 +10170,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/safir",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza,Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -10192,7 +10181,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/sp_saffiyah",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -10210,7 +10199,7 @@
   {
     "Campaign Name": "Safwaan - Orphan Sponsorship",
     "Code": "SYR-SPN-ORP",
-    "Community Name": "Ashb\u0101\u0641l Al-Ummah",
+    "Community Name": "Ashb\u00c4\u0641l Al-Ummah",
     "campaign_url": "https://www.launchgood.com/v4/campaign/safwaan",
     "Heading": "Sponsorships",
     "Sub-Heading": "Orphan Sponsorship",
@@ -10364,11 +10353,11 @@
   {
     "Campaign Name": "Sajeel Auntie - Water Well Afghanistan",
     "Code": "ALL-GFN",
-    "Community Name": "Ashb\u0101\u0641l Al-Ummah",
+    "Community Name": "Ashb\u00c4\u0641l Al-Ummah",
     "campaign_url": "https://www.launchgood.com/v4/campaign/sajeelauntie",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -10434,7 +10423,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/salihah_for_the_liberated_lands",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Afghanistan,General / Multi-Country",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -10507,7 +10496,7 @@
   {
     "Campaign Name": "Samara - Orphan Sponsorship [1yr]",
     "Code": "SYR-SPN-ORP",
-    "Community Name": "Ashb\u0101\u0641l Al-Ummah",
+    "Community Name": "Ashb\u00c4\u0641l Al-Ummah",
     "campaign_url": "https://www.launchgood.com/v4/campaign/samara",
     "Heading": "Sponsorships",
     "Sub-Heading": "Orphan Sponsorship",
@@ -10555,7 +10544,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/sp_samina",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Gaza,Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -10610,7 +10599,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/samiul_for_the_liberated_lands",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza,Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -10687,7 +10676,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/sanaa",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza,Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -10731,7 +10720,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/sp_saph",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -10764,7 +10753,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/sarah_for_the_liberated_lands",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza,Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -10797,7 +10786,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/sarfraz",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza,Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -10819,7 +10808,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/school_in_shaam_raising_hope_for_ummah",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -10863,7 +10852,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/servant_of_allah_swt",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -10874,7 +10863,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/servants_of_the_merciful_1",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -10896,7 +10885,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/sp_shabnam",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -10918,7 +10907,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/shadnan",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza,Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -10940,7 +10929,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/shagufta_for_the_liberated_lands",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza,Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -11127,7 +11116,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/shaz_4",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -11138,7 +11127,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/shjeel_and_kids_gaza_walk",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Gaza",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -11171,7 +11160,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/faizan_ahmeds_syrian__gazan_challenge",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -11204,7 +11193,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/siraj_for_the_liberated_lands",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza,Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -11270,7 +11259,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/abdullah_ansaris_greater_shaam_project",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -11281,7 +11270,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/sofia_for_the_liberated_lands_1",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -11321,11 +11310,11 @@
   {
     "Campaign Name": "Solar Panels 4 Widows",
     "Code": "ALL-GFN",
-    "Community Name": "Ashb\u0101\u0641l Al-Ummah",
+    "Community Name": "Ashb\u00c4\u0641l Al-Ummah",
     "campaign_url": "https://www.launchgood.com/v4/campaign/solar_panels_4_widows",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -11369,7 +11358,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/habib_for_the_liberated_lands",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza,Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -11391,7 +11380,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/hafizsponsorship",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -11453,7 +11442,7 @@
   {
     "Campaign Name": "Stairs to Sucess",
     "Code": "GAZ-SPN-ORP",
-    "Community Name": "Ashb\u0101\u0641l Al-Ummah",
+    "Community Name": "Ashb\u00c4\u0641l Al-Ummah",
     "campaign_url": "https://www.launchgood.com/v4/campaign/shahidah",
     "Heading": "Sponsorships",
     "Sub-Heading": "Orphan Sponsorship",
@@ -11479,7 +11468,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/sp_salma",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -11501,7 +11490,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/strivingforjannah__2",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Gaza",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -11633,7 +11622,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/sumayah_1",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza,Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -11688,14 +11677,14 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/summaya",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Palestine,Afghanistan,Gaza",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
   {
     "Campaign Name": "Suni Hifdh Sponsorship (1yr)",
     "Code": "SYR-SPN-HUF",
-    "Community Name": "Ashb\u0101\u0641l Al-Ummah",
+    "Community Name": "Ashb\u00c4\u0641l Al-Ummah",
     "campaign_url": "https://www.launchgood.com/v4/campaign/rabius",
     "Heading": "Sponsorships",
     "Sub-Heading": "Huffaz Sponsorships",
@@ -11721,7 +11710,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/asifs__greater_shaam_project",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -11732,7 +11721,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/support_syrian__gazan_families",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -11798,7 +11787,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/syed_for_the_liberated_lands_2",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -11816,7 +11805,7 @@
   {
     "Campaign Name": "Syeda & Maisha",
     "Code": "AFG-SPN-ORP",
-    "Community Name": "Ashb\u0101\u0641l Al-Ummah",
+    "Community Name": "Ashb\u00c4\u0641l Al-Ummah",
     "campaign_url": "https://www.launchgood.com/v4/campaign/syeda__maisha",
     "Heading": "Sponsorships",
     "Sub-Heading": "Orphan Sponsorship",
@@ -11831,7 +11820,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/syria__gaza_emergency_appeal",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -11849,7 +11838,7 @@
   {
     "Campaign Name": "Syria Hifdh Sponsorship",
     "Code": "SYR-SPN-HUF",
-    "Community Name": "Ashb\u0101\u0641l Al-Ummah",
+    "Community Name": "Ashb\u00c4\u0641l Al-Ummah",
     "campaign_url": "https://www.launchgood.com/v4/campaign/hifdh_1",
     "Heading": "Sponsorships",
     "Sub-Heading": "Huffaz Sponsorships",
@@ -11871,7 +11860,7 @@
   {
     "Campaign Name": "Syria Qurbani Deployment",
     "Code": "ALL-SEA-QUR",
-    "Community Name": "Ashb\u0101\u0641l Al-Ummah",
+    "Community Name": "Ashb\u00c4\u0641l Al-Ummah",
     "campaign_url": "https://www.launchgood.com/v4/campaign/qurbanideployment",
     "Heading": "Seasonal & Annual Campaigns",
     "Sub-Heading": "Qurbani",
@@ -11926,7 +11915,7 @@
   {
     "Campaign Name": "Syria needs you Campaign",
     "Code": "SYR-EMR",
-    "Community Name": "N/A",
+    "Community Name": "nan",
     "campaign_url": "https://www.launchgood.com/v4/campaign/48_hour_syria_challenge",
     "Heading": "Emergency Aid",
     "Sub-Heading": "Emergency Aid",
@@ -11974,7 +11963,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/team_dental_kent",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza,Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -11985,7 +11974,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/olc_bd",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -11996,7 +11985,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/olc_e",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Gaza",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -12014,7 +12003,7 @@
   {
     "Campaign Name": "Tahir - Widows & Orphans",
     "Code": "AFG-SPN-WID",
-    "Community Name": "Ashb\u0101\u0641l Al-Ummah",
+    "Community Name": "Ashb\u00c4\u0641l Al-Ummah",
     "campaign_url": "https://www.launchgood.com/v4/campaign/tahir__widows__orphans",
     "Heading": "Sponsorships",
     "Sub-Heading": "Widow Sponsorship",
@@ -12073,7 +12062,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/syed_for_the_liberated_lands_1",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza,Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -12161,7 +12150,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/nusrah_chowdhury",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -12183,7 +12172,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/talhat_walking_the_distance_for_gaza",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Gaza",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -12205,7 +12194,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/tania_for_the_liberated_lands_1",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -12359,7 +12348,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/eid2025",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -12370,7 +12359,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/team_south_london",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -12392,7 +12381,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/team_west_midlands",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -12403,7 +12392,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/team_yorkshire_1",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -12414,7 +12403,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/teamleicester",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -12447,7 +12436,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/liberated_lands__syria_palestine_afghanistan",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza,Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -12458,7 +12447,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/the_east_end_ansar",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -12480,7 +12469,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/soulsofshaam",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -12491,7 +12480,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/the_greater_shaam_project_5",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -12535,7 +12524,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/the_niqabi_diaries",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -12568,7 +12557,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/the_shaam_super_project",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -12601,7 +12590,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/the_biggest_school_in_shaam_in_the_10_best_days",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -12612,7 +12601,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/themuslimstrongman",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -12630,7 +12619,7 @@
   {
     "Campaign Name": "Tigerstyle MMA Orphan Sponsorship (1yr)",
     "Code": "GAZ-SPN-ORP",
-    "Community Name": "Ashb\u0101\u0641l Al-Ummah",
+    "Community Name": "Ashb\u00c4\u0641l Al-Ummah",
     "campaign_url": "https://www.launchgood.com/v4/campaign/tigerstyle",
     "Heading": "Sponsorships",
     "Sub-Heading": "Orphan Sponsorship",
@@ -12711,7 +12700,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/tuma",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -12788,7 +12777,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/ulfa",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -12854,14 +12843,14 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/umair7g_for_the_liberated_lands",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza,Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
   {
     "Campaign Name": "Umar & Nadim - Widows & Orphan",
     "Code": "AFG-SPN-WID",
-    "Community Name": "Ashb\u0101\u0641l Al-Ummah",
+    "Community Name": "Ashb\u00c4\u0641l Al-Ummah",
     "campaign_url": "https://www.launchgood.com/v4/campaign/umar__nadim__widows__orphan",
     "Heading": "Sponsorships",
     "Sub-Heading": "Widow Sponsorship",
@@ -12909,7 +12898,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/umayr_7g_for_the_liberated_lands",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza,Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -12953,7 +12942,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/sp_ummdawood",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -13026,7 +13015,7 @@
   {
     "Campaign Name": "Umm Ismaeel - Hifdh Sponsorship [1yr]",
     "Code": "SYR-SPN-HUF",
-    "Community Name": "Ashb\u0101\u0641l Al-Ummah",
+    "Community Name": "Ashb\u00c4\u0641l Al-Ummah",
     "campaign_url": "https://www.launchgood.com/v4/campaign/ummismaeel",
     "Heading": "Sponsorships",
     "Sub-Heading": "Huffaz Sponsorships",
@@ -13037,7 +13026,7 @@
   {
     "Campaign Name": "Umm Ismaeel - Orphan Sponsorship [1yr]",
     "Code": "SYR-SPN-ORP",
-    "Community Name": "Ashb\u0101\u0641l Al-Ummah",
+    "Community Name": "Ashb\u00c4\u0641l Al-Ummah",
     "campaign_url": "https://www.launchgood.com/v4/campaign/ummismaeel_1",
     "Heading": "Sponsorships",
     "Sub-Heading": "Orphan Sponsorship",
@@ -13081,7 +13070,7 @@
   {
     "Campaign Name": "Umm Mujahid - Orphan Sponsorship [1yr]",
     "Code": "SYR-SPN-ORP",
-    "Community Name": "Ashb\u0101\u0641l Al-Ummah",
+    "Community Name": "Ashb\u00c4\u0641l Al-Ummah",
     "campaign_url": "https://www.launchgood.com/v4/campaign/umm_mujahid",
     "Heading": "Sponsorships",
     "Sub-Heading": "Orphan Sponsorship",
@@ -13092,7 +13081,7 @@
   {
     "Campaign Name": "Umm Mujahid - orphan Sponsorship (1yr)",
     "Code": "SYR-SPN-ORP",
-    "Community Name": "Ashb\u0101\u0641l Al-Ummah",
+    "Community Name": "Ashb\u00c4\u0641l Al-Ummah",
     "campaign_url": "https://www.launchgood.com/v4/campaign/ummmujahid",
     "Heading": "Sponsorships",
     "Sub-Heading": "Orphan Sponsorship",
@@ -13195,7 +13184,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/leilas_survivors_support",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Gaza",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -13228,7 +13217,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/ikram_for_the_liberated_lands",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza,Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -13239,7 +13228,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/united_we_stand",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -13272,14 +13261,14 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/urgent_support_for_gaza_and_syrian",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Gaza,Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
   {
     "Campaign Name": "Usama - Orphan sponsorship (1yr)",
     "Code": "AFG-SPN-ORP",
-    "Community Name": "Ashb\u0101\u0641l Al-Ummah",
+    "Community Name": "Ashb\u00c4\u0641l Al-Ummah",
     "campaign_url": "https://www.launchgood.com/v4/campaign/usama_2",
     "Heading": "Sponsorships",
     "Sub-Heading": "Orphan Sponsorship",
@@ -13294,7 +13283,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/usama_1",
     "Heading": "General Fund",
     "Sub-Heading": "General Fund",
-    "Country": "Syria,Afghanistan,Gaza",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Zakat",
     "is_primary": 0
   },
@@ -13305,7 +13294,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/usamah_2",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -13393,7 +13382,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/abid_2",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -13437,7 +13426,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/we_will_never_forget_palestine",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -13455,7 +13444,7 @@
   {
     "Campaign Name": "Widows Sponsorship",
     "Code": "AFG-SPN-WID",
-    "Community Name": "Ashb\u0101\u0641l Al-Ummah",
+    "Community Name": "Ashb\u00c4\u0641l Al-Ummah",
     "campaign_url": "https://www.launchgood.com/v4/campaign/widows_sponsorship",
     "Heading": "Sponsorships",
     "Sub-Heading": "Widow Sponsorship",
@@ -13470,7 +13459,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/women_of_ihsan_syrian__gazan_challenge",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -13503,7 +13492,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/ym",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza,Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -13543,7 +13532,7 @@
   {
     "Campaign Name": "Yahya - Hifdh sponsorship (1yr)",
     "Code": "SYR-SPN-HUF",
-    "Community Name": "Ashb\u0101\u0641l Al-Ummah",
+    "Community Name": "Ashb\u00c4\u0641l Al-Ummah",
     "campaign_url": "https://www.launchgood.com/v4/campaign/yahyahifdh",
     "Heading": "Sponsorships",
     "Sub-Heading": "Huffaz Sponsorships",
@@ -13576,7 +13565,7 @@
   {
     "Campaign Name": "Yahya Friday Challenge!",
     "Code": "AFG-SPN-HUF",
-    "Community Name": "Ashb\u0101\u0641l Al-Ummah",
+    "Community Name": "Ashb\u00c4\u0641l Al-Ummah",
     "campaign_url": "https://www.launchgood.com/v4/campaign/yahya_6",
     "Heading": "Sponsorships",
     "Sub-Heading": "Huffaz Sponsorships",
@@ -13587,7 +13576,7 @@
   {
     "Campaign Name": "Yahya Quran Challenge!",
     "Code": "AFG-SPN-HUF",
-    "Community Name": "Ashb\u0101\u0641l Al-Ummah",
+    "Community Name": "Ashb\u00c4\u0641l Al-Ummah",
     "campaign_url": "https://www.launchgood.com/v4/campaign/yahya_7",
     "Heading": "Sponsorships",
     "Sub-Heading": "Huffaz Sponsorships",
@@ -13598,7 +13587,7 @@
   {
     "Campaign Name": "Yahya Qurbani page",
     "Code": "ALL-SEA-QUR",
-    "Community Name": "Ashb\u0101\u0641l Al-Ummah",
+    "Community Name": "Ashb\u00c4\u0641l Al-Ummah",
     "campaign_url": "https://www.launchgood.com/v4/campaign/yahya_2",
     "Heading": "Seasonal & Annual Campaigns",
     "Sub-Heading": "Qurbani",
@@ -13789,7 +13778,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/yunus",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza,Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -13822,7 +13811,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/yusuf_for_the_liberated_lands",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza,Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -13833,7 +13822,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/yusufs_first_charity_mission",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -13844,7 +13833,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/sp_zaksidat",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Gaza,Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -13855,7 +13844,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/zaksidat_liberated_lands_challenge",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -13877,7 +13866,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/zaksidat_syria_appeal",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -14053,7 +14042,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/zara4syria",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -14064,7 +14053,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/zareena_for_the_liberated_lands",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza,Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -14130,7 +14119,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/zeb",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Gaza,Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -14258,7 +14247,7 @@
   {
     "Campaign Name": "\u00a310 School Pack",
     "Code": "ALL-GFN",
-    "Community Name": "Ashb\u0101\u0641l Al-Ummah",
+    "Community Name": "Ashb\u00c4\u0641l Al-Ummah",
     "campaign_url": "https://www.launchgood.com/v4/campaign/10_school_pack",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
@@ -14273,7 +14262,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/___714",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -14361,7 +14350,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/abdul__ansr_of_the_ummah_for_the_liberated_lands",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza,Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -14416,7 +14405,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/abid",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza,Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -14427,7 +14416,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/abuayub",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza,Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -14537,7 +14526,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/amdad__ansr_of_the_ummah",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza,Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -14548,7 +14537,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/anayet",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza,Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -14570,7 +14559,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/aniqah__ansryyah_of_the_ummah",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza,Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -14592,7 +14581,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/ansar_group",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza,Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -14603,7 +14592,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/ansariyyah_group",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza,Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -14614,7 +14603,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/ashamed_for_the_liberated_lands",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza,Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -14702,7 +14691,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/be_the_ansr_of_today",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza,Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -14735,7 +14724,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/dawoud__ansr_of_the_ummah",
     "Heading": "General Fund",
     "Sub-Heading": "General Fund",
-    "Country": "Syria,Afghanistan,Gaza",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Zakat",
     "is_primary": 0
   },
@@ -14746,7 +14735,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/ebrahim",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza,Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -14764,7 +14753,7 @@
   {
     "Campaign Name": "E\u00c4\u00abd Clothes & Toys 4 Children in Sh\u00c4\u0641m",
     "Code": "ALL-SEA-EID",
-    "Community Name": "Ashb\u0101\u0641l Al-Ummah",
+    "Community Name": "Ashb\u00c4\u0641l Al-Ummah",
     "campaign_url": "https://www.launchgood.com/v4/campaign/eidclothes",
     "Heading": "Seasonal & Annual Campaigns",
     "Sub-Heading": "Eid Party",
@@ -14790,7 +14779,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/farhan__ansr_of_the_ummah",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza,Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -14823,7 +14812,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/habib",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza,Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -14845,7 +14834,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/hamid_ali",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza,Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -14867,7 +14856,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/hamzah",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza,Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -14878,7 +14867,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/hanif__ansr_of_the_ummah",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza,Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -14918,11 +14907,11 @@
   {
     "Campaign Name": "Ibr\u00c4\u0641h\u00c4\u00abm - Zakah Only (Distributed on the Ground)",
     "Code": "ALL-GFN",
-    "Community Name": "Ashb\u0101\u0641l Al-Ummah",
+    "Community Name": "Ashb\u00c4\u0641l Al-Ummah",
     "campaign_url": "https://www.launchgood.com/v4/campaign/ibrhm__ashbl_deployment",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -14955,7 +14944,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/istighfar",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza,Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -14999,7 +14988,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/jameel_2",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza,Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -15021,7 +15010,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/malaika__ansryyah_of_the_ummah",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza,Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -15065,7 +15054,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/mohammad__ansr_of_the_ummah",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza,Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -15076,7 +15065,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/mohammad_hanif_ahmed__ansr_of_the_ummah",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza,Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -15087,7 +15076,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/monwara__ansryyah_of_the_ummah",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza,Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -15109,7 +15098,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/nazma_4",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza,Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -15120,7 +15109,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/nazmin__ansariyyah_of_the_ummah",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza,Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -15153,7 +15142,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/mustafa_2",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza,Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -15171,11 +15160,11 @@
   {
     "Campaign Name": "Poplar Brotherhood Masjid in Gh\u00c5\u00abtah - Syria",
     "Code": "ALL-GFN",
-    "Community Name": "Ashb\u0101\u0641l Al-Ummah",
+    "Community Name": "Ashb\u00c4\u0641l Al-Ummah",
     "campaign_url": "https://www.launchgood.com/v4/campaign/restoration",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -15186,7 +15175,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/qais__ansr_of_the_ummah_for_the_liberated_lands",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza,Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -15208,7 +15197,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/rabius_suni",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza,Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -15252,7 +15241,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/rumal_rouf",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza,Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -15263,7 +15252,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/safwan__ansr_of_the_ummah_for_the_liberated_lands",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza,Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -15307,7 +15296,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/seeker_of_shade",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza,Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -15329,7 +15318,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/shahid__ansr_of_the_ummah",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza,Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -15351,7 +15340,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/shof",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza,Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -15373,7 +15362,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/syam",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza,Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -15516,7 +15505,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/yasin_for_the_liberated_lands",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza,Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -15527,7 +15516,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/zakaria_ahmed",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza,Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -15644,7 +15633,7 @@
   {
     "Campaign Name": "Their Right Upon Us | \u00d8\u00d9\u201a\u00d9\u2021\u00d9\u2020 \u00d8\u00b9\u00d9\u201e\u00d9\u0160\u00d9\u2020\u00d8\u00a7",
     "Code": "AFG-SPN-WID",
-    "Community Name": "Ashb\u0101\u0641l Al-Ummah",
+    "Community Name": "Ashb\u00c4\u0641l Al-Ummah",
     "campaign_url": "https://www.launchgood.com/v4/campaign/their_right_upon_us___",
     "Heading": "Sponsorships",
     "Sub-Heading": "Widow Sponsorship",
@@ -15776,7 +15765,7 @@
   {
     "Campaign Name": "70 Quran Give Away - Nusrat Subhan",
     "Code": "AFG-QRN",
-    "Community Name": "Ashb\u0101\u0641l Al-Ummah",
+    "Community Name": "Ashb\u00c4\u0641l Al-Ummah",
     "campaign_url": "https://www.launchgood.com/v4/campaign/quran_give_away__nusrat_subhan",
     "Heading": "Quran Distribution",
     "Sub-Heading": "Quran Distribution",
@@ -15820,7 +15809,7 @@
   {
     "Campaign Name": "Abu Ismaeel Friday Challenge \"\" Carriers of the Qur\u00c4\u0641n",
     "Code": "SYR-SPN-HUF",
-    "Community Name": "Ashb\u0101\u0641l Al-Ummah",
+    "Community Name": "Ashb\u00c4\u0641l Al-Ummah",
     "campaign_url": "https://www.launchgood.com/v4/campaign/abu_ismaeel",
     "Heading": "Sponsorships",
     "Sub-Heading": "Huffaz Sponsorships",
@@ -15831,7 +15820,7 @@
   {
     "Campaign Name": "Abu Ismail Friday Challenge \"\" Carriers of the Qur\u00c4\u0641n",
     "Code": "AFG-ONE-HAF",
-    "Community Name": "Ashb\u0101\u0641l Al-Ummah",
+    "Community Name": "Ashb\u00c4\u0641l Al-Ummah",
     "campaign_url": "https://www.launchgood.com/v4/campaign/abu_ismail",
     "Heading": "One-Off Projects",
     "Sub-Heading": "Hafiz Teacher Sponsorship",
@@ -15842,7 +15831,7 @@
   {
     "Campaign Name": "Abu Khalid Friday Challenge \"\" Carriers of the Qur\u00c4\u0641n",
     "Code": "SYR-SPN-HUF",
-    "Community Name": "Ashb\u0101\u0641l Al-Ummah",
+    "Community Name": "Ashb\u00c4\u0641l Al-Ummah",
     "campaign_url": "https://www.launchgood.com/v4/campaign/abu_khalid",
     "Heading": "Sponsorships",
     "Sub-Heading": "Huffaz Sponsorships",
@@ -15945,7 +15934,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/aisha_chands_syrian__gazan_challenge",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -15956,7 +15945,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/aishas_greater_shaam_project",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -15996,7 +15985,7 @@
   {
     "Campaign Name": "Ajwad - Carriers of the Qur\u00c4\u0641n",
     "Code": "AFG-SPN-HUF",
-    "Community Name": "Ashb\u0101\u0641l Al-Ummah",
+    "Community Name": "Ashb\u00c4\u0641l Al-Ummah",
     "campaign_url": "https://www.launchgood.com/v4/campaign/ajwad_1",
     "Heading": "Sponsorships",
     "Sub-Heading": "Huffaz Sponsorships",
@@ -16033,7 +16022,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/saadats_fundraiser_for_syria",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -16044,7 +16033,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/ameenah_shaws_syrian__gazan_challenge",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -16055,7 +16044,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/amina_khans_syria_fundraiser",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -16077,7 +16066,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/act4syria",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -16110,7 +16099,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/amiras_and_asiyahs_fundraiser",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza,Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -16143,7 +16132,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/sp_amrana",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Gaza,Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -16187,7 +16176,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/aniqas_fundraiser_for_the_super_village_campaign_in_syria",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -16198,7 +16187,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/annas_greater_shaam_project",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -16231,7 +16220,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/arshiyas_syrian_and_gazan_challenge",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -16253,7 +16242,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/ashmas_classroom",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -16275,7 +16264,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/asias_syria_and_gazachallenge",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -16297,7 +16286,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/sp_asia_khatun",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -16352,7 +16341,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/zainabs_super_village_syria",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -16363,7 +16352,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/astracias_liberated_lands_challenge",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -16374,7 +16363,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/astracias_syrian__gazan_challenge",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -16385,7 +16374,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/atia_rafiqs_syrian_and_gaza_challenge",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -16407,7 +16396,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/atiqs_rethink_village_syria",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -16451,18 +16440,18 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/brunels_greater_shaam_project",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
   {
     "Campaign Name": "Build a Wud\u00c5\u00ab Area at Madrasah D\u00c4\u0641rul Im\u00c4\u0641n \"\" Kabul, Afghanistan",
     "Code": "ALL-GFN",
-    "Community Name": "Ashb\u0101\u0641l Al-Ummah",
+    "Community Name": "Ashb\u00c4\u0641l Al-Ummah",
     "campaign_url": "https://www.launchgood.com/v4/campaign/wudhu",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -16473,7 +16462,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/build_your_legacy_for_when_youre_no_longer_here",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -16539,7 +16528,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/drummabdullahtorchbearers",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -16572,7 +16561,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/dr_aminas_syrian__gazan_challenge_remembering_our_ummah_at_large",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -16594,7 +16583,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/dr_ummabdullahs_educate_the_ummah_sadqa_e_jariah",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -16623,11 +16612,11 @@
   {
     "Campaign Name": "Eesa & Layths Deployment March 2024",
     "Code": "ALL-GFN",
-    "Community Name": "N/A",
+    "Community Name": "nan",
     "campaign_url": "https://www.launchgood.com/v4/campaign/eesa__layths_deploymentmarch2024",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -16649,7 +16638,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/sp_nhaila",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Gaza,Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -16660,7 +16649,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/empower_syrias_most_vulnerable__sponsorship",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -16671,7 +16660,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/ever_so_specials_liberated_lands_challenge",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -16682,7 +16671,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/ever_so_specials_syria__gaza_campaign",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -16693,7 +16682,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/farah_safiyyah_fatimah_and_ayoobs_fundraising_for_gaza_andsyria",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Gaza,Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -16733,7 +16722,7 @@
   {
     "Campaign Name": "Farhan  \"\" Carriers of the Qur\u00c4\u0641n",
     "Code": "AFG-SPN-HUF",
-    "Community Name": "Ashb\u0101\u0641l Al-Ummah",
+    "Community Name": "Ashb\u00c4\u0641l Al-Ummah",
     "campaign_url": "https://www.launchgood.com/v4/campaign/farhan_3",
     "Heading": "Sponsorships",
     "Sub-Heading": "Huffaz Sponsorships",
@@ -16748,7 +16737,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/faridas_greater_shaam_project",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -16781,7 +16770,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/fatihs_syria__gaza_appeal",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -16814,7 +16803,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/fatimas_gazan__syrian_challenge",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -16854,7 +16843,7 @@
   {
     "Campaign Name": "Friday Challenge \"\" Carriers of the Qur\u00c4\u0641n",
     "Code": "AFG-SPN-HUF",
-    "Community Name": "Ashb\u0101\u0641l Al-Ummah",
+    "Community Name": "Ashb\u00c4\u0641l Al-Ummah",
     "campaign_url": "https://www.launchgood.com/v4/campaign/abuismail_4",
     "Heading": "Sponsorships",
     "Sub-Heading": "Huffaz Sponsorships",
@@ -16902,7 +16891,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/hamids_syrian__gazanchallenge",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -16913,14 +16902,14 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/hamids_and_osmans_syrian__gazan_challenge",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
   {
     "Campaign Name": "Hamza \"\" Carriers of the Qur\u00c4\u0641n",
     "Code": "AFG-SPN-HUF",
-    "Community Name": "Ashb\u0101\u0641l Al-Ummah",
+    "Community Name": "Ashb\u00c4\u0641l Al-Ummah",
     "campaign_url": "https://www.launchgood.com/v4/campaign/hamza_5",
     "Heading": "Sponsorships",
     "Sub-Heading": "Huffaz Sponsorships",
@@ -16942,7 +16931,7 @@
   {
     "Campaign Name": "Hasanat Friday Challenge \"\" Carriers of the Qur\u00c4\u0641n",
     "Code": "SYR-SPN-HUF",
-    "Community Name": "Ashb\u0101\u0641l Al-Ummah",
+    "Community Name": "Ashb\u00c4\u0641l Al-Ummah",
     "campaign_url": "https://www.launchgood.com/v4/campaign/hasanat",
     "Heading": "Sponsorships",
     "Sub-Heading": "Huffaz Sponsorships",
@@ -16957,7 +16946,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/hasnan_iqbals_syrian__gazan_challenge",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -16979,7 +16968,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/help_empower_syrias_most_vulnerable__sponsorship",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -16997,7 +16986,7 @@
   {
     "Campaign Name": "Help Us Gift 200 New Qurans to a Madrasah in Afghanistan",
     "Code": "AFG-QRN",
-    "Community Name": "Ashb\u0101\u0641l Al-Ummah",
+    "Community Name": "Ashb\u00c4\u0641l Al-Ummah",
     "campaign_url": "https://www.launchgood.com/v4/campaign/qurans_1",
     "Heading": "Quran Distribution",
     "Sub-Heading": "Quran Distribution",
@@ -17023,7 +17012,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/hibas_syrian_and_gazan_challenge",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -17056,7 +17045,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/ibrahims_ramadan_syria_gaza_challenge",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -17067,7 +17056,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/idris_and_ibrahims_syrian_and_gazan_challenge",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -17089,7 +17078,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/ishrat_bhattis_syrian__gazan_challenge",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -17100,7 +17089,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/ishrat_bhatti_for_the_liberated_lands",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza,Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -17111,7 +17100,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/ishrats_page_for_the_greater_shaam_project",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -17133,7 +17122,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/jamilas_greater_shaam_project",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -17155,14 +17144,14 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/javeds_greater_shaam_project",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
   {
     "Campaign Name": "Join Motaz Azaizas Mission: Help 33 Gaza Students Become Doctors",
     "Code": "GAZ-ONE-DOC",
-    "Community Name": "N/A",
+    "Community Name": "nan",
     "campaign_url": "https://www.launchgood.com/v4/campaign/empower_27_future_doctors_from_gaza_to_graduate",
     "Heading": "One-Off Projects",
     "Sub-Heading": "Gaza Doctors",
@@ -17210,7 +17199,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/kausers_fundraiser_for_syria_and_gaza",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -17243,7 +17232,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/khalifa_family__friends_syrian__gazan_challenge",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -17265,7 +17254,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/labony_choudhurys_syrian__gazan_challenge",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Gaza",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -17287,7 +17276,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/lauren_booths_greater_shaam_project",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -17309,7 +17298,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/maleeka_for_the_liberated_lands",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -17320,7 +17309,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/mahdis_greater_shaam_project",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -17386,7 +17375,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/maqsudahs_syrian__gazan_challenge",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -17408,7 +17397,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/mariams_syrian__gazan_challenge",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -17430,7 +17419,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/maryam_sara_ismaeel_nusayba__aishas_syrian__gazan_challenge",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -17441,7 +17430,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/maryams_rethink_village_syria",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -17496,7 +17485,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/moazzam_beggs_greater_shaam_project_1",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -17529,7 +17518,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/mohsin_khans_greater_shaam_project",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -17551,7 +17540,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/mumtazs_page",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -17606,7 +17595,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/musab_dihyah__urwahs_call_for_the_blessed_lands",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza,Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -17628,7 +17617,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/musas_syrian_and_gazan_challenge",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -17650,7 +17639,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/nadas_liberated_lands_challenge",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza,Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -17661,7 +17650,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/nadas_liberated_lands_challenge_1",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza,Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -17760,7 +17749,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/nazias_syrian_and_gaza_challenge",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -17800,7 +17789,7 @@
   {
     "Campaign Name": "New Qur\u00c4\u0641ns 4 Hifdh Students",
     "Code": "AFG-QRN",
-    "Community Name": "Ashb\u0101\u0641l Al-Ummah",
+    "Community Name": "Ashb\u00c4\u0641l Al-Ummah",
     "campaign_url": "https://www.launchgood.com/v4/campaign/new_qurns_4_hifdh_students_1",
     "Heading": "Quran Distribution",
     "Sub-Heading": "Quran Distribution",
@@ -17837,7 +17826,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/nottingham_sisters_rethink_village",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -17892,7 +17881,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/nusaybah_aasiyah__yusufs_syria_gazachallenge",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -17936,7 +17925,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/osmans_greater_shaam_project",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -17958,14 +17947,14 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/100futures",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
   {
     "Campaign Name": "Qur\u00c4\u0641n Friday Challenge!",
     "Code": "AFG-SPN-HUF",
-    "Community Name": "Ashb\u0101\u0641l Al-Ummah",
+    "Community Name": "Ashb\u00c4\u0641l Al-Ummah",
     "campaign_url": "https://www.launchgood.com/v4/campaign/qurn_friday_challenge",
     "Heading": "Sponsorships",
     "Sub-Heading": "Huffaz Sponsorships",
@@ -18013,7 +18002,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/rekhas_homes4syria",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -18035,7 +18024,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/riannas_syrian_and_gazan_challenge",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -18079,7 +18068,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/rubys_greater_shaam_project",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -18134,7 +18123,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/most_needy_1",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -18145,7 +18134,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/spramadan2026",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -18189,7 +18178,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/sabihas_fundraiser_for_syria",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -18211,7 +18200,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/sadia_akhtars_syrian__gazan_challenge",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -18229,7 +18218,7 @@
   {
     "Campaign Name": "Safwan \"\" Carriers of the Qur\u00c4\u0641n",
     "Code": "ALL-GFN",
-    "Community Name": "Ashb\u0101\u0641l Al-Ummah",
+    "Community Name": "Ashb\u00c4\u0641l Al-Ummah",
     "campaign_url": "https://www.launchgood.com/v4/campaign/safwan",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
@@ -18240,7 +18229,7 @@
   {
     "Campaign Name": "Safwan Friday Challenge \"\" Carriers of the Qur\u00c4\u0641n",
     "Code": "SYR-SPN-HUF",
-    "Community Name": "Ashb\u0101\u0641l Al-Ummah",
+    "Community Name": "Ashb\u00c4\u0641l Al-Ummah",
     "campaign_url": "https://www.launchgood.com/v4/campaign/safwan_1",
     "Heading": "Sponsorships",
     "Sub-Heading": "Huffaz Sponsorships",
@@ -18255,7 +18244,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/sahistes_syrian_and_gaza_challenge",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -18277,7 +18266,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/sairas_greater_shaam_project",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -18299,7 +18288,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/sakinas_ramadan_challenge_for_gaza__syria_2024",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Gaza,Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -18343,7 +18332,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/sama_and_ayaans_ramadan_charity_fundraiser_for_syria_and_gaza",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -18376,7 +18365,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/sameeras_greater_shaam_project_1",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -18420,7 +18409,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/saminas_syria__gaza_challenge",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -18442,7 +18431,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/samra_1",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -18486,7 +18475,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/sandys_fundraiser_1",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -18508,7 +18497,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/sanias_greater_shaam_project",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -18519,7 +18508,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/saphs_liberated_lands_campaign",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -18541,7 +18530,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/sarahs_fundraiser_for_syria",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -18640,7 +18629,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/sohail_osmans_greater_shaam_project",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -18662,7 +18651,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/sophina_and_shamimas_syrian__gazan_challenge",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -18680,7 +18669,7 @@
   {
     "Campaign Name": "Sponsor Qur\u00c4\u0641n Teacher",
     "Code": "AFG-ONE-HAF",
-    "Community Name": "Ashb\u0101\u0641l Al-Ummah",
+    "Community Name": "Ashb\u00c4\u0641l Al-Ummah",
     "campaign_url": "https://www.launchgood.com/v4/campaign/qurn_teacher",
     "Heading": "One-Off Projects",
     "Sub-Heading": "Hafiz Teacher Sponsorship",
@@ -18695,7 +18684,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/suhaib__iqbals_greater_shaam_project",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -18717,7 +18706,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/sumaiya_and_hibas_fundraising_page",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -18761,7 +18750,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/sumayyahs_syrian_andgazachallenge",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -18794,7 +18783,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/surraiyas_page",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -18805,7 +18794,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/syrias_most_needy",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -18915,7 +18904,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/tanias_syria_gaza_appeal",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -18926,7 +18915,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/tausifs_syriagaza_challenge",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -18937,7 +18926,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/tayebas_greater_shaam_project",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -18948,7 +18937,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/team_iffats_village_in_syria",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -19069,7 +19058,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/iftar_4_orphans__widows",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza,Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -19098,11 +19087,11 @@
   {
     "Campaign Name": "Umm Ismaeel \"\" Carriers of the Qur\u00c4\u0641n",
     "Code": "ALL-GFN",
-    "Community Name": "Ashb\u0101\u0641l Al-Ummah",
+    "Community Name": "Ashb\u00c4\u0641l Al-Ummah",
     "campaign_url": "https://www.launchgood.com/v4/campaign/ummismaeel_2",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -19113,7 +19102,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/umm_musas_syria__gaza_fundraiser",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -19124,7 +19113,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/umm_ruhees_ramadan_campaign_1",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "United Kingdom",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -19153,7 +19142,7 @@
   {
     "Campaign Name": "Yahya \"\" Carriers of the Qur\u00c4\u0641n",
     "Code": "AFG-SPN-HUF",
-    "Community Name": "Ashb\u0101\u0641l Al-Ummah",
+    "Community Name": "Ashb\u00c4\u0641l Al-Ummah",
     "campaign_url": "https://www.launchgood.com/v4/campaign/yahya_3",
     "Heading": "Sponsorships",
     "Sub-Heading": "Huffaz Sponsorships",
@@ -19164,7 +19153,7 @@
   {
     "Campaign Name": "Yahya Friday Challenge \"\" Carriers of the Qur\u00c4\u0641n",
     "Code": "ALL-GFN",
-    "Community Name": "Ashb\u0101\u0641l Al-Ummah",
+    "Community Name": "Ashb\u00c4\u0641l Al-Ummah",
     "campaign_url": "https://www.launchgood.com/v4/campaign/yahya_4",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
@@ -19179,7 +19168,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/yasirs_greater_shaam_project",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -19201,7 +19190,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/yassars_syrian__gazan_challenge",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -19245,7 +19234,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/zahra_buxs_syrian__gazan_challenge",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -19256,7 +19245,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/zahrah_and_zakarias_fundraising_page",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -19278,7 +19267,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/education4syria",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -19311,7 +19300,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/zaman_qayyums_syrian__gazan_challenge",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -19344,7 +19333,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/zaynabs_fundraiser_for_syria",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Gaza,Syria",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -19377,7 +19366,7 @@
     "campaign_url": "https://www.launchgood.com/v4/campaign/zeenats_syria__gaza_challenge",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Syria,Gaza",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -19439,8 +19428,8 @@
   {
     "Campaign Name": "Fathima - STAND WITH GAZA & SYRIA",
     "Code": "GAZ-EMR",
-    "Community Name": "N/A",
-    "campaign_url": "",
+    "Community Name": "TEAM SISTERS PROJECT",
+    "campaign_url": "https://www.launchgood.com/v4/campaign/fathima_khatun",
     "Heading": "Emergency Aid",
     "Sub-Heading": "Emergency Aid",
     "Country": "Gaza",
@@ -19494,8 +19483,8 @@
   {
     "Campaign Name": "Nazia - STAND WITH GAZA & SYRIA",
     "Code": "SYR-SPN-HUF",
-    "Community Name": "N/A",
-    "campaign_url": "",
+    "Community Name": "TEAM SISTERS PROJECT",
+    "campaign_url": "https://www.launchgood.com/v4/campaign/sp_nazia",
     "Heading": "Sponsorships",
     "Sub-Heading": "Huffaz Sponsorships",
     "Country": "Syria",
@@ -19505,8 +19494,8 @@
   {
     "Campaign Name": "SAMRA - STAND WITH GAZA & SYRIA",
     "Code": "GAZ-FOD",
-    "Community Name": "N/A",
-    "campaign_url": "",
+    "Community Name": "TEAM SISTERS PROJECT",
+    "campaign_url": "https://www.launchgood.com/v4/campaign/sp_1_1",
     "Heading": "Food",
     "Sub-Heading": "Food",
     "Country": "Gaza",
@@ -19516,8 +19505,8 @@
   {
     "Campaign Name": "Aftab, Hina, Safa - STAND WITH GAZA & SYRIA",
     "Code": "GAZ-ONE-MUS",
-    "Community Name": "N/A",
-    "campaign_url": "",
+    "Community Name": "TEAM SISTERS PROJECT",
+    "campaign_url": "https://www.launchgood.com/v4/campaign/aftab_hina_safa",
     "Heading": "One-Off Projects",
     "Sub-Heading": "Musallah",
     "Country": "GAZA",
@@ -19527,8 +19516,8 @@
   {
     "Campaign Name": "DR UMM ABDULLAH 2026 - RAMADAN 2026: STAND WITH GAZA & SYRIA",
     "Code": "GAZ-ONE-MUS",
-    "Community Name": "N/A",
-    "campaign_url": "",
+    "Community Name": "TEAM SISTERS PROJECT",
+    "campaign_url": "https://www.launchgood.com/v4/campaign/drummabdullah_2026",
     "Heading": "One-Off Projects",
     "Sub-Heading": "Musallah",
     "Country": "GAZA",
@@ -19538,8 +19527,8 @@
   {
     "Campaign Name": "Sakina and Ruqayyah - STAND WITH GAZA & SYRIA",
     "Code": "SYR-SPN-HUF",
-    "Community Name": "N/A",
-    "campaign_url": "",
+    "Community Name": "TEAM SISTERS PROJECT",
+    "campaign_url": "https://www.launchgood.com/v4/campaign/sp_sakina",
     "Heading": "Sponsorships",
     "Sub-Heading": "Huffaz Sponsorships",
     "Country": "Syria",
@@ -19560,19 +19549,19 @@
   {
     "Campaign Name": "Asia - STAND WITH GAZA & SYRIA",
     "Code": "ALL-GFN",
-    "Community Name": "N/A",
-    "campaign_url": "",
+    "Community Name": "TEAM SISTERS PROJECT",
+    "campaign_url": "https://www.launchgood.com/v4/campaign/sp_asia_liaquat",
     "Heading": "General Fund",
     "Sub-Heading": "Most Needed / Flexible Allocation",
-    "Country": "Afghanistan",
+    "Country": "General / Multi-Country",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
   {
     "Campaign Name": "DR UMM ABDULLAH EMERGENCY FOOD AID FOR GAZA",
     "Code": "GAZ-SPN-ORP",
-    "Community Name": "N/A",
-    "campaign_url": "",
+    "Community Name": "TEAM SISTERS PROJECT",
+    "campaign_url": "https://www.launchgood.com/v4/campaign/dr",
     "Heading": "Sponsorships",
     "Sub-Heading": "Orphan Sponsorship",
     "Country": "Gaza",
@@ -19620,6 +19609,83 @@
     "Heading": "Water",
     "Sub-Heading": "Wells and Boreholes",
     "Country": "Gaza",
+    "Zakat Eligibility": "Non-Zakat",
+    "is_primary": 0
+  },
+  {
+    "Campaign Name": "Aftab, Hina, Safa - STAND WITH GAZA & SYRIA",
+    "Code": "ALL-DIV",
+    "Community Name": "N/A",
+    "campaign_url": "",
+    "Heading": "Seasonal & Annual Campaigns",
+    "Sub-Heading": "Diversify Your Donation",
+    "Country": "ALL",
+    "Zakat Eligibility": "Zakat",
+    "is_primary": 0
+  },
+  {
+    "Campaign Name": "Aftab, Hina, Safa - STAND WITH GAZA & SYRIA",
+    "Code": "SYR-MAS-CSR",
+    "Community Name": "N/A",
+    "campaign_url": "",
+    "Heading": "Masjid General",
+    "Sub-Heading": "Masjid Construction/Restoration",
+    "Country": "Syria",
+    "Zakat Eligibility": "Non-Zakat",
+    "is_primary": 0
+  },
+  {
+    "Campaign Name": "Mus'ab, Dihyah & Urwah's Call for the Blessed Lands",
+    "Code": "ALL-DIV",
+    "Community Name": "N/A",
+    "campaign_url": "",
+    "Heading": "Seasonal & Annual Campaigns",
+    "Sub-Heading": "Diversify Your Donation",
+    "Country": "ALL",
+    "Zakat Eligibility": "Zakat",
+    "is_primary": 0
+  },
+  {
+    "Campaign Name": "Stick to the Deen",
+    "Code": "SYR-MAS-CSR",
+    "Community Name": "N/A",
+    "campaign_url": "",
+    "Heading": "Masjid General",
+    "Sub-Heading": "Masjid Construction/Restoration",
+    "Country": "Syria",
+    "Zakat Eligibility": "Non-Zakat",
+    "is_primary": 0
+  },
+  {
+    "Campaign Name": "SISTERS\u00e2\u20ac\u2122 PROJECT: STAND WITH GAZA & SYRIA",
+    "Code": "ALL-DIV",
+    "Community Name": "N/A",
+    "campaign_url": "",
+    "Heading": "Seasonal & Annual Campaigns",
+    "Sub-Heading": "Diversify Your Donation",
+    "Country": "ALL",
+    "Zakat Eligibility": "Zakat",
+    "is_primary": 0
+  },
+  {
+    "Campaign Name": "Ammarah & Hiba - STAND WITH GAZA & SYRIA",
+    "Code": "ALL-DIV",
+    "Community Name": "N/A",
+    "campaign_url": "",
+    "Heading": "Seasonal & Annual Campaigns",
+    "Sub-Heading": "Diversify Your Donation",
+    "Country": "ALL",
+    "Zakat Eligibility": "Zakat",
+    "is_primary": 0
+  },
+  {
+    "Campaign Name": "Mus'ab, Dihyah & Urwah's Call for the Blessed Lands",
+    "Code": "SYR-MAS-CSR",
+    "Community Name": "N/A",
+    "campaign_url": "",
+    "Heading": "Masjid General",
+    "Sub-Heading": "Masjid Construction/Restoration",
+    "Country": "Syria",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   }

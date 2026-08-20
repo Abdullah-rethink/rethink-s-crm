@@ -88,16 +88,25 @@ def save_givebright_classification_matrix(matrix_df):
         return 0
 
     conn = sqlite3.connect(LOCAL_DB_PATH, timeout=30.0)
+
+    # 1. Reconcile codes per campaign: remove any codes in DB that are NOT in the submitted matrix for these campaigns
+    cname_to_codes = {}
+    for _, row in matrix_df.iterrows():
+        cname = str(row.get("Campaign Name", "Unassigned")).strip().replace("’", "'").replace("‘", "'")
+        code = str(row.get("Code", "Unassigned")).strip()
+        if cname and cname.lower() not in ["nan", "none", "n/a", "", "campaign_name", "campaign name"]:
+            cname_to_codes.setdefault(cname.lower(), set()).add(code.lower())
+
+    for cname_lower, codes in cname_to_codes.items():
+        placeholders = ','.join(['?'] * len(codes))
+        conn.execute(f"DELETE FROM givebright_classifications WHERE LOWER(campaign_name) = ? AND LOWER(code) NOT IN ({placeholders})", [cname_lower] + list(codes))
+
     for _, row in matrix_df.iterrows():
         cname = str(row.get("Campaign Name", "Unassigned")).strip().replace("’", "'").replace("‘", "'")
         code = str(row.get("Code", "Unassigned")).strip()
         curl = str(row.get("Campaign URL") or row.get("campaign_url") or "")
         if not cname or cname.lower() in ["nan", "none", "n/a", "", "campaign_name", "campaign name"]:
             continue
-
-        # If assigning a valid code, delete any leftover Unassigned row for this campaign
-        if code.lower() not in ["unassigned", "nan", "none", "n/a", ""]:
-            conn.execute("DELETE FROM givebright_classifications WHERE LOWER(campaign_name) = ? AND LOWER(code) IN ('unassigned', 'nan', 'none', 'n/a', '')", (cname.lower(),))
 
         conn.execute("DELETE FROM givebright_classifications WHERE LOWER(campaign_name) = ? AND LOWER(code) = ?", (cname.lower(), code.lower()))
         conn.execute("""

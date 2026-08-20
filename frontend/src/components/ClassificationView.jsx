@@ -107,20 +107,20 @@ export default function ClassificationView({ user }) {
   }, []);
 
   // Race-Condition-Free Data Loading with Cancellation Cleanup
-  useEffect(() => {
-    let isCurrent = true;
+  const loadMatrixData = () => {
     setLoading(true);
     setSaveMsg('');
 
     fetch(`${API_BASE_URL}/api/classifications/${platform}`)
       .then(res => res.json())
       .then(data => {
-        if (!isCurrent) return; // Discard response if user already switched platforms!
-        
-        let rules = (data.rules || []).map(r => ({
+        let rules = (data.rules || []).map((r, i) => ({
           ...r,
+          _row_id: `${r['Campaign Name'] || r['campaign_name']}__${r['Code'] || r['code'] || i}__${i}`,
           'Campaign Name': cleanText(r['Campaign Name']),
           'Community Name': cleanText(r['Community Name']),
+          'Donor Name': cleanText(r['Donor Name'] || r['donor_name'] || ''),
+          'Donor Email': cleanText(r['Donor Email'] || r['donor_email'] || ''),
           'Heading': cleanText(r['Heading']),
           'Sub-Heading': cleanText(r['Sub-Heading']),
           'Country': cleanText(r['Country']),
@@ -128,17 +128,6 @@ export default function ClassificationView({ user }) {
           'Zakat Eligibility': cleanText(r['Zakat Eligibility']),
           'Campaign URL': r['Campaign URL'] || r['campaign_url'] || ''
         }));
-
-        // Deduplicate GiveBright by Campaign Name
-        if (platform === 'givebright') {
-          const seen = new Set();
-          rules = rules.filter(r => {
-            const cName = String(r['Campaign Name'] || '').trim().toLowerCase();
-            if (!cName || seen.has(cName)) return false;
-            seen.add(cName);
-            return true;
-          });
-        }
 
         setMatrixData({
           ...data,
@@ -150,14 +139,14 @@ export default function ClassificationView({ user }) {
         setLoading(false);
       })
       .catch(err => {
-        if (!isCurrent) return;
         console.error('Error loading classification matrix:', err);
         setLoading(false);
       });
+  };
 
-    return () => {
-      isCurrent = false; // Cancel stale promise resolution
-    };
+  // Race-Condition-Free Data Loading
+  useEffect(() => {
+    loadMatrixData();
   }, [platform]);
 
   // Dynamic list of all known unique codes (from central code map + active rules + any newly typed codes)
@@ -179,7 +168,7 @@ export default function ClassificationView({ user }) {
   }, [codeMap, matrixData?.rules]);
 
   // Dynamic cell change handler with Code -> Classification Auto-Fill & Same-Code Auto-Propagation
-  const handleCellChange = (campaignKey, codeKey, field, value) => {
+  const handleCellChange = (rowId, field, value) => {
     if (!isSuperAdmin) return;
     const valClean = cleanText(value);
 
@@ -206,12 +195,8 @@ export default function ClassificationView({ user }) {
       }
 
       setMatrixData(prev => {
-        let targetFound = false;
         const updatedRules = prev.rules.map(r => {
-          const cName = r['Campaign Name'] || r['campaign_name'];
-          const cCode = r['Code'] || r['code'] || 'Unassigned';
-          if (!targetFound && cName === campaignKey && cCode === codeKey) {
-            targetFound = true;
+          if (r._row_id === rowId) {
             const currentRow = { ...r, Code: newCodeClean };
             if (existingInfo) {
               if (existingInfo.Heading && existingInfo.Heading !== 'Unassigned') currentRow['Heading'] = existingInfo.Heading;
@@ -237,6 +222,8 @@ export default function ClassificationView({ user }) {
     // 2. If user is changing Heading, Sub-Heading, Country, or Zakat Eligibility on a row:
     const classificationFields = ['Heading', 'Sub-Heading', 'Country', 'Zakat Eligibility'];
     if (classificationFields.includes(field)) {
+      const targetRow = (matrixData.rules || []).find(r => r._row_id === rowId);
+      const codeKey = targetRow?.Code || targetRow?.code || '';
       const codeUpper = (codeKey || '').trim().toUpperCase();
       const codeLower = (codeKey || '').trim().toLowerCase();
       const isValidCode = codeUpper && !['UNASSIGNED', 'N/A', 'NONE', 'NAN', ''].includes(codeUpper);
@@ -262,20 +249,13 @@ export default function ClassificationView({ user }) {
 
       setMatrixData(prev => {
         const updatedRules = prev.rules.map(r => {
-          const cName = r['Campaign Name'] || r['campaign_name'];
-          const cCode = r['Code'] || r['code'] || 'Unassigned';
-          const rCodeUpper = (cCode || '').trim().toUpperCase();
-
-          // Target row being edited
-          if (cName === campaignKey && cCode === codeKey) {
+          if (r._row_id === rowId) {
             return { ...r, [field]: valClean };
           }
-
           // AUTO-PROPAGATE to any other row that shares the SAME valid Code:
-          if (isValidCode && rCodeUpper === codeUpper) {
+          if (isValidCode && (r.Code || r.code || '').trim().toUpperCase() === codeUpper) {
             return { ...r, [field]: valClean };
           }
-
           return r;
         });
 
@@ -290,22 +270,10 @@ export default function ClassificationView({ user }) {
     }
 
     // 3. For any other field (e.g. Campaign URL, Community Name)
-    setMatrixData(prev => {
-      let targetFound = false;
-      const updatedRules = prev.rules.map(r => {
-        const cName = r['Campaign Name'] || r['campaign_name'];
-        const cCode = r['Code'] || r['code'] || 'Unassigned';
-        if (!targetFound && cName === campaignKey && cCode === codeKey) {
-          targetFound = true;
-          return { ...r, [field]: valClean };
-        }
-        return r;
-      });
-      return {
-        ...prev,
-        rules: updatedRules
-      };
-    });
+    setMatrixData(prev => ({
+      ...prev,
+      rules: prev.rules.map(r => r._row_id === rowId ? { ...r, [field]: valClean } : r)
+    }));
   };
 
   // Add/Duplicate a new code variant rule for the same campaign name
@@ -314,6 +282,7 @@ export default function ClassificationView({ user }) {
     const cName = rule['Campaign Name'] || rule['campaign_name'];
     const newRule = {
       ...rule,
+      _row_id: `${cName}__new__${Date.now()}`,
       Code: '',
       Heading: 'Unassigned',
       'Sub-Heading': 'Unassigned',
@@ -335,17 +304,17 @@ export default function ClassificationView({ user }) {
   // Toggle Primary/Default Code Variant for a Multi-Code Campaign
   const handleTogglePrimary = (rule) => {
     if (!isSuperAdmin) return;
+    const targetRowId = rule._row_id;
     const cName = rule['Campaign Name'] || rule['campaign_name'];
     const targetCode = rule['Code'] || rule['code'] || 'Unassigned';
 
     setMatrixData(prev => {
       const updatedRules = prev.rules.map(r => {
         const rowName = r['Campaign Name'] || r['campaign_name'];
-        const rowCode = r['Code'] || r['code'] || 'Unassigned';
         if (rowName === cName) {
           return {
             ...r,
-            is_primary: rowCode === targetCode
+            is_primary: r._row_id === targetRowId
           };
         }
         return r;
@@ -439,6 +408,7 @@ export default function ClassificationView({ user }) {
         setSaving(false);
         if (res?.status === 'success') {
           setSaveMsg(`✅ ${res.message}`);
+          loadMatrixData();
         } else {
           setSaveMsg(`❌ ${res?.detail || 'Failed to save rules.'}`);
         }
@@ -949,9 +919,7 @@ export default function ClassificationView({ user }) {
                   </tr>
                 ) : (
                   paginatedRules.map((r, idx) => {
-                    const cKey = r['Campaign Name'] || r['campaign_name'];
-                    const cCode = r['Code'] || r['code'] || 'Unassigned';
-                    const rowUniqueKey = `${cKey}__${cCode}__${idx}`;
+                    const rowUniqueKey = r._row_id || `${r['Campaign Name'] || r['campaign_name']}__${idx}`;
                     const isMulti = r.variants_count > 1 || r.status === 'multi_code';
                     return (
                       <tr key={rowUniqueKey} className="hover:bg-slate-50 dark:hover:bg-cyan-500/5 transition-colors border-b border-slate-200 dark:border-white/5">
@@ -1003,7 +971,7 @@ export default function ClassificationView({ user }) {
                                 type="text"
                                 disabled={!isSuperAdmin}
                                 value={r['Campaign URL'] || ''}
-                                onChange={e => handleCellChange(cKey, cCode, 'Campaign URL', e.target.value)}
+                                onChange={e => handleCellChange(r._row_id, 'Campaign URL', e.target.value)}
                                 placeholder="Paste URL..."
                                 className="bg-white dark:bg-slate-900/90 border border-slate-300 dark:border-white/10 rounded-lg px-2 py-1 text-[11px] text-slate-800 dark:text-slate-300 w-24 focus:outline-none focus:border-cyan-500 disabled:opacity-60 font-mono"
                                 title="Paste or edit campaign URL"
@@ -1026,7 +994,7 @@ export default function ClassificationView({ user }) {
                             list="known-codes-list"
                             disabled={!isSuperAdmin}
                             value={r['Code'] || ''} 
-                            onChange={e => handleCellChange(cKey, cCode, 'Code', e.target.value)}
+                            onChange={e => handleCellChange(r._row_id, 'Code', e.target.value)}
                             placeholder="Type Code..."
                             className="bg-white dark:bg-slate-900/90 border border-cyan-400 dark:border-cyan-500/40 rounded-lg px-2.5 py-1.5 text-xs font-mono text-cyan-800 dark:text-cyan-300 font-extrabold w-full focus:outline-none focus:border-cyan-500 disabled:opacity-60 uppercase shadow-sm"
                             title="Changing Code automatically auto-fills Heading, Sub-Heading, Country, and Zakat!"
@@ -1039,7 +1007,7 @@ export default function ClassificationView({ user }) {
                             type="text" 
                             disabled={!isSuperAdmin}
                             value={r['Heading'] || ''} 
-                            onChange={e => handleCellChange(cKey, cCode, 'Heading', e.target.value)}
+                            onChange={e => handleCellChange(r._row_id, 'Heading', e.target.value)}
                             className="bg-white dark:bg-slate-900/90 border border-slate-300 dark:border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-slate-800 dark:text-slate-200 font-semibold w-full focus:outline-none focus:border-teal-500 dark:focus:border-cyan-400 disabled:opacity-60 shadow-sm"
                             title={r['Heading']}
                           />
@@ -1051,7 +1019,7 @@ export default function ClassificationView({ user }) {
                             type="text" 
                             disabled={!isSuperAdmin}
                             value={r['Sub-Heading'] || ''} 
-                            onChange={e => handleCellChange(cKey, cCode, 'Sub-Heading', e.target.value)}
+                            onChange={e => handleCellChange(r._row_id, 'Sub-Heading', e.target.value)}
                             className="bg-white dark:bg-slate-900/90 border border-slate-300 dark:border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-purple-800 dark:text-purple-300 font-semibold w-full focus:outline-none focus:border-purple-500 dark:focus:border-purple-400 disabled:opacity-60 shadow-sm"
                             title={r['Sub-Heading']}
                           />
@@ -1063,7 +1031,7 @@ export default function ClassificationView({ user }) {
                             type="text" 
                             disabled={!isSuperAdmin}
                             value={r['Country'] || ''} 
-                            onChange={e => handleCellChange(cKey, cCode, 'Country', e.target.value)}
+                            onChange={e => handleCellChange(r._row_id, 'Country', e.target.value)}
                             className="bg-white dark:bg-slate-900/90 border border-slate-300 dark:border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-emerald-800 dark:text-emerald-300 font-semibold w-full focus:outline-none focus:border-emerald-500 dark:focus:border-emerald-400 disabled:opacity-60 shadow-sm"
                             title={r['Country']}
                           />
@@ -1074,7 +1042,7 @@ export default function ClassificationView({ user }) {
                           <select 
                             disabled={!isSuperAdmin}
                             value={r['Zakat Eligibility'] || 'Unassigned'} 
-                            onChange={e => handleCellChange(cKey, cCode, 'Zakat Eligibility', e.target.value)}
+                            onChange={e => handleCellChange(r._row_id, 'Zakat Eligibility', e.target.value)}
                             className="bg-white dark:bg-slate-900/90 border border-slate-300 dark:border-white/10 rounded-lg px-2 py-1.5 text-xs font-bold text-slate-800 dark:text-slate-200 w-full focus:outline-none focus:border-teal-500 dark:focus:border-cyan-400 disabled:opacity-60 cursor-pointer shadow-sm"
                           >
                             <option value="Unassigned">Unassigned</option>

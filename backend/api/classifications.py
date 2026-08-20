@@ -482,10 +482,15 @@ def save_matrix_rules(payload: SaveRulesRequest):
             if c == "Unassigned" and c_info.get("Country") != "Unassigned": c = c_info["Country"]
             if z == "Unassigned" and c_info.get("Zakat Eligibility") != "Unassigned": z = c_info["Zakat Eligibility"]
 
+        d_name = sanitize_text(r.get("Donor Name") or r.get("donor_name", ""))
+        d_email = sanitize_text(r.get("Donor Email") or r.get("donor_email", ""))
+
         rules_dict.append({
             "Campaign Name": sanitize_text(r.get("Campaign Name") or r.get("campaign_name", "N/A")),
             "Campaign URL": sanitize_text(r.get("Campaign URL") or r.get("campaign_url", "")),
             "Community Name": sanitize_text(r.get("Community Name") or r.get("community_name", "Unassigned")),
+            "Donor Name": d_name,
+            "Donor Email": d_email,
             "Heading": h,
             "Sub-Heading": sh,
             "Country": c,
