@@ -852,7 +852,11 @@ export default function ExplorerView({ user, filters, onSelectDonor }) {
               </thead>
               <tbody className="divide-y divide-white/5">
                 {data.records?.map((row, rowIdx) => {
-                  const donorKey = row['Email'] || row['Display Name'] || row['First Name'];
+                  const hasValidEmail = row['Email'] && !['nan', 'none', '', 'unassigned', 'null'].includes(String(row['Email']).trim().toLowerCase());
+                  const donorIdVal = (row['Donor ID'] && !['nan', 'none', '', 'unassigned', 'null', 'donation boost', 'anonymous', 'anonymous kind soul'].includes(String(row['Donor ID']).trim().toLowerCase())) ? row['Donor ID'] : null;
+                  const donorKey = hasValidEmail 
+                    ? row['Email'] 
+                    : (donorIdVal || (row['Donation ID'] ? `ID:${row['Donation ID']}` : (row['Display Name'] || row['First Name'] || 'Anonymous Donor')));
                   return (
                     <tr 
                       key={rowIdx} 
