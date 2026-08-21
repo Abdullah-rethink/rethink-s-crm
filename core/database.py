@@ -34,8 +34,68 @@ except Exception as e:
 engine = local_engine if local_engine else cloud_engine
 
 
+def seed_database_if_empty():
+    """
+    If launchgood_donations.db is missing or missing tables (e.g. in fresh cloud deploy),
+    automatically restores classification rules, payouts, fundraisers, and settings from data_cache/seed_database.sqlite.
+    """
+    import os
+    import shutil
+    import sqlite3
+    import pandas as pd
+
+    seed_path = os.path.join(os.path.dirname(LOCAL_DB_PATH), "data_cache", "seed_database.sqlite")
+    if not os.path.exists(seed_path):
+        return
+
+    # If local DB file does not exist, copy entire seed DB directly
+    if not os.path.exists(LOCAL_DB_PATH):
+        try:
+            shutil.copyfile(seed_path, LOCAL_DB_PATH)
+            print(f"[DB Auto-Seed] Successfully initialized {LOCAL_DB_PATH} from seed_database.sqlite")
+            return
+        except Exception as e:
+            print(f"[DB Auto-Seed Error]: {e}")
+
+    # Check if essential tables exist and are populated
+    try:
+        conn = sqlite3.connect(LOCAL_DB_PATH, timeout=15.0)
+        cursor = conn.cursor()
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='campaign_classifications'")
+        has_classifications = cursor.fetchone()
+        count = 0
+        if has_classifications:
+            cursor.execute("SELECT COUNT(*) FROM campaign_classifications")
+            count = cursor.fetchone()[0]
+
+        if count == 0:
+            print("[DB Auto-Seed] Database missing classifications, seeding from seed_database.sqlite...")
+            seed_conn = sqlite3.connect(seed_path, timeout=15.0)
+            seed_cur = seed_conn.cursor()
+            seed_cur.execute("SELECT name FROM sqlite_master WHERE type='table'")
+            seed_tables = [r[0] for r in seed_cur.fetchall()]
+
+            for tbl in seed_tables:
+                if tbl == "sqlite_sequence":
+                    continue
+                df_tbl = pd.read_sql_query(f'SELECT * FROM "{tbl}"', seed_conn)
+                df_tbl.to_sql(tbl, conn, if_exists="replace", index=False)
+            seed_conn.close()
+            conn.commit()
+            print(f"[DB Auto-Seed] Successfully restored {len(seed_tables)} tables to SQLite.")
+
+        conn.close()
+    except Exception as e:
+        print(f"[DB Auto-Seed Notice]: {e}")
+
+
+# Run seed check on module load
+seed_database_if_empty()
+
+
 def ensure_database_indexes():
     """Builds B-Tree indexes on SQLite donations table for high-speed lookups."""
+    seed_database_if_empty()
     try:
         conn = sqlite3.connect(LOCAL_DB_PATH, timeout=20.0)
         cursor = conn.cursor()

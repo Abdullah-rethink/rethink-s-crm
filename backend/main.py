@@ -78,7 +78,13 @@ def root_endpoint():
 
 
 def _background_prewarm():
-    """Warms up in-memory parquet cache and DuckDB analytics engine asynchronously."""
+    """Warms up SQLite seed database, in-memory parquet cache, and DuckDB analytics engine asynchronously."""
+    try:
+        from core.database import seed_database_if_empty
+        seed_database_if_empty()
+    except Exception as e:
+        print(f"[Seed Check Notice]: {e}")
+
     try:
         from core.data_processor import load_data
         df = load_data()
