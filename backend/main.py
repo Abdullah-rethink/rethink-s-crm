@@ -10,9 +10,6 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from backend.api import admin, auth, classifications, donors, events, expenses, filters, fundraisers, ltv, metrics, overview, payouts, tracker
 from core.auth import init_user_db
 
-# Initialize user DB
-init_user_db()
-
 app = FastAPI(
     title="Crowdfunding Analytics & Enterprise CRM API",
     description="High-performance FastAPI engine providing LTV analytics, 360° donor profiles, classification rules, and dataset management.",
@@ -20,25 +17,22 @@ app = FastAPI(
 )
 
 # Enable CORS for React / Vercel frontend
-allowed_origins_env = os.getenv("ALLOWED_ORIGINS", "")
-origins = [o.strip() for o in allowed_origins_env.split(",") if o.strip()]
-
-if origins:
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=origins,
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
-else:
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origin_regex=r"^https?:\/\/.*$",
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "https://rethink-s-crm.vercel.app",
+        "http://localhost:5173",
+        "http://localhost:3000",
+        "http://127.0.0.1:5173",
+        "http://127.0.0.1:8000",
+        "https://rethink-s-crm-5e5c3bf8.fastapicloud.dev",
+        "*"
+    ],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+    expose_headers=["*"],
+)
 
 # Register API Routers
 app.include_router(auth.router)
@@ -84,6 +78,12 @@ def _background_prewarm():
         seed_database_if_empty()
     except Exception as e:
         print(f"[Seed Check Notice]: {e}")
+
+    try:
+        from core.auth import init_user_db
+        init_user_db()
+    except Exception as e:
+        print(f"[Auth DB Init Notice]: {e}")
 
     try:
         from core.data_processor import load_data
