@@ -8,3 +8,4 @@ scratch/
 *.env*
 .github/
 *.md
+scripts/

@@ -1,3 +1,37 @@
+[project]
+name = "crowdfunding-crm-backend"
+version = "2.0.0"
+description = "Crowdfunding Analytics & Enterprise CRM API"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi>=0.100.0",
+    "uvicorn[standard]>=0.22.0",
+    "pandas>=2.0.0",
+    "numpy>=1.24.0",
+    "pyarrow>=14.0.0",
+    "openpyxl>=3.1.0",
+    "xlsxwriter>=3.2.0",
+    "sqlalchemy>=2.0.0",
+    "psycopg2-binary>=2.9.0",
+    "requests>=2.31.0",
+    "python-dotenv>=1.0.0",
+    "pydantic>=2.0.0",
+    "python-jose[cryptography]>=3.3.0",
+    "passlib[bcrypt]>=1.7.4",
+    "websockets>=11.0",
+    "plotly>=5.18.0",
+    "duckdb"
+]
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["backend*", "core*", "config*", "api*", "views*", "components*"]
+exclude = ["frontend*", "scratch*", "reports*", "data_cache*", "tests*"]
+
 [tool.ruff]
 line-length = 120
 target-version = "py311"
