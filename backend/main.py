@@ -57,6 +57,7 @@ app.include_router(fundraisers.router)
 
 
 @app.get("/api/health", tags=["Health"])
+@app.get("/health", tags=["Health"])
 def health_check():
     return {
         "status": "healthy",
@@ -65,51 +66,63 @@ def health_check():
     }
 
 
-# Mount Built Static Frontend Assets if present
-frontend_dist = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "frontend", "dist")
-if os.path.exists(frontend_dist):
-    app.mount("/", StaticFiles(directory=frontend_dist, html=True), name="static")
+@app.get("/", tags=["Root"])
+def root_endpoint():
+    return {
+        "status": "online",
+        "service": "Crowdfunding Analytics & Enterprise CRM API",
+        "version": "2.0.0",
+        "docs": "/docs",
+        "health": "/api/health"
+    }
 
 
-@app.on_event("startup")
-def startup_event():
-    print("Crowdfunding Enterprise CRM API initializing...")
+def _background_prewarm():
+    """Warms up database indexes, caches, and analytics engine in the background."""
+    import time
+    time.sleep(0.5)
     try:
         from core.database import ensure_database_indexes
         ensure_database_indexes()
     except Exception as e:
         print(f"[DB Index Init Notice]: {e}")
 
+    try:
+        from core.data_processor import load_data
+        df = load_data()
+        print(f"In-memory dataset cache pre-warmed: {len(df):,} donor records.")
+    except Exception as e:
+        print(f"[Cache Pre-warm Notice]: {e}")
+
+    try:
+        from core.analytics_engine import get_duckdb_connection, get_executive_kpis
+        get_duckdb_connection()
+        get_executive_kpis()
+        print("DuckDB high-speed analytics engine initialized.")
+    except Exception as e:
+        print(f"[DuckDB Pre-warm Notice]: {e}")
+
+    try:
+        from core.data_processor import sync_donors_to_classification_matrix
+        synced = sync_donors_to_classification_matrix()
+        print(f"Donor classifications synchronized to matrix tables ({synced:,} rules).")
+    except Exception as e:
+        print(f"[Classification Matrix Sync Notice]: {e}")
+
+    try:
+        from backend.api.tracker import get_tracker_stats
+        get_tracker_stats()
+        print("Sponsorship Tracker pre-computation complete.")
+    except Exception as e:
+        print(f"Tracker pre-compute notice: {e}")
+
+
+@app.on_event("startup")
+def startup_event():
+    print("Crowdfunding Enterprise CRM API initialized and ready to receive requests.")
     if not os.environ.get("VERCEL"):
-        # Pre-warm in-memory dataset cache
-        try:
-            from core.data_processor import load_data
-            df = load_data()
-            print(f"In-memory dataset cache pre-warmed: {len(df):,} donor records.")
-        except Exception as e:
-            print(f"[Cache Pre-warm Notice]: {e}")
+        import threading
+        threading.Thread(target=_background_prewarm, daemon=True).start()
 
-        # Pre-warm DuckDB engine
-        try:
-            from core.analytics_engine import get_duckdb_connection, get_executive_kpis
-            get_duckdb_connection()
-            get_executive_kpis()
-            print("DuckDB high-speed analytics engine initialized.")
-        except Exception as e:
-            print(f"[DuckDB Pre-warm Notice]: {e}")
-
-        try:
-            from core.data_processor import sync_donors_to_classification_matrix
-            synced = sync_donors_to_classification_matrix()
-            print(f"Donor classifications synchronized to matrix tables ({synced:,} rules).")
-        except Exception as e:
-            print(f"[Classification Matrix Sync Notice]: {e}")
-
-        try:
-            from backend.api.tracker import get_tracker_stats
-            get_tracker_stats()
-            print("Sponsorship Tracker pre-computation complete.")
-        except Exception as e:
-            print(f"Tracker pre-compute notice: {e}")
 
 
