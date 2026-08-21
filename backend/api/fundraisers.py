@@ -169,39 +169,36 @@ def get_available_campaigns_list():
                 "code": code
             }
 
-        # 1. From donations table
-        cur.execute("""
-            SELECT DISTINCT 
-                [Campaign Name], 
-                COALESCE(Code, 'Unassigned'), 
-                COALESCE(Platform, 'LaunchGood'), 
-                COALESCE(Heading, 'Unassigned'),
-                COALESCE([Sub-Heading], 'Unassigned'),
-                COALESCE(Country, 'Unassigned')
-            FROM donations 
-            WHERE [Campaign Name] IS NOT NULL AND TRIM([Campaign Name]) != ''
-        """)
-        for cname, code, plat, head, subhead, country in cur.fetchall():
-            cname_str = str(cname).strip()
-            code_str = str(code).strip() if code else "Unassigned"
-            plat_str = str(plat).strip() if plat else "LaunchGood"
-            key = (cname_str.lower(), code_str.lower())
-            if key not in unique_pairs and cname_str:
-                unique_pairs.add(key)
-                
-                # Check assignment
-                assigned_info = assigned_map.get(key) or assigned_map.get((cname_str.lower(), "all"))
+        # 1. From donations cached dataset
+        try:
+            df_don = load_data()
+            if df_don is not None and not df_don.empty and "Campaign Name" in df_don.columns:
+                target_cols = [c for c in ["Campaign Name", "Code", "Platform", "Heading", "Sub-Heading", "Country"] if c in df_don.columns]
+                df_unique = df_don[df_don["Campaign Name"].notna() & (df_don["Campaign Name"].astype(str).str.strip() != "")][target_cols].drop_duplicates(subset=["Campaign Name", "Code"] if "Code" in target_cols else ["Campaign Name"])
+                for _, r in df_unique.iterrows():
+                    cname_str = str(r.get("Campaign Name") or "").strip()
+                    code_str = str(r.get("Code") or "Unassigned").strip() if "Code" in r else "Unassigned"
+                    plat_str = str(r.get("Platform") or "LaunchGood").strip() if "Platform" in r else "LaunchGood"
+                    head = str(r.get("Heading") or "Unassigned").strip() if "Heading" in r else "Unassigned"
+                    subhead = str(r.get("Sub-Heading") or "Unassigned").strip() if "Sub-Heading" in r else "Unassigned"
+                    country = str(r.get("Country") or "Unassigned").strip() if "Country" in r else "Unassigned"
+                    key = (cname_str.lower(), code_str.lower())
+                    if key not in unique_pairs and cname_str:
+                        unique_pairs.add(key)
+                        assigned_info = assigned_map.get(key) or assigned_map.get((cname_str.lower(), "all"))
 
-                campaign_items.append({
-                    "campaign_name": cname_str,
-                    "code": code_str,
-                    "platform": plat_str,
-                    "heading": str(head or "Unassigned"),
-                    "sub_heading": str(subhead or "Unassigned"),
-                    "country": str(country or "Unassigned"),
-                    "is_assigned": bool(assigned_info),
-                    "assigned_to": assigned_info
-                })
+                        campaign_items.append({
+                            "campaign_name": cname_str,
+                            "code": code_str,
+                            "platform": plat_str,
+                            "heading": head,
+                            "sub_heading": subhead,
+                            "country": country,
+                            "is_assigned": bool(assigned_info),
+                            "assigned_to": assigned_info
+                        })
+        except Exception as e:
+            print(f"[Fundraiser Campaign List Notice]: {e}")
 
         # 2. From payout_settlements table
         try:
