@@ -8,10 +8,6 @@ from fastapi.staticfiles import StaticFiles
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from backend.api import admin, auth, classifications, donors, events, expenses, filters, fundraisers, ltv, metrics, overview, payouts, tracker
-from core.database import seed_database_if_empty
-
-# Restore seed database immediately if running in fresh container (fast-copies in 0.002s)
-seed_database_if_empty()
 
 app = FastAPI(
     title="Crowdfunding Analytics & Enterprise CRM API",
@@ -74,15 +70,15 @@ def root_endpoint():
     }
 
 
-def _background_prewarm():
-    """Warms up SQLite seed database, in-memory parquet cache, and DuckDB analytics engine asynchronously."""
+@app.on_event("startup")
+def startup_event():
+    print("Crowdfunding Enterprise CRM API initialized and ready to receive requests.")
     try:
         from core.database import seed_database_if_empty
         seed_database_if_empty()
     except Exception as e:
-@app.on_event("startup")
-def startup_event():
-    print("Crowdfunding Enterprise CRM API initialized and ready to receive requests.")
+        print(f"[Startup Seed Notice]: {e}")
+
 
 
 
