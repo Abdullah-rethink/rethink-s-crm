@@ -78,15 +78,7 @@ def root_endpoint():
 
 
 def _background_prewarm():
-    """Warms up database indexes, caches, and analytics engine in the background."""
-    import time
-    time.sleep(0.5)
-    try:
-        from core.database import ensure_database_indexes
-        ensure_database_indexes()
-    except Exception as e:
-        print(f"[DB Index Init Notice]: {e}")
-
+    """Warms up in-memory parquet cache and DuckDB analytics engine asynchronously."""
     try:
         from core.data_processor import load_data
         df = load_data()
@@ -95,26 +87,11 @@ def _background_prewarm():
         print(f"[Cache Pre-warm Notice]: {e}")
 
     try:
-        from core.analytics_engine import get_duckdb_connection, get_executive_kpis
+        from core.analytics_engine import get_duckdb_connection
         get_duckdb_connection()
-        get_executive_kpis()
         print("DuckDB high-speed analytics engine initialized.")
     except Exception as e:
         print(f"[DuckDB Pre-warm Notice]: {e}")
-
-    try:
-        from core.data_processor import sync_donors_to_classification_matrix
-        synced = sync_donors_to_classification_matrix()
-        print(f"Donor classifications synchronized to matrix tables ({synced:,} rules).")
-    except Exception as e:
-        print(f"[Classification Matrix Sync Notice]: {e}")
-
-    try:
-        from backend.api.tracker import get_tracker_stats
-        get_tracker_stats()
-        print("Sponsorship Tracker pre-computation complete.")
-    except Exception as e:
-        print(f"Tracker pre-compute notice: {e}")
 
 
 @app.on_event("startup")
