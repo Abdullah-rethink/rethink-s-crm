@@ -2397,3 +2397,159 @@ def ensure_database_indexes():
     except Exception as e:
         print(f"[Index Notice]: {e}")
 
+
+def get_givebright_classification_matrix(df_raw=None):
+    """Returns GiveBright classification matrix DataFrame with (Campaign Name, Code) granularity."""
+    target_cols_display = ["Heading", "Sub-Heading", "Country", "Code", "Zakat Eligibility"]
+
+    # 1. Read SQLite stored GiveBright classifications
+    conn = sqlite3.connect(LOCAL_DB_PATH, timeout=10.0)
+    try:
+        db_matrix = pd.read_sql_query("""
+            SELECT 
+                campaign_name as "Campaign Name",
+                COALESCE(code, 'Unassigned') as "Code",
+                COALESCE(campaign_url, '') as "Campaign URL",
+                COALESCE(heading, 'Unassigned') as "Heading",
+                COALESCE(sub_heading, 'Unassigned') as "Sub-Heading",
+                COALESCE(country, 'Unassigned') as "Country",
+                COALESCE(zakat_eligibility, 'Unassigned') as "Zakat Eligibility"
+            FROM givebright_classifications
+        """, conn)
+    except Exception:
+        db_matrix = pd.DataFrame(columns=["Campaign Name", "Code", "Campaign URL"] + [c for c in target_cols_display if c != "Code"])
+    finally:
+        conn.close()
+
+    # 2. Extract distinct GiveBright campaigns from in-memory cached donations
+    df_donations = df_raw if (df_raw is not None and not df_raw.empty) else load_data()
+    if df_donations is not None and not df_donations.empty and "Campaign Name" in df_donations.columns:
+        platform_s = df_donations.get("Platform", pd.Series("", index=df_donations.index)).astype(str).str.lower()
+        source_s = df_donations.get("Source", pd.Series("", index=df_donations.index)).astype(str).str.lower()
+        gb_mask = (platform_s == "givebright") | source_s.str.contains("givebright|give_bright|file-", na=False)
+        gb_df = df_donations[gb_mask] if gb_mask.any() else df_donations.iloc[0:0]
+
+        if not gb_df.empty:
+            c_name = gb_df["Campaign Name"].astype(str).str.strip()
+            c_name = c_name[~c_name.str.lower().isin(['nan', 'none', 'n/a', '', 'unassigned'])]
+            code_val = gb_df.loc[c_name.index, "Code"].astype(str).str.strip().replace({'nan': 'Unassigned', '': 'Unassigned', 'None': 'Unassigned'}) if "Code" in gb_df.columns else pd.Series("Unassigned", index=c_name.index)
+            
+            url_series = pd.Series("", index=gb_df.index)
+            for u_col in ["Campaign URL", "campaign_url", "URL", "url"]:
+                if u_col in gb_df.columns:
+                    url_series = gb_df[u_col].fillna("").astype(str).replace({'nan': '', 'None': ''})
+                    break
+
+            donor_df = pd.DataFrame({"Campaign Name": c_name, "Code": code_val, "Campaign URL": url_series.loc[c_name.index]})
+            for tc in target_cols_display:
+                if tc in gb_df.columns and tc != "Code":
+                    donor_df[tc] = gb_df.loc[c_name.index, tc].values
+
+            donor_distinct = donor_df.drop_duplicates(subset=["Campaign Name", "Code"])
+
+            if db_matrix.empty:
+                return donor_distinct.fillna("Unassigned").reset_index(drop=True)
+
+            merged = pd.merge(
+                donor_distinct[["Campaign Name", "Code", "Campaign URL"]],
+                db_matrix,
+                on=["Campaign Name", "Code"],
+                how="outer",
+                suffixes=('', '_db')
+            ).fillna("Unassigned")
+            return merged.drop_duplicates(subset=["Campaign Name", "Code"]).reset_index(drop=True)
+
+    if not db_matrix.empty:
+        return db_matrix.fillna("Unassigned").reset_index(drop=True)
+
+    return pd.DataFrame(columns=["Campaign Name", "Code", "Campaign URL"] + [c for c in target_cols_display if c != "Code"])
+
+
+def save_givebright_classification_matrix(matrix_df):
+    """Saves updated GiveBright classification matrix to SQLite and synchronizes to active donation records."""
+    if matrix_df.empty:
+        return 0
+
+    conn = sqlite3.connect(LOCAL_DB_PATH, timeout=30.0)
+
+    # 1. Reconcile codes per campaign
+    cname_to_codes = {}
+    for _, row in matrix_df.iterrows():
+        cname = str(row.get("Campaign Name", "Unassigned")).strip().replace("’", "'").replace("‘", "'")
+        code = str(row.get("Code", "Unassigned")).strip()
+        if cname and cname.lower() not in ["nan", "none", "n/a", "", "campaign_name", "campaign name"]:
+            cname_to_codes.setdefault(cname.lower(), set()).add(code.lower())
+
+    for cname_lower, codes in cname_to_codes.items():
+        placeholders = ','.join(['?'] * len(codes))
+        conn.execute(f"DELETE FROM givebright_classifications WHERE LOWER(campaign_name) = ? AND LOWER(code) NOT IN ({placeholders})", [cname_lower] + list(codes))
+
+    for _, row in matrix_df.iterrows():
+        cname = str(row.get("Campaign Name", "Unassigned")).strip().replace("’", "'").replace("‘", "'")
+        code = str(row.get("Code", "Unassigned")).strip()
+        curl = str(row.get("Campaign URL") or row.get("campaign_url") or "")
+        if not cname or cname.lower() in ["nan", "none", "n/a", "", "campaign_name", "campaign name"]:
+            continue
+
+        conn.execute("DELETE FROM givebright_classifications WHERE LOWER(campaign_name) = ? AND LOWER(code) = ?", (cname.lower(), code.lower()))
+        conn.execute("""
+            INSERT INTO givebright_classifications (campaign_name, code, campaign_url, heading, sub_heading, country, zakat_eligibility, is_primary)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            cname,
+            code,
+            curl,
+            str(row.get("Heading", "Unassigned")),
+            str(row.get("Sub-Heading", "Unassigned")),
+            str(row.get("Country", "Unassigned")),
+            str(row.get("Zakat Eligibility", "Unassigned")),
+            1 if row.get("is_primary") in [1, True, "1", "true", "True"] else 0
+        ))
+    conn.commit()
+    conn.close()
+
+    # Re-apply to active dataset in Parquet and SQLite using sync_matrix_classifications_to_donors
+    sync_matrix_classifications_to_donors(matrix_df)
+
+    return len(matrix_df)
+
+
+def normalize_classification_import_df(raw_df):
+    """Standardizes imported column names and auto-fills missing fields from recognized Codes."""
+    col_mapping = {}
+    for col in raw_df.columns:
+        c_clean = str(col).strip().lower().replace("_", " ").replace("-", " ")
+        if c_clean in ["campaign", "campaign name", "fundraiser name", "fundraiser", "bank ref", "direct debit ref", "project", "project name"]:
+            col_mapping[col] = "Campaign Name"
+        elif c_clean in ["community", "community name", "fundraiser by", "platform source"]:
+            col_mapping[col] = "Community Name"
+        elif c_clean in ["code", "campaign code", "project code", "cost code", "item code", "giving level fund code", "giving level campaign code", "fund code", "accounting code"]:
+            col_mapping[col] = "Code"
+        elif c_clean in ["heading", "main heading", "category", "main category"]:
+            col_mapping[col] = "Heading"
+        elif c_clean in ["sub heading", "subheading", "sub category", "subcategory", "sub_heading"]:
+            col_mapping[col] = "Sub-Heading"
+        elif c_clean in ["country", "beneficiary country", "target country"]:
+            col_mapping[col] = "Country"
+        elif c_clean in ["zakat eligibility", "zakat", "zakat eligibilty", "zakat status", "zakat_eligibility"]:
+            col_mapping[col] = "Zakat Eligibility"
+        elif c_clean in ["campaign url", "campaign link", "campaign page", "url", "link"]:
+            col_mapping[col] = "Campaign URL"
+        elif c_clean in ["fundraiser url", "fundraiser link", "fundraiser page"]:
+            col_mapping[col] = "Fundraiser URL"
+
+    df_norm = raw_df.rename(columns=col_mapping).copy()
+
+    # Ensure required Campaign Name column exists
+    if "Campaign Name" not in df_norm.columns:
+        if len(df_norm.columns) > 0:
+            df_norm.rename(columns={df_norm.columns[0]: "Campaign Name"}, inplace=True)
+
+    if "Campaign URL" not in df_norm.columns:
+        df_norm["Campaign URL"] = ""
+
+    if "Community Name" not in df_norm.columns:
+        df_norm["Community Name"] = "Unassigned"
+
+    return df_norm
+
