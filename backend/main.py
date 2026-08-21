@@ -77,35 +77,10 @@ def _background_prewarm():
         from core.database import seed_database_if_empty
         seed_database_if_empty()
     except Exception as e:
-        print(f"[Seed Check Notice]: {e}")
-
-    try:
-        from core.auth import init_user_db
-        init_user_db()
-    except Exception as e:
-        print(f"[Auth DB Init Notice]: {e}")
-
-    try:
-        from core.data_processor import load_data
-        df = load_data()
-        print(f"In-memory dataset cache pre-warmed: {len(df):,} donor records.")
-    except Exception as e:
-        print(f"[Cache Pre-warm Notice]: {e}")
-
-    try:
-        from core.analytics_engine import get_duckdb_connection
-        get_duckdb_connection()
-        print("DuckDB high-speed analytics engine initialized.")
-    except Exception as e:
-        print(f"[DuckDB Pre-warm Notice]: {e}")
-
-
 @app.on_event("startup")
 def startup_event():
     print("Crowdfunding Enterprise CRM API initialized and ready to receive requests.")
-    if not os.environ.get("VERCEL"):
-        import threading
-        threading.Thread(target=_background_prewarm, daemon=True).start()
+
 
 
 
