@@ -2,10 +2,6 @@
   "version": 2,
   "builds": [
     {
-      "src": "api/index.py",
-      "use": "@vercel/python"
-    },
-    {
       "src": "frontend/package.json",
       "use": "@vercel/static-build",
       "config": {
@@ -16,11 +12,15 @@
   "routes": [
     {
       "src": "/api/(.*)",
-      "dest": "api/index.py"
+      "dest": "https://rethink-s-crm-5e5c3bf8.fastapicloud.dev/api/$1"
+    },
+    {
+      "src": "/health",
+      "dest": "https://rethink-s-crm-5e5c3bf8.fastapicloud.dev/health"
     },
     {
       "src": "/(.*)",
-      "dest": "frontend/$1"
+      "dest": "/frontend/$1"
     }
   ]
 }
