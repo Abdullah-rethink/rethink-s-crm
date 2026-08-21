@@ -83,6 +83,7 @@ def startup_event():
     if not os.environ.get("VERCEL"):
         # Pre-warm in-memory dataset cache
         try:
+            from core.data_processor import load_data
             df = load_data()
             print(f"In-memory dataset cache pre-warmed: {len(df):,} donor records.")
         except Exception as e:

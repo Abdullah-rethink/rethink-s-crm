@@ -32,6 +32,9 @@ build-backend = "setuptools.build_meta"
 include = ["backend*", "core*", "config*", "api*", "views*", "components*"]
 exclude = ["frontend*", "scratch*", "reports*", "data_cache*", "tests*"]
 
+[tool.fastapi]
+entrypoint = "main:app"
+
 [tool.ruff]
 line-length = 120
 target-version = "py311"
