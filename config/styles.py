@@ -1,10 +1,15 @@
-import streamlit as st
+try:
+    import streamlit as st
+except Exception:
+    st = None
 
 
 def apply_custom_css():
     """
     Inject modern glassmorphism, card view, and theme CSS variables into Streamlit.
     """
+    if st is None:
+        return
     st.markdown("""
         <style>
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');

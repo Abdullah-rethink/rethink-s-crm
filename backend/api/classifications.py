@@ -16,13 +16,11 @@ from core.data_processor import (
     save_paysuite_classification_matrix,
     get_rethink_website_classification_matrix,
     save_rethink_website_classification_matrix,
-    get_code_to_classification_map,
-    sync_matrix_classifications_to_donors,
-)
-from views.classification_view import (
     get_givebright_classification_matrix,
     save_givebright_classification_matrix,
     normalize_classification_import_df,
+    get_code_to_classification_map,
+    sync_matrix_classifications_to_donors,
 )
 try:
     from backend.api.payouts import invalidate_payouts_cache

@@ -1,4 +1,7 @@
-import streamlit.components.v1 as components
+try:
+    import streamlit.components.v1 as components
+except Exception:
+    components = None
 
 
 def sync_auth_to_local_storage(username: str):
