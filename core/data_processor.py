@@ -2104,11 +2104,6 @@ def purge_all_data():
     conn.commit()
     conn.close()
 
-    try:
-        st.cache_data.clear()
-        st.cache_resource.clear()
-    except Exception:
-        pass
     invalidate_data_cache()
     invalidate_payouts_cache()
     try:
