@@ -691,25 +691,16 @@ def get_donors_kanban(
     else:
         df["_real_name"] = df.get("Display Name", "")
 
-    # Pre-calculate true cumulative LTV & total transaction count for all donors across the entire dataset!
     col_amount = "Total Online Donations Net Amount in Settled Currency"
-    if col_amount not in df_raw.columns:
+    if col_amount not in df.columns:
         col_amount = "Donation Amount in Project Currency (May be approx.)"
 
-    group_col = "Email" if "Email" in df_raw.columns else "Display Name"
-    df_raw_copy = df_raw.copy()
-    df_raw_copy["_clean_key"] = df_raw_copy[group_col].astype(str).str.strip().str.lower()
-    donor_overall_stats = df_raw_copy.groupby("_clean_key").agg(
-        true_ltv=(col_amount, "sum"),
-        true_count=(col_amount, "count")
-    ).to_dict(orient="index")
-
+    group_col = "Email" if "Email" in df.columns else "Display Name"
     tiers = ["Low End", "Medium Low", "Medium", "High", "Super High"]
     kanban_data = {}
+    
     for t in tiers:
         t_df = df[df["Lifetime Donor Classification"] == t]
-        
-        # Calculate Total Sum Amount for the Column Header!
         total_sum_amount = float(t_df[col_amount].sum()) if (not t_df.empty and col_amount in t_df.columns) else 0.0
 
         if not t_df.empty:
@@ -717,24 +708,25 @@ def get_donors_kanban(
                 name=("_real_name", "first"),
                 email=("Email", "first") if "Email" in t_df.columns else (group_col, "first"),
                 tier=("Lifetime Donor Classification", "first"),
-                txn_tier=("Transaction Donor Classification", "first") if "Transaction Donor Classification" in t_df.columns else ("Lifetime Donor Classification", "first")
+                txn_tier=("Transaction Donor Classification", "first") if "Transaction Donor Classification" in t_df.columns else ("Lifetime Donor Classification", "first"),
+                total_ltv=(col_amount, "sum") if col_amount in t_df.columns else (group_col, "count"),
+                donation_count=(col_amount, "count") if col_amount in t_df.columns else (group_col, "count")
             ).reset_index()
 
+            donor_summary = donor_summary.sort_values("total_ltv", ascending=False).head(30)
+
             records = []
-            for _, r in donor_summary.head(30).iterrows():
-                # Avoid overriding real names with "Anonymous Donor" if they are present
+            for _, r in donor_summary.iterrows():
                 r_name = str(r["name"]).strip() if (pd.notna(r["name"]) and str(r["name"]).strip().lower() not in ["nan", "none", "null", ""]) else "Anonymous Donor"
                 r_email = str(r["email"]) if (pd.notna(r["email"]) and str(r["email"]).strip().lower() not in ["nan", "none", "null"]) else ""
                 r_tier = str(r["tier"]) if (pd.notna(r["tier"]) and str(r["tier"]).strip().lower() not in ["nan", "none", "null"]) else "Unassigned"
                 r_txntier = str(r["txn_tier"]) if (pd.notna(r["txn_tier"]) and str(r["txn_tier"]).strip().lower() not in ["nan", "none", "null"]) else "Unassigned"
                 
-                clean_key = r_email.strip().lower() if r_email else r_name.strip().lower()
-                st = donor_overall_stats.get(clean_key, {})
                 records.append({
                     "name": r_name,
                     "email": r_email,
-                    "total_ltv": round(float(st.get("true_ltv", 0.0)), 2) if st else 0.0,
-                    "donation_count": int(st.get("true_count", 1)) if st else 1,
+                    "total_ltv": round(float(r.get("total_ltv", 0.0)), 2),
+                    "donation_count": int(r.get("donation_count", 1)),
                     "tier": r_tier,
                     "txn_tier": r_txntier
                 })
