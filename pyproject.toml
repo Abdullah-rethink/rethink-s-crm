@@ -30,7 +30,7 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 include = ["backend*", "core*", "config*", "api*", "views*", "components*"]
-exclude = ["frontend*", "scratch*", "reports*", "data_cache*", "tests*"]
+exclude = ["frontend*", "scratch*", "reports*", "tests*"]
 
 [tool.fastapi]
 entrypoint = "main:app"

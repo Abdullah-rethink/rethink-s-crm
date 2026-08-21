@@ -44,8 +44,18 @@ def seed_database_if_empty():
     import sqlite3
     import pandas as pd
 
-    seed_path = os.path.join(os.path.dirname(LOCAL_DB_PATH), "data_cache", "seed_database.sqlite")
-    if not os.path.exists(seed_path):
+    possible_seed_paths = [
+        os.path.join(os.path.dirname(LOCAL_DB_PATH), "data_cache", "seed_database.sqlite"),
+        os.path.join(os.getcwd(), "data_cache", "seed_database.sqlite"),
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data_cache", "seed_database.sqlite")
+    ]
+    seed_path = None
+    for p in possible_seed_paths:
+        if os.path.exists(p):
+            seed_path = p
+            break
+
+    if not seed_path:
         return
 
     # If local DB file does not exist or is empty (< 100KB), fast-copy entire seed DB directly
