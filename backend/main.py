@@ -8,7 +8,10 @@ from fastapi.staticfiles import StaticFiles
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from backend.api import admin, auth, classifications, donors, events, expenses, filters, fundraisers, ltv, metrics, overview, payouts, tracker
-from core.auth import init_user_db
+from core.database import seed_database_if_empty
+
+# Restore seed database immediately if running in fresh container (fast-copies in 0.002s)
+seed_database_if_empty()
 
 app = FastAPI(
     title="Crowdfunding Analytics & Enterprise CRM API",
