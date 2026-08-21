@@ -44,49 +44,56 @@ def seed_database_if_empty():
     import sqlite3
     import pandas as pd
 
-    possible_seed_paths = [
-        os.path.join(os.path.dirname(LOCAL_DB_PATH), "data_cache", "seed_database.sqlite"),
-        os.path.join(os.getcwd(), "data_cache", "seed_database.sqlite"),
-        os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data_cache", "seed_database.sqlite")
-    ]
-    seed_path = None
-    for p in possible_seed_paths:
-        if os.path.exists(p):
-            seed_path = p
-            break
-
-    if not seed_path:
-        return
-
-    # If local DB file does not exist or is empty (< 100KB), fast-copy entire seed DB directly
-    if not os.path.exists(LOCAL_DB_PATH) or os.path.getsize(LOCAL_DB_PATH) < 100000:
-        try:
-            shutil.copyfile(seed_path, LOCAL_DB_PATH)
-            print(f"[DB Auto-Seed] Fast-initialized {LOCAL_DB_PATH} from seed_database.sqlite ({os.path.getsize(seed_path)/1024:.1f} KB)")
-            return
-        except Exception as e:
-            print(f"[DB Auto-Seed Copy Notice]: {e}")
-
-    # Check if essential tables exist and are populated
     try:
-        conn = sqlite3.connect(LOCAL_DB_PATH, timeout=5.0)
-        cursor = conn.cursor()
-        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='campaign_classifications'")
-        has_classifications = cursor.fetchone()
-        count = 0
-        if has_classifications:
-            cursor.execute("SELECT COUNT(*) FROM campaign_classifications")
-            count = cursor.fetchone()[0]
+        possible_seed_paths = [
+            os.path.join(os.path.dirname(LOCAL_DB_PATH), "data_cache", "seed_database.sqlite"),
+            os.path.join(os.getcwd(), "data_cache", "seed_database.sqlite"),
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data_cache", "seed_database.sqlite")
+        ]
+        seed_path = None
+        for p in possible_seed_paths:
+            if os.path.exists(p):
+                seed_path = p
+                break
 
-        if count == 0:
-            print("[DB Auto-Seed] Database missing classifications, restoring from seed_database.sqlite...")
-            conn.close()
-            shutil.copyfile(seed_path, LOCAL_DB_PATH)
-            print(f"[DB Auto-Seed] Successfully restored tables to {LOCAL_DB_PATH}")
+        if not seed_path:
             return
-        conn.close()
+
+        db_dir = os.path.dirname(LOCAL_DB_PATH)
+        if db_dir and not os.path.exists(db_dir):
+            os.makedirs(db_dir, exist_ok=True)
+
+        # If local DB file does not exist or is empty (< 100KB), fast-copy entire seed DB directly
+        if not os.path.exists(LOCAL_DB_PATH) or os.path.getsize(LOCAL_DB_PATH) < 100000:
+            try:
+                shutil.copyfile(seed_path, LOCAL_DB_PATH)
+                print(f"[DB Auto-Seed] Fast-initialized {LOCAL_DB_PATH} from seed_database.sqlite ({os.path.getsize(seed_path)/1024:.1f} KB)")
+                return
+            except Exception as e:
+                print(f"[DB Auto-Seed Copy Notice]: {e}")
+
+        # Check if essential tables exist and are populated
+        try:
+            conn = sqlite3.connect(LOCAL_DB_PATH, timeout=5.0)
+            cursor = conn.cursor()
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='campaign_classifications'")
+            has_classifications = cursor.fetchone()
+            count = 0
+            if has_classifications:
+                cursor.execute("SELECT COUNT(*) FROM campaign_classifications")
+                count = cursor.fetchone()[0]
+
+            if count == 0:
+                print("[DB Auto-Seed] Database missing classifications, restoring from seed_database.sqlite...")
+                conn.close()
+                shutil.copyfile(seed_path, LOCAL_DB_PATH)
+                print(f"[DB Auto-Seed] Successfully restored tables to {LOCAL_DB_PATH}")
+                return
+            conn.close()
+        except Exception as e:
+            print(f"[DB Auto-Seed Query Notice]: {e}")
     except Exception as e:
-        print(f"[DB Auto-Seed Notice]: {e}")
+        print(f"[DB Auto-Seed Fatal Safe Notice]: {e}")
 
 
 def ensure_database_indexes():
