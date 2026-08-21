@@ -5,7 +5,7 @@ description = "Crowdfunding Analytics & Enterprise CRM API"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
-    "fastapi>=0.100.0",
+    "fastapi[standard]>=0.111.0",
     "uvicorn[standard]>=0.22.0",
     "pandas>=2.0.0",
     "numpy>=1.24.0",
