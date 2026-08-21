@@ -186,7 +186,6 @@ def normalize_classifications(df):
             })
     return df
 
-@st.cache_resource(show_spinner=False, ttl=3600)
 def load_data():
     """
     Reads from Parquet cache (~0.05s) if it exists, else falls back to SQLite.
@@ -526,8 +525,6 @@ def save_classification_matrix(matrix_df):
             df_donations.to_sql("donations", con=conn, if_exists="replace", index=False)
             conn.close()
 
-    st.cache_data.clear()
-    st.cache_resource.clear()
     return len(matrix_df)
 
 COUNTRY_ISO_MAP = {
@@ -707,8 +704,6 @@ def save_givebright_classification_matrix(matrix_df):
                 df_donations.to_sql("donations", con=conn, if_exists="replace", index=False)
                 conn.close()
 
-    st.cache_data.clear()
-    st.cache_resource.clear()
     return len(matrix_df)
 
 def delete_single_dataset(source_tag):
@@ -771,8 +766,6 @@ def delete_single_dataset(source_tag):
                 print(f"Cloud delete notice: {e}")
         threading.Thread(target=delete_cloud, daemon=True).start()
 
-    st.cache_data.clear()
-    st.cache_resource.clear()
     return deleted_rows
 
 def import_givebright_classifications_file(file_path_or_buffer):
@@ -842,8 +835,6 @@ def update_source_tag(old_tag, new_tag):
                         print(f"Cloud source tag rename notice: {e}")
                 threading.Thread(target=_rename_cloud, daemon=True).start()
 
-
-    st.cache_data.clear()
     return updated_count
 
 
@@ -994,8 +985,6 @@ def purge_all_data():
     """
     import gc
     import sqlite3
-    st.cache_data.clear()
-    st.cache_resource.clear()
     
     # 1. Clear Parquet cache file
     if os.path.exists(PARQUET_PATH):
@@ -1028,8 +1017,6 @@ def purge_all_data():
             conn.close()
         except Exception as e:
             print(f"Cloud purge notice: {e}")
-
-    st.cache_data.clear()
 
 def process_and_upload_excel(file_buffer, source_name=None, upload_mode="replace", platform="auto"):
     """
@@ -1216,16 +1203,15 @@ def process_and_upload_excel(file_buffer, source_name=None, upload_mode="replace
                 
         threading.Thread(target=sync_to_cloud_fast, args=(df, upload_mode), daemon=True).start()
     
-    # 7. Clear Streamlit cache
-    st.cache_data.clear()
-    st.cache_resource.clear()
     return len(df)
 
 def apply_custom_css():
     """
     Inject modern glassmorphism and card CSS into Streamlit.
     """
-    st.markdown("""
+    try:
+        import streamlit as st
+        st.markdown("""
         <style>
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
         
@@ -1547,6 +1533,8 @@ def apply_custom_css():
         footer {visibility: hidden;}
         </style>
     """, unsafe_allow_html=True)
+    except Exception:
+        pass
 
 def format_currency(val):
     if pd.isna(val) or val is None:
