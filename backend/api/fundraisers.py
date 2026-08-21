@@ -615,13 +615,13 @@ def get_fundraiser_detail(
                 campaign_breakdown.append({
                     "campaign_name": cname,
                     "code": code,
-                    "platform": c_item.get("platform", "ALL"),
+                    "platform": str(c_item.get("platform") or "ALL"),
                     "gross_raised": round(gross_period, 2),
                     "gross_raised_all_time": round(gross_all, 2),
                     "total_donations": txns,
                     "total_donors": donor_count,
-                    "heading": str(sub_df["Heading"].iloc[0]) if "Heading" in sub_df.columns and not sub_df["Heading"].empty else "Unassigned",
-                    "country": str(sub_df["Country"].iloc[0]) if "Country" in sub_df.columns and not sub_df["Country"].empty else "Unassigned"
+                    "heading": str(sub_df["Heading"].iloc[0]) if "Heading" in sub_df.columns and not sub_df["Heading"].empty and pd.notna(sub_df["Heading"].iloc[0]) else "Unassigned",
+                    "country": str(sub_df["Country"].iloc[0]) if "Country" in sub_df.columns and not sub_df["Country"].empty and pd.notna(sub_df["Country"].iloc[0]) else "Unassigned"
                 })
 
                 # Monthly aggregation (use full dataset or period)
@@ -632,20 +632,39 @@ def get_fundraiser_detail(
                         if pd.notna(m_val) and m_val != "NaT":
                             monthly_timeline[m_val] = monthly_timeline.get(m_val, 0.0) + float(amt)
 
-                # Recent transactions
+                # Recent transactions (sanitize all NaN / nulls for valid JSON serialization)
                 if len(recent_transactions) < 50:
                     sample_cols = [c for c in ["Created Date (UTC)", "Donor Name", "First Name", "Last Name", "Email", "Campaign Name", "Code", amount_col, "Platform"] if c in sub_df.columns]
                     tx_sample = period_sub[sample_cols].head(20).to_dict('records')
                     for t in tx_sample:
-                        name = t.get("Donor Name") or f"{t.get('First Name', '')} {t.get('Last Name', '')}".strip() or "Anonymous"
+                        fn = str(t.get("First Name") or "").strip() if pd.notna(t.get("First Name")) else ""
+                        ln = str(t.get("Last Name") or "").strip() if pd.notna(t.get("Last Name")) else ""
+                        raw_name = t.get("Donor Name")
+                        name = str(raw_name).strip() if pd.notna(raw_name) and str(raw_name).strip() else (f"{fn} {ln}".strip() or "Anonymous")
+                        
+                        email_val = t.get("Email")
+                        email_str = str(email_val).strip() if pd.notna(email_val) and str(email_val).strip().lower() not in ["nan", "none", ""] else "N/A"
+                        
+                        cname_val = t.get("Campaign Name")
+                        cname_str = str(cname_val).strip() if pd.notna(cname_val) and str(cname_val).strip() else cname
+                        
+                        code_val = t.get("Code")
+                        code_str = str(code_val).strip() if pd.notna(code_val) and str(code_val).strip() else code
+                        
+                        plat_val = t.get("Platform")
+                        plat_str = str(plat_val).strip() if pd.notna(plat_val) and str(plat_val).strip() else "N/A"
+                        
+                        amt_val = pd.to_numeric(t.get(amount_col), errors="coerce")
+                        amt_num = float(amt_val) if pd.notna(amt_val) else 0.0
+
                         recent_transactions.append({
-                            "date": str(t.get("Created Date (UTC)", "N/A")),
+                            "date": str(t.get("Created Date (UTC)") or "N/A") if pd.notna(t.get("Created Date (UTC)")) else "N/A",
                             "donor_name": name,
-                            "email": t.get("Email", "N/A"),
-                            "campaign_name": t.get("Campaign Name", cname),
-                            "code": t.get("Code", code),
-                            "amount": round(float(t.get(amount_col) or 0.0), 2),
-                            "platform": t.get("Platform", "N/A")
+                            "email": email_str,
+                            "campaign_name": cname_str,
+                            "code": code_str,
+                            "amount": round(amt_num, 2),
+                            "platform": plat_str
                         })
 
         # Overall first and latest donation dates

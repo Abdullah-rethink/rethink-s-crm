@@ -867,28 +867,38 @@ def _enrich_dataframe(df):
 
     # Identity Resolution - Vectorized
     df['email_clean'] = df['Email'].astype(str).str.strip().str.lower()
-    df['email_clean'] = df['email_clean'].where(~df['email_clean'].isin(['nan', 'none', '']), None)
+    GENERIC_DONOR_NAMES = {
+        'anonymous', 'anonymous kind soul', 'anonymous donor', 'kind soul', 
+        'donation boost', 'unnamed donor', 'nan', 'none', 'null', '', 'unassigned',
+        'mr', 'mrs', 'miss', 'dr', 'ms', 'm', 's', 'a', 'n'
+    }
+
+    df['email_clean'] = df['email_clean'].where(~df['email_clean'].isin(['nan', 'none', '', 'unassigned', 'null']), None)
     fname = df['First Name'].astype(str).str.strip().str.lower().replace({'nan': '', 'none': ''})
     lname = df['Last Name'].astype(str).str.strip().str.lower().replace({'nan': '', 'none': ''})
     df['full_name_clean'] = (fname + " " + lname).str.strip()
-    df['full_name_clean'] = df['full_name_clean'].where(~df['full_name_clean'].isin(['', 'nan', 'none']), None)
+    df['full_name_clean'] = df['full_name_clean'].where(~df['full_name_clean'].isin(GENERIC_DONOR_NAMES), None)
 
     bname_col = df['Billing Name'] if 'Billing Name' in df.columns else pd.Series(index=df.index, dtype=str)
     df['bname_clean'] = bname_col.astype(str).str.strip().str.lower()
-    df['bname_clean'] = df['bname_clean'].where(~df['bname_clean'].isin(['nan', 'none', '']), None)
+    df['bname_clean'] = df['bname_clean'].where(~df['bname_clean'].isin(GENERIC_DONOR_NAMES), None)
 
-    valid = df.dropna(subset=['full_name_clean', 'email_clean'])
-    name_to_email_map = valid.groupby('full_name_clean')['email_clean'].first()
+    # Only map authentic human full names (at least 2 words or distinct non-generic names) to email
+    valid = pd.DataFrame({'name': df['full_name_clean'], 'email': df['email_clean']}).dropna()
+    valid = valid[valid['name'].str.contains(' ') & (~valid['name'].isin(GENERIC_DONOR_NAMES))]
+    name_to_email_map = valid.groupby('name')['email'].first() if not valid.empty else pd.Series(dtype=str)
 
-    mapped_email_from_name = df['full_name_clean'].map(name_to_email_map)
-    mapped_email_from_billing = df['bname_clean'].map(name_to_email_map)
+    mapped_email_from_name = df['full_name_clean'].map(name_to_email_map) if not name_to_email_map.empty else pd.Series(None, index=df.index)
+    mapped_email_from_billing = df['bname_clean'].map(name_to_email_map) if not name_to_email_map.empty else pd.Series(None, index=df.index)
+
+    did_series = df['Donation ID'].astype(str) if 'Donation ID' in df.columns else pd.Series(range(len(df)), index=df.index).astype(str)
 
     df['Donor ID'] = df['email_clean'] \
         .combine_first(mapped_email_from_name) \
-        .combine_first(df['full_name_clean']) \
         .combine_first(mapped_email_from_billing) \
+        .combine_first(df['full_name_clean']) \
         .combine_first(df['bname_clean']) \
-        .combine_first(df.get('Donation ID', pd.Series(range(len(df)), index=df.index)).astype(str))
+        .combine_first(did_series)
 
     df.drop(columns=['email_clean', 'full_name_clean', 'bname_clean'], inplace=True, errors='ignore')
 

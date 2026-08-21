@@ -599,23 +599,48 @@ def export_donors(
     zakat: Optional[str] = None,
     donor_country: Optional[str] = None,
     campaign_search: Optional[str] = None,
-    gift_aid: Optional[str] = None
+    gift_aid: Optional[str] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None
 ):
-    """Exports filtered donor/payout rows with multi-Donation ID and universal search support."""
+    """Exports filtered donor/payout rows with date range, multi-Donation ID, and universal search support."""
     is_payout_export = bool(source and str(source).strip().lower() in ["launchgood payout", "payout", "payouts"])
     df_raw = load_payouts_data() if is_payout_export else load_data()
     if df_raw.empty:
         raise HTTPException(status_code=400, detail="No donor data available to export.")
 
-    filtered_df = _apply_filters(df_raw, payment_type, tier, source, heading, subheading, country, code, zakat, donor_country, campaign_search, gift_aid)
+    filtered_df = _apply_filters(
+        df_raw,
+        payment_type=payment_type,
+        tier=tier,
+        source=source,
+        heading=heading,
+        subheading=subheading,
+        country=country,
+        code=code,
+        zakat=zakat,
+        donor_country=donor_country,
+        campaign_search=campaign_search,
+        gift_aid=gift_aid,
+        start_date=start_date,
+        end_date=end_date
+    )
     display_df = _apply_search_to_df(filtered_df, search)
 
     date_str = datetime.now().strftime("%Y%m%d_%H%M%S")
 
     if format.lower() == "xlsx":
+        # Drop columns that are completely empty to speed up serialization
+        export_df = display_df.dropna(axis=1, how="all") if not display_df.empty else display_df
         buffer = io.BytesIO()
-        with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
-            display_df.to_excel(writer, index=False, sheet_name="Filtered Donors")
+        try:
+            with pd.ExcelWriter(buffer, engine="xlsxwriter", engine_kwargs={"options": {"constant_memory": True}}) as writer:
+                export_df.to_excel(writer, index=False, sheet_name="Filtered Donors")
+        except Exception:
+            # Fallback to openpyxl if xlsxwriter is unavailable
+            with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
+                export_df.to_excel(writer, index=False, sheet_name="Filtered Donors")
+
         buffer.seek(0)
         headers = {"Content-Disposition": f'attachment; filename="filtered_donors_{date_str}.xlsx"'}
         return Response(
@@ -799,6 +824,73 @@ def resolve_best_donor_name(donor_txns, first_row):
     return "Anonymous Donor", "", ""
 
 
+ANON_PLACEHOLDERS = {
+    "anonymous", "anonymous kind soul", "anonymous donor", "kind soul", 
+    "donation boost", "unnamed donor", "nan", "none", "null", "", "unassigned"
+}
+
+
+def _get_donor_matching_mask(df: pd.DataFrame, donor_id_or_email: str) -> pd.Series:
+    """Safely matches donor transactions without accidentally grouping 40k+ anonymous records."""
+    if not donor_id_or_email or df.empty:
+        return pd.Series(False, index=df.index)
+        
+    identity = str(donor_id_or_email).strip().lower()
+    
+    # 1. Explicit Donation ID prefix: "ID:23547022" or "donation_id:23547022"
+    if identity.startswith("id:") or identity.startswith("donation_id:"):
+        clean_id = identity.split(":", 1)[1].strip()
+        if "Donation ID" in df.columns:
+            return df["Donation ID"].astype(str).str.strip().str.lower() == clean_id
+        return pd.Series(False, index=df.index)
+        
+    # 2. If generic anonymous placeholder, never aggregate 43,000+ records!
+    if identity in ANON_PLACEHOLDERS:
+        if "Donation ID" in df.columns and (df["Donation ID"].astype(str).str.strip().str.lower() == identity).any():
+            return df["Donation ID"].astype(str).str.strip().str.lower() == identity
+        if "Display Name" in df.columns:
+            sub = df[df["Display Name"].astype(str).str.strip().str.lower() == identity]
+            if not sub.empty:
+                mask = pd.Series(False, index=df.index)
+                mask.loc[sub.index[0]] = True
+                return mask
+        return pd.Series(False, index=df.index)
+
+    # 3. Match by exact Email
+    if "@" in identity:
+        mask = pd.Series(False, index=df.index)
+        if "Email" in df.columns:
+            mask |= (df["Email"].astype(str).str.strip().str.lower() == identity)
+        if "Donor ID" in df.columns:
+            mask |= (df["Donor ID"].astype(str).str.strip().str.lower() == identity)
+        if mask.any():
+            return mask
+
+    # 4. Match by Donor ID (excluding generic placeholders)
+    if "Donor ID" in df.columns:
+        valid_donor_mask = (df["Donor ID"].astype(str).str.strip().str.lower() == identity) & (~df["Donor ID"].astype(str).str.strip().str.lower().isin(ANON_PLACEHOLDERS))
+        if valid_donor_mask.any():
+            return valid_donor_mask
+
+    # 5. Match by exact Donation ID
+    if "Donation ID" in df.columns:
+        did_mask = (df["Donation ID"].astype(str).str.strip().str.lower() == identity)
+        if did_mask.any():
+            return did_mask
+
+    # 6. Fallback: Match by authentic Full Name or Billing Name (only if not generic)
+    mask = pd.Series(False, index=df.index)
+    if "First Name" in df.columns and "Last Name" in df.columns:
+        full_names = (df["First Name"].fillna("").astype(str).str.strip() + " " + df["Last Name"].fillna("").astype(str).str.strip()).str.strip().str.lower()
+        mask |= (full_names == identity)
+    if "Billing Name" in df.columns:
+        mask |= (df["Billing Name"].astype(str).str.strip().str.lower() == identity)
+    if "Display Name" in df.columns and identity not in ANON_PLACEHOLDERS:
+        mask |= (df["Display Name"].astype(str).str.strip().str.lower() == identity)
+
+    return mask
+
+
 @router.get("/profile/{donor_id_or_email:path}")
 def get_donor_360_profile(donor_id_or_email: str):
     """Returns complete 360° Donor Profile payload with all donor details, dual classifications, and full transaction history."""
@@ -806,13 +898,7 @@ def get_donor_360_profile(donor_id_or_email: str):
     if df.empty:
         raise HTTPException(status_code=404, detail="Donor dataset is empty.")
 
-    identity = donor_id_or_email.strip().lower()
-    
-    match_mask = pd.Series(False, index=df.index)
-    for col in ["Email", "Donor ID", "Display Name", "First Name", "Last Name"]:
-        if col in df.columns:
-            match_mask = match_mask | (df[col].astype(str).str.strip().str.lower() == identity)
-
+    match_mask = _get_donor_matching_mask(df, donor_id_or_email)
     donor_txns = df.loc[match_mask]
     if donor_txns.empty:
         raise HTTPException(status_code=404, detail=f"Donor '{donor_id_or_email}' not found.")
@@ -924,12 +1010,7 @@ def get_donor_history_paginated(
     if df.empty:
         raise HTTPException(status_code=404, detail="Donor dataset is empty.")
 
-    identity = donor_id.strip().lower()
-    match_mask = pd.Series(False, index=df.index)
-    for col in ["Email", "Donor ID", "Display Name", "First Name", "Last Name"]:
-        if col in df.columns:
-            match_mask = match_mask | (df[col].astype(str).str.strip().str.lower() == identity)
-
+    match_mask = _get_donor_matching_mask(df, donor_id)
     donor_txns = df.loc[match_mask]
     if donor_txns.empty:
         return {"total_records": 0, "page": 1, "page_size": page_size, "total_pages": 1, "records": []}
