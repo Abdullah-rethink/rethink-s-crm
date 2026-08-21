@@ -48,18 +48,18 @@ def seed_database_if_empty():
     if not os.path.exists(seed_path):
         return
 
-    # If local DB file does not exist, copy entire seed DB directly
-    if not os.path.exists(LOCAL_DB_PATH):
+    # If local DB file does not exist or is empty (< 100KB), fast-copy entire seed DB directly
+    if not os.path.exists(LOCAL_DB_PATH) or os.path.getsize(LOCAL_DB_PATH) < 100000:
         try:
             shutil.copyfile(seed_path, LOCAL_DB_PATH)
-            print(f"[DB Auto-Seed] Successfully initialized {LOCAL_DB_PATH} from seed_database.sqlite")
+            print(f"[DB Auto-Seed] Fast-initialized {LOCAL_DB_PATH} from seed_database.sqlite ({os.path.getsize(seed_path)/1024:.1f} KB)")
             return
         except Exception as e:
-            print(f"[DB Auto-Seed Error]: {e}")
+            print(f"[DB Auto-Seed Copy Notice]: {e}")
 
     # Check if essential tables exist and are populated
     try:
-        conn = sqlite3.connect(LOCAL_DB_PATH, timeout=15.0)
+        conn = sqlite3.connect(LOCAL_DB_PATH, timeout=5.0)
         cursor = conn.cursor()
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='campaign_classifications'")
         has_classifications = cursor.fetchone()
@@ -69,28 +69,14 @@ def seed_database_if_empty():
             count = cursor.fetchone()[0]
 
         if count == 0:
-            print("[DB Auto-Seed] Database missing classifications, seeding from seed_database.sqlite...")
-            seed_conn = sqlite3.connect(seed_path, timeout=15.0)
-            seed_cur = seed_conn.cursor()
-            seed_cur.execute("SELECT name FROM sqlite_master WHERE type='table'")
-            seed_tables = [r[0] for r in seed_cur.fetchall()]
-
-            for tbl in seed_tables:
-                if tbl == "sqlite_sequence":
-                    continue
-                df_tbl = pd.read_sql_query(f'SELECT * FROM "{tbl}"', seed_conn)
-                df_tbl.to_sql(tbl, conn, if_exists="replace", index=False)
-            seed_conn.close()
-            conn.commit()
-            print(f"[DB Auto-Seed] Successfully restored {len(seed_tables)} tables to SQLite.")
-
+            print("[DB Auto-Seed] Database missing classifications, restoring from seed_database.sqlite...")
+            conn.close()
+            shutil.copyfile(seed_path, LOCAL_DB_PATH)
+            print(f"[DB Auto-Seed] Successfully restored tables to {LOCAL_DB_PATH}")
+            return
         conn.close()
     except Exception as e:
         print(f"[DB Auto-Seed Notice]: {e}")
-
-
-# Run seed check on module load
-seed_database_if_empty()
 
 
 def ensure_database_indexes():
