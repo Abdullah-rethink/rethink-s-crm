@@ -35,59 +35,101 @@ _CACHE_LOCK = threading.Lock()
 
 
 
+MOJIBAKE_MAP = {
+    # 4-byte Emojis misdecoded as Windows-1252 / latin-1
+    "ðŸŽŸ": "🎟",
+    "ðŸ †": "🏆",
+    "ð\x9f\x8f†": "🏆",
+    "ðŸ\x8f†": "🏆",
+    "ðŸŒ": "🍬",
+    "ðŸŒ™": "🌙",
+    "ðŸ\"¥": "🔥",
+    "ðŸ’–": "💖",
+    "ðŸ™": "🙏",
+    "ðŸ•": "🕌",
+    "ðŸ“": "📖",
+    "ðŸ’": "💧",
+    "ðŸ’ª": "💪",
+    "ðŸŒŽ": "🌍",
+    "ðŸ‡µðŸ‡¸": "🇵🇸",
+    "ðŸ‡¸ðŸ‡¾": "🇸🇾",
+    "ðŸ‡¦ðŸ‡«": "🇦🇫",
+    "â\x9d¤ï¸\x8f": "❤️",
+    "â\x9d¤": "❤️",
+    "âœ¨": "✨",
+    "â­\x90": "⭐",
+    "âف": "✨",
+    
+    # 2 & 3-byte UTF-8 symbols misdecoded
+    "â€“": "–",
+    "â€”": "–",
+    "â€™": "'",
+    "â€˜": "'",
+    "â€œ": '"',
+    "â€\x9d": '"',
+    "â€": '"',
+    "Â": "",
+    "\xa0": " ",
+    "\xad": "",
+    "\u200b": "",
+    "\u200c": "",
+    "\u200d": "",
+    "\ufeff": "",
+    "\ufffd": "",
+    
+    # Arabic / Transliteration artifacts
+    "Qur’Äفn": "Qur'ān",
+    "Qur'Äفn": "Qur'ān",
+    "QurÄفn": "Qur'ān",
+    "Qur'Äفn": "Qur'ān",
+    "Qur’Äفn": "Qur'ān",
+    "Qur'an": "Qur'ān",
+    "Qur’an": "Qur'ān",
+    "AshbÄ\xad": "Ashbāl",
+    "AshbÄفl": "Ashbāl",
+    "Ashbāفl": "Ashbāl",
+    "AshbÄفl": "Ashbāl",
+    "AshbÄ l": "Ashbāl",
+    "AshbÄ": "Ashbāl",
+    "AnsÄفrÄ«yyah": "Ansārīyyah",
+    "AnsÄفr": "Ansār",
+    "Ansāفr": "Ansār",
+    "DÄفrul": "Dārul",
+    "ImÄفn": "Imān",
+    "KunÄفr": "Kunar",
+    "KunÄفr": "Kunar",
+    "AbÅ«": "Abū",
+    "WudÅ«": "Wudū",
+    
+    # Quotes & Dashes
+    "’": "'",
+    "‘": "'",
+    "`": "'",
+    "''": '"',
+    '""': "–",
+    "“": '"',
+    "”": '"',
+    "—": "–",
+    " - ": " – "
+}
+
 def fix_mojibake(text):
     """
     Fixes garbled text encodings (UTF-8 bytes mis-decoded as Windows-1252 / ISO-8859-1).
-    Restores multi-lingual characters, Arabic, accents, and special symbols.
+    Restores multi-lingual characters, Arabic, accents, emojis, and special symbols.
     """
-    if not isinstance(text, str) or not text.strip():
-        return text
+    if not text or not isinstance(text, str):
+        return "" if text is None else str(text)
+    s = str(text).strip()
     
-    s = str(text)
-    # Fast exit if standard clean ASCII
-    if not any(c in s for c in ['â', 'Ã', 'Â', '\xa0', '\xad', '\x81', '\u200b', '\ufeff', '\ufffd', '’', '‘', '“', '”', '–', '—', 'ā', 'ū', 'ī']):
-        return s
-
-    replacements = {
-        'â€™': "'",
-        'â€˜': "'",
-        'â€œ': '"',
-        'â€\x9d': '"',
-        'â€': '"',
-        'â€“': '-',
-        'â€”': '-',
-        'Â': '',
-        '\xa0': ' ',
-        '\xad': '',
-        '\u200b': '',
-        '\ufeff': '',
-        '\ufffd': '',
-        '\x81': 'a',
-        '’': "'",
-        '‘': "'",
-        '“': '"',
-        '”': '"',
-        '–': '-',
-        '—': '-',
-        'ā': 'a',
-        'ū': 'u',
-        'ī': 'i',
-        'Abū': 'Abu'
-    }
-    for k, v in replacements.items():
+    for k, v in MOJIBAKE_MAP.items():
         if k in s:
             s = s.replace(k, v)
             
-    if any(c in s for c in ['â', 'Ã']):
-        try:
-            s = s.encode('latin1').decode('utf-8')
-        except Exception:
-            pass
-        
-    for k, v in replacements.items():
-        if k in s:
-            s = s.replace(k, v)
-            
+    # Strip variation selectors & zero-width chars
+    s = s.replace("\ufe0f", "").replace("Â", "").replace("\xad", "").replace("\xa0", " ")
+    import re
+    s = re.sub(r'\s+', ' ', s).strip()
     return s
 
 def deduplicate_dataframe_columns(df_input):
@@ -461,6 +503,10 @@ def get_classification_matrix(df_raw=None):
     finally:
         conn.close()
 
+    if not db_matrix.empty:
+        db_matrix["Campaign Name"] = db_matrix["Campaign Name"].apply(fix_mojibake).str.strip()
+        db_matrix["Community Name"] = db_matrix["Community Name"].apply(fix_mojibake).str.strip()
+
     # 2. Extract distinct (Campaign Name, Code, Community Name) pairs from donations
     donor_distinct = None
     try:
@@ -495,8 +541,11 @@ def get_classification_matrix(df_raw=None):
                 donor_distinct = donor_df.drop_duplicates(subset=["Campaign Name", "Code", "Community Name"])
 
     if donor_distinct is not None and not donor_distinct.empty:
+        donor_distinct["Campaign Name"] = donor_distinct["Campaign Name"].apply(fix_mojibake).str.strip()
+        donor_distinct["Community Name"] = donor_distinct["Community Name"].apply(fix_mojibake).str.strip()
+
         if db_matrix.empty:
-            matrix_df = donor_distinct.fillna("Unassigned").reset_index(drop=True)
+            merged_raw = donor_distinct.fillna("Unassigned").reset_index(drop=True)
         else:
             merged = pd.merge(
                 donor_distinct[["Campaign Name", "Code", "Community Name"]],
@@ -508,9 +557,42 @@ def get_classification_matrix(df_raw=None):
             if "Community Name_db" in merged.columns:
                 merged["Community Name"] = merged["Community Name"].replace("N/A", "").combine_first(merged["Community Name_db"]).replace("", "N/A")
                 merged.drop(columns=["Community Name_db"], inplace=True)
-            matrix_df = merged.drop_duplicates(subset=["Campaign Name", "Code"]).reset_index(drop=True)
+            merged_raw = merged
     else:
-        matrix_df = db_matrix
+        merged_raw = db_matrix
+
+    # 3. Canonical Deduplication & Ghost Row Purging
+    cleaned_rows = []
+    cname_code_groups = merged_raw.groupby([merged_raw["Campaign Name"].str.lower(), merged_raw["Code"].str.upper()])
+
+    for (c_low, code_up), grp in cname_code_groups:
+        row = grp.iloc[0].copy()
+        # Pick non-empty Campaign URL if available
+        if "Campaign URL" in grp.columns:
+            urls = [u for u in grp["Campaign URL"] if str(u).strip() and str(u).strip().startswith("http")]
+            if urls:
+                row["Campaign URL"] = urls[0]
+        # Pick non-N/A / non-Unassigned Community Name if available
+        if "Community Name" in grp.columns:
+            comms = [c for c in grp["Community Name"] if str(c).strip().lower() not in ["n/a", "unassigned", "none", "nan", ""]]
+            if comms:
+                row["Community Name"] = comms[0]
+        cleaned_rows.append(row)
+
+    deduped_df = pd.DataFrame(cleaned_rows) if cleaned_rows else merged_raw
+
+    # Filter out ghost ALL-GFN if a specific valid code exists
+    final_rows = []
+    for c_name, grp in deduped_df.groupby(deduped_df["Campaign Name"].str.lower()):
+        codes = grp["Code"].str.upper().tolist()
+        has_specific = any(c not in ["ALL-GFN", "UNASSIGNED", "N/A", "NONE", "NAN"] for c in codes)
+        for _, r in grp.iterrows():
+            # If campaign already has a specific project code and this row is an empty ghost ALL-GFN, purge it
+            if has_specific and str(r.get("Code", "")).upper() == "ALL-GFN" and (not r.get("Campaign URL") or not str(r.get("Campaign URL")).startswith("http")):
+                continue
+            final_rows.append(r)
+
+    matrix_df = pd.DataFrame(final_rows) if final_rows else deduped_df
 
     # Dynamic auto-assignment based on Code mapping in < 5ms
     code_map = get_code_to_classification_map()

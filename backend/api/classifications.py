@@ -22,6 +22,7 @@ from core.data_processor import (
     normalize_classification_import_df,
     get_code_to_classification_map,
     sync_matrix_classifications_to_donors,
+    fix_mojibake,
 )
 try:
     from backend.api.payouts import invalidate_payouts_cache
@@ -56,16 +57,7 @@ def sanitize_matrix_df(df: pd.DataFrame) -> pd.DataFrame:
     clean_df = df.copy()
     for col in clean_df.columns:
         if clean_df[col].dtype == object or pd.api.types.is_string_dtype(clean_df[col]):
-            clean_df[col] = (
-                clean_df[col]
-                .astype(str)
-                .str.strip()
-                .str.replace("\xad", "", regex=False)
-                .str.replace("\u200b", "", regex=False)
-                .str.replace("\ufeff", "", regex=False)
-                .str.replace("AshbÄ\xad", "Ashbā", regex=False)
-                .str.replace("AshbÄ", "Ashbā", regex=False)
-            )
+            clean_df[col] = clean_df[col].apply(fix_mojibake)
     return clean_df
 
 
