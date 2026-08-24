@@ -3,14 +3,43 @@ import threading
 import time
 import pandas as pd
 
-from sqlalchemy import create_engine
-
-
+from sqlalchemy import create_engine, event
+from sqlalchemy.pool import NullPool
 from config.settings import DATABASE_URL, LOCAL_DB_PATH, LOCAL_DB_URL
 
-# Create local SQLAlchemy engine
+_DB_LOCK = threading.RLock()
+
+
+def get_db_connection(timeout: float = 60.0) -> sqlite3.Connection:
+    """Thread-safe SQLite connection with WAL mode and busy timeout enabled."""
+    conn = sqlite3.connect(LOCAL_DB_PATH, timeout=timeout, check_same_thread=False)
+    try:
+        conn.execute("PRAGMA journal_mode = WAL;")
+        conn.execute("PRAGMA synchronous = NORMAL;")
+        conn.execute("PRAGMA busy_timeout = 60000;")
+    except Exception:
+        pass
+    return conn
+
+
+# Create local SQLAlchemy engine with NullPool and SQLite WAL mode listener
 try:
-    local_engine = create_engine(LOCAL_DB_URL)
+    local_engine = create_engine(
+        LOCAL_DB_URL,
+        poolclass=NullPool,
+        connect_args={"timeout": 60.0, "check_same_thread": False}
+    )
+
+    @event.listens_for(local_engine, "connect")
+    def set_sqlite_pragma(dbapi_connection, connection_record):
+        try:
+            cursor = dbapi_connection.cursor()
+            cursor.execute("PRAGMA journal_mode = WAL;")
+            cursor.execute("PRAGMA synchronous = NORMAL;")
+            cursor.execute("PRAGMA busy_timeout = 60000;")
+            cursor.close()
+        except Exception:
+            pass
 except Exception as e:
     print(f"Local engine init notice: {e}")
     local_engine = None

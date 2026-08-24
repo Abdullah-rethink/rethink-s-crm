@@ -62,7 +62,17 @@ export default function ClassificationView({ user }) {
   const [codeMap, setCodeMap] = useState({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [saveMsg, setSaveMsg] = useState('');
+  const [saveNotification, setSaveNotification] = useState(null); // { type: 'success' | 'error' | 'info', title: string, message: string, timestamp: string }
+
+  // Auto-dismiss success notification after 7 seconds
+  useEffect(() => {
+    if (saveNotification?.type === 'success') {
+      const timer = setTimeout(() => {
+        setSaveNotification(null);
+      }, 7000);
+      return () => clearTimeout(timer);
+    }
+  }, [saveNotification]);
 
   // 🚀 Fast Client-Side Search & Pagination State
   const [searchQuery, setSearchQuery] = useState('');
@@ -109,7 +119,6 @@ export default function ClassificationView({ user }) {
   // Race-Condition-Free Data Loading with Cancellation Cleanup
   const loadMatrixData = () => {
     setLoading(true);
-    setSaveMsg('');
 
     fetch(`${API_BASE_URL}/api/classifications/${platform}`)
       .then(res => res.json())
@@ -298,7 +307,12 @@ export default function ClassificationView({ user }) {
       unassigned_campaigns: prev.unassigned_campaigns + 1,
       rules: [newRule, ...prev.rules]
     }));
-    setSaveMsg(`➕ Added new code variant slot for "${cName}". Specify Code and click Save.`);
+    setSaveNotification({
+      type: 'info',
+      title: 'Variant Added',
+      message: `Added new code variant slot for "${cName}". Specify Code and click "Save Matrix & Sync".`,
+      timestamp: new Date().toLocaleTimeString()
+    });
   };
 
   // Toggle Primary/Default Code Variant for a Multi-Code Campaign
@@ -325,7 +339,12 @@ export default function ClassificationView({ user }) {
       };
     });
 
-    setSaveMsg(`⭐ Marked "${targetCode}" as Primary code for "${cName}". Click Save All Rules to persist.`);
+    setSaveNotification({
+      type: 'info',
+      title: 'Primary Variant Set',
+      message: `Marked "${targetCode}" as Primary code for "${cName}". Click "Save Matrix & Sync" to persist.`,
+      timestamp: new Date().toLocaleTimeString()
+    });
   };
 
   // Dynamic status counts calculation
@@ -388,35 +407,57 @@ export default function ClassificationView({ user }) {
     return filteredRules.slice(start, start + effectivePageSize);
   }, [filteredRules, safePage, effectivePageSize, pageSize]);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!isSuperAdmin) return;
     setSaving(true);
-    setSaveMsg('');
+    setSaveNotification({
+      type: 'info',
+      title: 'Saving & Syncing...',
+      message: `Saving classification matrix rules and synchronizing to database records for ${platform.toUpperCase()}...`,
+      timestamp: new Date().toLocaleTimeString()
+    });
 
-    fetch(`${API_BASE_URL}/api/classifications/save`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        user_role: user?.role,
-        can_edit_matrix: true,
-        platform: platform,
-        rules: matrixData.rules
-      })
-    })
-      .then(r => r.json())
-      .then(res => {
-        setSaving(false);
-        if (res?.status === 'success') {
-          setSaveMsg(`✅ ${res.message}`);
-          loadMatrixData();
-        } else {
-          setSaveMsg(`❌ ${res?.detail || 'Failed to save rules.'}`);
-        }
-      })
-      .catch(err => {
-        setSaving(false);
-        setSaveMsg(`❌ Error: ${err.message}`);
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/classifications/save`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_role: user?.role,
+          can_edit_matrix: true,
+          platform: platform,
+          rules: matrixData.rules
+        })
       });
+
+      const res = await response.json().catch(() => null);
+
+      if (response.ok && res?.status === 'success') {
+        setSaveNotification({
+          type: 'success',
+          title: 'Matrix Saved & Synced Successfully',
+          message: res.message || `Successfully saved ${matrixData.rules.length.toLocaleString()} rules and synced live donor records!`,
+          timestamp: new Date().toLocaleTimeString()
+        });
+        loadMatrixData();
+      } else {
+        const errorMsg = res?.detail || res?.message || `Server returned error (${response.status}: ${response.statusText})`;
+        setSaveNotification({
+          type: 'error',
+          title: 'Save & Sync Failed',
+          message: errorMsg,
+          timestamp: new Date().toLocaleTimeString()
+        });
+      }
+    } catch (err) {
+      setSaveNotification({
+        type: 'error',
+        title: 'Connection / Server Error',
+        message: err.message || 'Failed to communicate with backend server. Please verify your connection or retry.',
+        timestamp: new Date().toLocaleTimeString()
+      });
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleDeleteRule = async (rule) => {
@@ -441,7 +482,12 @@ export default function ClassificationView({ user }) {
       });
       const data = await res.json();
       if (data?.status === 'success') {
-        setSaveMsg(`🗑️ ${data.message}`);
+        setSaveNotification({
+          type: 'success',
+          title: 'Rule Deleted',
+          message: data.message || `Successfully deleted rule for "${cName}".`,
+          timestamp: new Date().toLocaleTimeString()
+        });
         setMatrixData(prev => {
           const filtered = prev.rules.filter(r => {
             const matchName = (r['Campaign Name'] || r['campaign_name']) === cName;
@@ -457,10 +503,20 @@ export default function ClassificationView({ user }) {
           };
         });
       } else {
-        setSaveMsg(`❌ ${data?.detail || 'Failed to delete rule.'}`);
+        setSaveNotification({
+          type: 'error',
+          title: 'Delete Failed',
+          message: data?.detail || 'Failed to delete rule.',
+          timestamp: new Date().toLocaleTimeString()
+        });
       }
     } catch (err) {
-      setSaveMsg(`❌ Error: ${err.message}`);
+      setSaveNotification({
+        type: 'error',
+        title: 'Delete Error',
+        message: err.message || 'Error communicating with server.',
+        timestamp: new Date().toLocaleTimeString()
+      });
     }
   };
 
@@ -573,7 +629,118 @@ export default function ClassificationView({ user }) {
   const bStyles = bannerStyles[platform] || bannerStyles.launchgood;
 
   return (
-    <div className="flex flex-col gap-6 animate-fade-in pb-16">
+    <div className="flex flex-col gap-6 animate-fade-in pb-16 relative">
+      {/* 🔔 Floating Real-Time Save & Sync Notifier Toast */}
+      {saveNotification && (
+        <div 
+          className={`fixed top-6 right-6 z-[9999] max-w-md w-[calc(100vw-3rem)] sm:w-96 p-4 rounded-2xl shadow-2xl backdrop-blur-xl border transition-all duration-300 transform translate-y-0 animate-slide-in ${
+            saveNotification.type === 'success'
+              ? 'bg-emerald-950/95 text-emerald-100 border-emerald-500/50 shadow-emerald-950/50 ring-1 ring-emerald-500/30'
+              : saveNotification.type === 'error'
+              ? 'bg-rose-950/95 text-rose-100 border-rose-500/50 shadow-rose-950/50 ring-1 ring-rose-500/30'
+              : 'bg-slate-900/95 text-slate-100 border-cyan-500/50 shadow-cyan-950/50 ring-1 ring-cyan-500/30'
+          }`}
+          role="alert"
+        >
+          <div className="flex items-start gap-3">
+            <div className={`p-2 rounded-xl shrink-0 ${
+              saveNotification.type === 'success' 
+                ? 'bg-emerald-500/20 text-emerald-400' 
+                : saveNotification.type === 'error' 
+                ? 'bg-rose-500/20 text-rose-400' 
+                : 'bg-cyan-500/20 text-cyan-400'
+            }`}>
+              {saveNotification.type === 'success' ? (
+                <CheckCircle className="w-5 h-5 animate-pulse" />
+              ) : saveNotification.type === 'error' ? (
+                <AlertCircle className="w-5 h-5 animate-bounce" />
+              ) : (
+                <Zap className="w-5 h-5 animate-pulse" />
+              )}
+            </div>
+
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center justify-between gap-2">
+                <h4 className="text-xs font-black tracking-tight text-white uppercase">
+                  {saveNotification.title}
+                </h4>
+                <span className="text-[10px] text-slate-400 font-mono">
+                  {saveNotification.timestamp}
+                </span>
+              </div>
+              <p className="text-xs text-slate-200 mt-1 leading-relaxed break-words font-medium">
+                {saveNotification.message}
+              </p>
+
+              {saveNotification.type === 'error' && (
+                <div className="mt-3 flex items-center gap-2">
+                  <button
+                    onClick={handleSave}
+                    disabled={saving}
+                    className="px-3 py-1 text-xs font-bold rounded-lg bg-rose-600 hover:bg-rose-500 text-white shadow-sm transition-all cursor-pointer flex items-center gap-1.5"
+                  >
+                    <RefreshCw className={`w-3 h-3 ${saving ? 'animate-spin' : ''}`} />
+                    <span>Retry Save & Sync</span>
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <button
+              onClick={() => setSaveNotification(null)}
+              className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-white/10 transition-colors cursor-pointer shrink-0"
+              title="Dismiss notification"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Inline Save & Sync Status Banner (when active) */}
+      {saveNotification && (
+        <div className={`p-3.5 rounded-2xl border flex items-center justify-between gap-3 shadow-md transition-all ${
+          saveNotification.type === 'success'
+            ? 'bg-emerald-500/10 dark:bg-emerald-950/40 border-emerald-500/30 text-emerald-900 dark:text-emerald-200'
+            : saveNotification.type === 'error'
+            ? 'bg-rose-500/10 dark:bg-rose-950/40 border-rose-500/30 text-rose-900 dark:text-rose-200'
+            : 'bg-cyan-500/10 dark:bg-cyan-950/40 border-cyan-500/30 text-cyan-900 dark:text-cyan-200'
+        }`}>
+          <div className="flex items-center gap-2.5 min-w-0">
+            {saveNotification.type === 'success' ? (
+              <CheckCircle className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+            ) : saveNotification.type === 'error' ? (
+              <AlertCircle className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0" />
+            ) : (
+              <Zap className="w-4 h-4 text-cyan-600 dark:text-cyan-400 shrink-0" />
+            )}
+            <div className="text-xs truncate">
+              <span className="font-extrabold uppercase mr-2">[{saveNotification.title}]</span>
+              <span className="font-medium">{saveNotification.message}</span>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            {saveNotification.type === 'error' && (
+              <button
+                onClick={handleSave}
+                disabled={saving}
+                className="px-2.5 py-0.5 text-xs font-bold rounded-lg bg-rose-600 hover:bg-rose-500 text-white transition-all cursor-pointer flex items-center gap-1"
+              >
+                <RefreshCw className={`w-3 h-3 ${saving ? 'animate-spin' : ''}`} />
+                <span>Retry</span>
+              </button>
+            )}
+            <button
+              onClick={() => setSaveNotification(null)}
+              className="text-slate-400 hover:text-slate-600 dark:hover:text-white p-1 rounded-lg transition-colors cursor-pointer"
+              title="Close"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Top Header & Platform Selector Bar */}
       <div className="flex flex-wrap items-center justify-between gap-4 pb-2 border-b border-slate-200 dark:border-white/10">
         <div className="flex items-center gap-3">

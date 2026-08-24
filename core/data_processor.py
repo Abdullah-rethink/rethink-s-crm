@@ -6,7 +6,7 @@ from typing import Optional
 import pandas as pd
 
 from config.settings import LOCAL_DB_PATH, PARQUET_PATH, PAYOUTS_PARQUET_PATH
-from core.database import sync_to_cloud_async
+from core.database import sync_to_cloud_async, get_db_connection, _DB_LOCK
 
 COUNTRY_ISO_MAP = {
     "GB": "United Kingdom", "UK": "United Kingdom", "GBR": "United Kingdom",
@@ -202,8 +202,9 @@ def _mode_or_last(series):
 def init_classification_db():
     """Ensure SQLite campaign_classifications, paysuite_classifications, and sponsorship_targets tables exist with composite (campaign_name, code) primary keys."""
     try:
-        conn = sqlite3.connect(LOCAL_DB_PATH, timeout=30.0)
-        cur = conn.cursor()
+        with _DB_LOCK:
+            conn = get_db_connection(timeout=60.0)
+            cur = conn.cursor()
         
         # 1. Migrate / Initialize campaign_classifications with composite PRIMARY KEY (campaign_name, code)
         cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='campaign_classifications'")
@@ -893,31 +894,16 @@ def save_classification_matrix(matrix_df):
     clean_matrix["Code"] = clean_matrix["Code"].astype(str).fillna("Unassigned").replace({'nan': 'Unassigned', '': 'Unassigned', 'None': 'Unassigned'})
     clean_matrix["Community Name"] = clean_matrix["Community Name"].astype(str).fillna("N/A").replace({'nan': 'N/A', '': 'N/A', 'None': 'N/A'})
 
-    conn = sqlite3.connect(LOCAL_DB_PATH, timeout=30.0)
-
-    # 1. Reconcile codes per campaign: remove any codes in DB that are NOT in the submitted matrix for these campaigns
     cname_to_codes = {}
-    for _, row in clean_matrix.iterrows():
-        cname = str(row.get("Campaign Name", "Unassigned")).strip().replace("’", "'").replace("‘", "'")
-        code = str(row.get("Code", "Unassigned")).strip()
-        if cname and cname.lower() not in ["nan", "none", "n/a", "", "campaign_name", "campaign name"]:
-            cname_to_codes.setdefault(cname.lower(), set()).add(code.lower())
-
-    for cname_lower, codes in cname_to_codes.items():
-        placeholders = ','.join(['?'] * len(codes))
-        conn.execute(f"DELETE FROM campaign_classifications WHERE LOWER(campaign_name) = ? AND LOWER(code) NOT IN ({placeholders})", [cname_lower] + list(codes))
-
+    insert_rows = []
     for _, row in clean_matrix.iterrows():
         cname = str(row.get("Campaign Name", "Unassigned")).strip().replace("’", "'").replace("‘", "'")
         code = str(row.get("Code", "Unassigned")).strip()
         if not cname or cname.lower() in ["nan", "none", "n/a", "", "campaign_name", "campaign name"]:
             continue
+        cname_to_codes.setdefault(cname.lower(), set()).add(code.lower())
 
-        conn.execute("DELETE FROM campaign_classifications WHERE LOWER(campaign_name) = ? AND LOWER(code) = ?", (cname.lower(), code.lower()))
-        conn.execute("""
-            INSERT INTO campaign_classifications (campaign_name, code, community_name, campaign_url, heading, sub_heading, country, zakat_eligibility, is_primary)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (
+        insert_rows.append((
             cname,
             code,
             str(row.get("Community Name", "N/A")),
@@ -928,8 +914,36 @@ def save_classification_matrix(matrix_df):
             str(row.get("Zakat Eligibility", "Unassigned")),
             1 if row.get("is_primary") in [1, True, "1", "true", "True"] else 0
         ))
-    conn.commit()
-    conn.close()
+
+    import time
+    for attempt in range(5):
+        try:
+            with _DB_LOCK:
+                conn = get_db_connection(timeout=60.0)
+                with conn:
+                    for cname_lower, codes in cname_to_codes.items():
+                        placeholders = ','.join(['?'] * len(codes))
+                        conn.execute(f"DELETE FROM campaign_classifications WHERE LOWER(campaign_name) = ? AND LOWER(code) NOT IN ({placeholders})", [cname_lower] + list(codes))
+
+                    conn.executemany("""
+                        INSERT INTO campaign_classifications (campaign_name, code, community_name, campaign_url, heading, sub_heading, country, zakat_eligibility, is_primary)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        ON CONFLICT(campaign_name, code) DO UPDATE SET
+                            community_name = excluded.community_name,
+                            campaign_url = excluded.campaign_url,
+                            heading = excluded.heading,
+                            sub_heading = excluded.sub_heading,
+                            country = excluded.country,
+                            zakat_eligibility = excluded.zakat_eligibility,
+                            is_primary = excluded.is_primary
+                    """, insert_rows)
+                conn.close()
+            break
+        except sqlite3.OperationalError as e:
+            if "locked" in str(e).lower() and attempt < 4:
+                time.sleep(0.3 * (attempt + 1))
+                continue
+            raise
 
     # Save to JSON config as well
     try:
@@ -1008,44 +1022,19 @@ def save_paysuite_classification_matrix(matrix_df):
     init_classification_db()
     if matrix_df.empty:
         return 0
-    conn = sqlite3.connect(LOCAL_DB_PATH, timeout=30.0)
-
-    # 1. Reconcile codes per campaign: remove any codes in DB that are NOT in the submitted matrix for these campaigns
     cname_to_codes = {}
-    for _, row in matrix_df.iterrows():
-        cname = str(row.get("Campaign Name", "Unassigned")).strip().replace("’", "'").replace("‘", "'")
-        code = str(row.get("Code", "Unassigned")).strip()
-        if cname and cname.lower() not in ["nan", "none", "n/a", "", "campaign_name", "campaign name"]:
-            cname_to_codes.setdefault(cname.lower(), set()).add(code.lower())
-
-    for cname_lower, codes in cname_to_codes.items():
-        placeholders = ','.join(['?'] * len(codes))
-        conn.execute(f"DELETE FROM paysuite_classifications WHERE LOWER(campaign_name) = ? AND LOWER(code) NOT IN ({placeholders})", [cname_lower] + list(codes))
-
+    insert_rows = []
     for _, row in matrix_df.iterrows():
         cname = str(row.get("Campaign Name", "Unassigned")).strip().replace("’", "'").replace("‘", "'")
         code = str(row.get("Code", "Unassigned")).strip()
         if not cname or cname.lower() in ["nan", "none", "n/a", "", "campaign_name", "campaign name"]:
             continue
+        cname_to_codes.setdefault(cname.lower(), set()).add(code.lower())
 
         d_name = str(row.get("Donor Name") or "").strip()
         d_email = str(row.get("Donor Email") or "").strip()
 
-        # If donor name or email is blank in the incoming row, preserve existing values from DB
-        if not d_name or not d_email or d_name.lower() == 'n/a' or d_email.lower() == 'n/a':
-            cur = conn.execute("SELECT donor_name, donor_email FROM paysuite_classifications WHERE LOWER(campaign_name) = ? AND donor_name != '' AND donor_name != 'N/A' LIMIT 1", (cname.lower(),))
-            res = cur.fetchone()
-            if res:
-                if (not d_name or d_name.lower() == 'n/a') and res[0]:
-                    d_name = res[0]
-                if (not d_email or d_email.lower() == 'n/a') and res[1]:
-                    d_email = res[1]
-
-        conn.execute("DELETE FROM paysuite_classifications WHERE LOWER(campaign_name) = ? AND LOWER(code) = ?", (cname.lower(), code.lower()))
-        conn.execute("""
-            INSERT INTO paysuite_classifications (campaign_name, code, community_name, heading, sub_heading, country, zakat_eligibility, donor_name, donor_email, is_primary)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (
+        insert_rows.append((
             cname,
             code,
             str(row.get("Community Name", "N/A")),
@@ -1057,8 +1046,38 @@ def save_paysuite_classification_matrix(matrix_df):
             d_email,
             1 if row.get("is_primary") in [1, True, "1", "true", "True"] else 0
         ))
-    conn.commit()
-    conn.close()
+
+    import time
+    for attempt in range(5):
+        try:
+            with _DB_LOCK:
+                conn = get_db_connection(timeout=60.0)
+                with conn:
+                    for cname_lower, codes in cname_to_codes.items():
+                        placeholders = ','.join(['?'] * len(codes))
+                        conn.execute(f"DELETE FROM paysuite_classifications WHERE LOWER(campaign_name) = ? AND LOWER(code) NOT IN ({placeholders})", [cname_lower] + list(codes))
+
+                    conn.executemany("""
+                        INSERT INTO paysuite_classifications (campaign_name, code, community_name, heading, sub_heading, country, zakat_eligibility, donor_name, donor_email, is_primary)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        ON CONFLICT(campaign_name, code) DO UPDATE SET
+                            community_name = excluded.community_name,
+                            heading = excluded.heading,
+                            sub_heading = excluded.sub_heading,
+                            country = excluded.country,
+                            zakat_eligibility = excluded.zakat_eligibility,
+                            donor_name = CASE WHEN excluded.donor_name != '' AND excluded.donor_name != 'N/A' THEN excluded.donor_name ELSE paysuite_classifications.donor_name END,
+                            donor_email = CASE WHEN excluded.donor_email != '' AND excluded.donor_email != 'N/A' THEN excluded.donor_email ELSE paysuite_classifications.donor_email END,
+                            is_primary = excluded.is_primary
+                    """, insert_rows)
+                conn.close()
+            break
+        except sqlite3.OperationalError as e:
+            if "locked" in str(e).lower() and attempt < 4:
+                time.sleep(0.3 * (attempt + 1))
+                continue
+            raise
+
     return len(matrix_df)
 
 
@@ -1123,31 +1142,14 @@ def save_rethink_website_classification_matrix(matrix_df):
     init_classification_db()
     if matrix_df.empty:
         return 0
-    conn = sqlite3.connect(LOCAL_DB_PATH, timeout=30.0)
 
-    # 1. Reconcile codes per campaign: remove any codes in DB that are NOT in the submitted matrix for these campaigns
-    cname_to_codes = {}
-    for _, row in matrix_df.iterrows():
-        cname = str(row.get("Campaign Name", "Unassigned")).strip().replace("’", "'").replace("‘", "'")
-        code = str(row.get("Code", "Unassigned")).strip()
-        if cname and cname.lower() not in ["nan", "none", "n/a", "", "campaign_name", "campaign name"]:
-            cname_to_codes.setdefault(cname.lower(), set()).add(code.lower())
-
-    for cname_lower, codes in cname_to_codes.items():
-        placeholders = ','.join(['?'] * len(codes))
-        conn.execute(f"DELETE FROM rethink_website_classifications WHERE LOWER(campaign_name) = ? AND LOWER(code) NOT IN ({placeholders})", [cname_lower] + list(codes))
-
+    insert_rows = []
     for _, row in matrix_df.iterrows():
         cname = str(row.get("Campaign Name", "Unassigned")).strip().replace("’", "'").replace("‘", "'")
         code = str(row.get("Code", "Unassigned")).strip()
         if not cname or cname.lower() in ["nan", "none", "n/a", "", "campaign_name", "campaign name"]:
             continue
-
-        conn.execute("DELETE FROM rethink_website_classifications WHERE LOWER(campaign_name) = ? AND LOWER(code) = ?", (cname.lower(), code.lower()))
-        conn.execute("""
-            INSERT INTO rethink_website_classifications (campaign_name, code, community_name, heading, sub_heading, country, zakat_eligibility, is_primary)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """, (
+        insert_rows.append((
             cname,
             code,
             str(row.get("Community Name", "N/A")),
@@ -1157,8 +1159,32 @@ def save_rethink_website_classification_matrix(matrix_df):
             str(row.get("Zakat Eligibility", "Unassigned")),
             1 if row.get("is_primary") in [1, True, "1", "true", "True"] else 0
         ))
-    conn.commit()
-    conn.close()
+
+    import time
+    for attempt in range(5):
+        try:
+            with _DB_LOCK:
+                conn = get_db_connection(timeout=60.0)
+                with conn:
+                    conn.executemany("""
+                        INSERT INTO rethink_website_classifications (campaign_name, code, community_name, heading, sub_heading, country, zakat_eligibility, is_primary)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                        ON CONFLICT(campaign_name, code) DO UPDATE SET
+                            community_name = excluded.community_name,
+                            heading = excluded.heading,
+                            sub_heading = excluded.sub_heading,
+                            country = excluded.country,
+                            zakat_eligibility = excluded.zakat_eligibility,
+                            is_primary = excluded.is_primary
+                    """, insert_rows)
+                conn.close()
+            break
+        except sqlite3.OperationalError as e:
+            if "locked" in str(e).lower() and attempt < 4:
+                time.sleep(0.3 * (attempt + 1))
+                continue
+            raise
+
     return len(matrix_df)
 
 
@@ -2470,32 +2496,17 @@ def save_givebright_classification_matrix(matrix_df):
     if matrix_df.empty:
         return 0
 
-    conn = sqlite3.connect(LOCAL_DB_PATH, timeout=30.0)
-
-    # 1. Reconcile codes per campaign
     cname_to_codes = {}
-    for _, row in matrix_df.iterrows():
-        cname = str(row.get("Campaign Name", "Unassigned")).strip().replace("’", "'").replace("‘", "'")
-        code = str(row.get("Code", "Unassigned")).strip()
-        if cname and cname.lower() not in ["nan", "none", "n/a", "", "campaign_name", "campaign name"]:
-            cname_to_codes.setdefault(cname.lower(), set()).add(code.lower())
-
-    for cname_lower, codes in cname_to_codes.items():
-        placeholders = ','.join(['?'] * len(codes))
-        conn.execute(f"DELETE FROM givebright_classifications WHERE LOWER(campaign_name) = ? AND LOWER(code) NOT IN ({placeholders})", [cname_lower] + list(codes))
-
+    insert_rows = []
     for _, row in matrix_df.iterrows():
         cname = str(row.get("Campaign Name", "Unassigned")).strip().replace("’", "'").replace("‘", "'")
         code = str(row.get("Code", "Unassigned")).strip()
         curl = str(row.get("Campaign URL") or row.get("campaign_url") or "")
         if not cname or cname.lower() in ["nan", "none", "n/a", "", "campaign_name", "campaign name"]:
             continue
+        cname_to_codes.setdefault(cname.lower(), set()).add(code.lower())
 
-        conn.execute("DELETE FROM givebright_classifications WHERE LOWER(campaign_name) = ? AND LOWER(code) = ?", (cname.lower(), code.lower()))
-        conn.execute("""
-            INSERT INTO givebright_classifications (campaign_name, code, campaign_url, heading, sub_heading, country, zakat_eligibility, is_primary)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """, (
+        insert_rows.append((
             cname,
             code,
             curl,
@@ -2505,8 +2516,35 @@ def save_givebright_classification_matrix(matrix_df):
             str(row.get("Zakat Eligibility", "Unassigned")),
             1 if row.get("is_primary") in [1, True, "1", "true", "True"] else 0
         ))
-    conn.commit()
-    conn.close()
+
+    import time
+    for attempt in range(5):
+        try:
+            with _DB_LOCK:
+                conn = get_db_connection(timeout=60.0)
+                with conn:
+                    for cname_lower, codes in cname_to_codes.items():
+                        placeholders = ','.join(['?'] * len(codes))
+                        conn.execute(f"DELETE FROM givebright_classifications WHERE LOWER(campaign_name) = ? AND LOWER(code) NOT IN ({placeholders})", [cname_lower] + list(codes))
+
+                    conn.executemany("""
+                        INSERT INTO givebright_classifications (campaign_name, code, campaign_url, heading, sub_heading, country, zakat_eligibility, is_primary)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                        ON CONFLICT(campaign_name, code) DO UPDATE SET
+                            campaign_url = excluded.campaign_url,
+                            heading = excluded.heading,
+                            sub_heading = excluded.sub_heading,
+                            country = excluded.country,
+                            zakat_eligibility = excluded.zakat_eligibility,
+                            is_primary = excluded.is_primary
+                    """, insert_rows)
+                conn.close()
+            break
+        except sqlite3.OperationalError as e:
+            if "locked" in str(e).lower() and attempt < 4:
+                time.sleep(0.3 * (attempt + 1))
+                continue
+            raise
 
     # Re-apply to active dataset in Parquet and SQLite using sync_matrix_classifications_to_donors
     sync_matrix_classifications_to_donors(matrix_df)

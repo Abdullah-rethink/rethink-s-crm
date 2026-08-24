@@ -8,6 +8,7 @@ from fastapi import APIRouter, File, Form, HTTPException, Query, Response, Uploa
 from pydantic import BaseModel
 
 from config.settings import LOCAL_DB_PATH, PARQUET_PATH
+from core.database import get_db_connection, _DB_LOCK
 from core.data_processor import (
     get_classification_matrix,
     load_data,
@@ -545,21 +546,23 @@ def delete_single_rule(payload: DeleteRuleRequest):
     code = sanitize_text(payload.code.strip()) if payload.code else None
     platform = payload.platform.lower()
 
-    conn = sqlite3.connect(LOCAL_DB_PATH, timeout=30.0)
-    try:
-        tbl = (
-            "givebright_classifications" if platform == "givebright" else
-            "paysuite_classifications" if platform == "paysuite" else
-            "rethink_website_classifications" if platform in ["website", "rethink_website", "rethink website"] else
-            "campaign_classifications"
-        )
-        if code:
-            conn.execute(f"DELETE FROM {tbl} WHERE campaign_name = ? AND code = ?", (cname, code))
-        else:
-            conn.execute(f"DELETE FROM {tbl} WHERE campaign_name = ?", (cname,))
-        conn.commit()
-    finally:
-        conn.close()
+    tbl = (
+        "givebright_classifications" if platform == "givebright" else
+        "paysuite_classifications" if platform == "paysuite" else
+        "rethink_website_classifications" if platform in ["website", "rethink_website", "rethink website"] else
+        "campaign_classifications"
+    )
+
+    with _DB_LOCK:
+        conn = get_db_connection(timeout=60.0)
+        try:
+            with conn:
+                if code:
+                    conn.execute(f"DELETE FROM {tbl} WHERE campaign_name = ? AND code = ?", (cname, code))
+                else:
+                    conn.execute(f"DELETE FROM {tbl} WHERE campaign_name = ?", (cname,))
+        finally:
+            conn.close()
 
     # Reset donor records matching this rule to Unassigned
     if os.path.exists(PARQUET_PATH):
