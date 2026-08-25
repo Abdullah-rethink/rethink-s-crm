@@ -377,10 +377,9 @@ def get_donors_paginated(
 ):
     """
     Ultra-fast SQL Paginated Endpoint (< 100ms) with multi-Donation ID and universal text search.
+    Strictly queries donations data without payout records.
     """
-    # Determine target table based on source filter
-    is_payout_query = bool(source and str(source).strip().lower() in ["launchgood payout", "payout", "payouts"])
-    target_table = "payout_settlements" if is_payout_query else "donations"
+    target_table = "donations"
 
     try:
         conn = sqlite3.connect(LOCAL_DB_PATH, timeout=10.0)
@@ -396,6 +395,11 @@ def get_donors_paginated(
             where_clauses = []
             params = []
 
+            # Exclude any accidental payout settlement records from Data Explorer
+            if "Platform" in avail_cols:
+                where_clauses.append('LOWER("Platform") != ?')
+                params.append("launchgood payout")
+
             if payment_type and payment_type != "All Payment Types" and "Payment Frequency" in avail_cols:
                 norm_type = payment_type.strip()
                 if norm_type.lower() in ["one-time", "one-time payment"]:
@@ -410,9 +414,8 @@ def get_donors_paginated(
                 params.append(tier.strip())
 
             if source and source != "All Sources (Combined)":
-                sources_list = [s.strip().lower() for s in source.split(",") if s.strip()]
-                # If specifically querying payout_settlements, do not filter out rows if Platform contains LaunchGood Payout
-                if not is_payout_query and sources_list:
+                sources_list = [s.strip().lower() for s in source.split(",") if s.strip() and s.strip().lower() not in ["launchgood payout", "payout", "payouts"]]
+                if sources_list:
                     p_holders = ','.join(['?'] * len(sources_list))
                     src_clauses = []
                     sub_params = []
@@ -603,11 +606,13 @@ def export_donors(
     start_date: Optional[str] = None,
     end_date: Optional[str] = None
 ):
-    """Exports filtered donor/payout rows with date range, multi-Donation ID, and universal search support."""
-    is_payout_export = bool(source and str(source).strip().lower() in ["launchgood payout", "payout", "payouts"])
-    df_raw = load_payouts_data() if is_payout_export else load_data()
+    """Exports filtered donor rows with date range, multi-Donation ID, and universal search support."""
+    df_raw = load_data()
     if df_raw.empty:
         raise HTTPException(status_code=400, detail="No donor data available to export.")
+
+    if "Platform" in df_raw.columns:
+        df_raw = df_raw[~df_raw["Platform"].astype(str).str.lower().isin(["launchgood payout", "payout", "payouts"])]
 
     filtered_df = _apply_filters(
         df_raw,

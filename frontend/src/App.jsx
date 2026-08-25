@@ -248,7 +248,7 @@ export default function App() {
               {activeTab === 'kanban' && <KanbanBoard key={dataVersion} filters={filters} onSelectDonor={setSelectedDonor} />}
               {activeTab === 'explorer' && <ExplorerView key={dataVersion} user={user} filters={filters} onSelectDonor={setSelectedDonor} onDataChange={handleDataChange} />}
               {activeTab === 'fundraisers' && <FundraiserView key={dataVersion} user={user} accentColor={accentColor} />}
-              {activeTab === 'payouts' && <PayoutsView key={dataVersion} user={user} accentColor={accentColor} />}
+              {activeTab === 'payouts' && <PayoutsView key={dataVersion} user={user} accentColor={accentColor} onDataChange={handleDataChange} />}
               {activeTab === 'tracker' && <TrackerView key={dataVersion} user={user} filters={filters} onSelectDonor={setSelectedDonor} accentColor={accentColor} />}
               {activeTab === 'classifications' && <ClassificationView key={dataVersion} user={user} onDataChange={handleDataChange} />}
               {activeTab === 'expenses' && <ExpenseView key={dataVersion} user={user} />}

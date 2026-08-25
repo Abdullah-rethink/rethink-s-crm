@@ -21,11 +21,20 @@ import {
   Minimize2,
   Tag,
   Download,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Edit3,
+  Check,
+  Save,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
+  Globe,
+  Zap,
+  Sliders
 } from 'lucide-react';
 import { API_BASE_URL } from '../config';
 
-export default function PayoutsView({ user, accentColor }) {
+export default function PayoutsView({ user, accentColor, onDataChange }) {
   const currency = 'GBP'; // Unified GBP (£) settlement
   const [summary, setSummary] = useState({
     total_gross: 0,
@@ -40,10 +49,25 @@ export default function PayoutsView({ user, accentColor }) {
   
   const [batchesData, setBatchesData] = useState({ total_batches: 0, page: 1, page_size: 25, total_pages: 1, batches: [] });
   const [selectedBatch, setSelectedBatch] = useState('ALL'); // 'ALL' or specific transfer_id
+  
+  // Breakdown Data
   const [campaignData, setCampaignData] = useState([]);
   const [codeGroups, setCodeGroups] = useState([]);
+  const [headingGroups, setHeadingGroups] = useState([]);
+  const [countryGroups, setCountryGroups] = useState([]);
+
+  // Expanded Groups State
   const [expandedCodes, setExpandedCodes] = useState({});
-  const [breakdownViewMode, setBreakdownViewMode] = useState('code_groups'); // 'code_groups' or 'flat'
+  const [expandedHeadings, setExpandedHeadings] = useState({});
+  const [expandedCountries, setExpandedCountries] = useState({});
+
+  // Breakdown View Mode: 'code_groups' | 'heading_groups' | 'country_groups' | 'flat'
+  const [breakdownViewMode, setBreakdownViewMode] = useState('code_groups');
+  
+  // Sorting State
+  const [sortBy, setSortBy] = useState('gross_amount');
+  const [sortOrder, setSortOrder] = useState('desc');
+
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
   const [activeTab, setActiveTab] = useState('disbursement'); // 'disbursement', 'batches', 'campaigns', 'ledger'
@@ -53,13 +77,27 @@ export default function PayoutsView({ user, accentColor }) {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
 
-  // Code Breakdown Pagination State
+  // Pagination State for each breakdown mode
   const [codePage, setCodePage] = useState(1);
   const [codePageSize, setCodePageSize] = useState(25);
 
-  // Flat Campaign Breakdown Pagination State
+  const [headingPage, setHeadingPage] = useState(1);
+  const [headingPageSize, setHeadingPageSize] = useState(25);
+
+  const [countryPage, setCountryPage] = useState(1);
+  const [countryPageSize, setCountryPageSize] = useState(25);
+
   const [campPage, setCampPage] = useState(1);
   const [campPageSize, setCampPageSize] = useState(25);
+
+  // Classification Edit State & Code Map Lookup
+  const [codeMap, setCodeMap] = useState({});
+  const [editingClassification, setEditingClassification] = useState(null); // { campaign_name, code, heading, sub_heading, country, zakat_eligibility }
+  const [editSaving, setEditSaving] = useState(false);
+  const [editMsg, setEditMsg] = useState('');
+  
+  // Real-time Save Toast Notification
+  const [saveNotification, setSaveNotification] = useState(null);
 
   // Purge Payout Modal State
   const [showPurgeModal, setShowPurgeModal] = useState(false);
@@ -68,15 +106,34 @@ export default function PayoutsView({ user, accentColor }) {
   const [purgeMsg, setPurgeMsg] = useState('');
 
   const isSuperAdmin = user?.role === 'super_admin';
+  const canEdit = user?.role === 'super_admin' || user?.role === 'admin' || user?.can_edit_donors === 1;
   const currSymbol = '£';
 
-  // 300ms Debounce on Search Input to prevent server flooding
+  // Load Code Map on Mount
+  useEffect(() => {
+    fetch(`${API_BASE_URL}/api/classifications/code-map`)
+      .then(r => r.json())
+      .then(data => {
+        if (data && typeof data === 'object') setCodeMap(data);
+      })
+      .catch(err => console.error('Error fetching code-map for payouts:', err));
+  }, []);
+
+  // 300ms Debounce on Search Input
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearch(search);
     }, 300);
     return () => clearTimeout(timer);
   }, [search]);
+
+  // Auto-dismiss toast notification after 7s
+  useEffect(() => {
+    if (saveNotification) {
+      const timer = setTimeout(() => setSaveNotification(null), 7000);
+      return () => clearTimeout(timer);
+    }
+  }, [saveNotification]);
 
   const fetchPayoutData = (searchQuery = debouncedSearch, batchVal = selectedBatch) => {
     setLoading(true);
@@ -98,6 +155,8 @@ export default function PayoutsView({ user, accentColor }) {
         setBatchesData(batchRes);
         setCampaignData(campRes.campaigns || []);
         setCodeGroups(campRes.code_groups || []);
+        setHeadingGroups(campRes.heading_groups || []);
+        setCountryGroups(campRes.country_groups || []);
         setLoading(false);
       })
       .catch(err => {
@@ -116,21 +175,145 @@ export default function PayoutsView({ user, accentColor }) {
     }
   };
 
+  // Expand / Collapse Toggles
   const toggleCodeExpand = (code) => {
-    setExpandedCodes(prev => ({
-      ...prev,
-      [code]: !prev[code]
-    }));
+    setExpandedCodes(prev => ({ ...prev, [code]: !prev[code] }));
   };
 
-  const expandAllCodes = () => {
-    const allExp = {};
-    codeGroups.forEach(cg => { allExp[cg.code] = true; });
-    setExpandedCodes(allExp);
+  const toggleHeadingExpand = (heading) => {
+    setExpandedHeadings(prev => ({ ...prev, [heading]: !prev[heading] }));
   };
 
-  const collapseAllCodes = () => {
-    setExpandedCodes({});
+  const toggleCountryExpand = (country) => {
+    setExpandedCountries(prev => ({ ...prev, [country]: !prev[country] }));
+  };
+
+  const expandAll = () => {
+    if (breakdownViewMode === 'code_groups') {
+      const allExp = {};
+      codeGroups.forEach(cg => { allExp[cg.code] = true; });
+      setExpandedCodes(allExp);
+    } else if (breakdownViewMode === 'heading_groups') {
+      const allExp = {};
+      headingGroups.forEach(hg => { allExp[hg.heading] = true; });
+      setExpandedHeadings(allExp);
+    } else if (breakdownViewMode === 'country_groups') {
+      const allExp = {};
+      countryGroups.forEach(ctg => { allExp[ctg.country] = true; });
+      setExpandedCountries(allExp);
+    }
+  };
+
+  const collapseAll = () => {
+    if (breakdownViewMode === 'code_groups') setExpandedCodes({});
+    else if (breakdownViewMode === 'heading_groups') setExpandedHeadings({});
+    else if (breakdownViewMode === 'country_groups') setExpandedCountries({});
+  };
+
+  // Sort Handler
+  const handleSort = (columnKey) => {
+    if (sortBy === columnKey) {
+      setSortOrder(prev => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortBy(columnKey);
+      setSortOrder('desc');
+    }
+  };
+
+  // Sort Helper for arrays
+  const sortItems = (items) => {
+    if (!items || items.length === 0) return [];
+    return [...items].sort((a, b) => {
+      let valA = a[sortBy];
+      let valB = b[sortBy];
+
+      if (valA === undefined || valA === null) valA = '';
+      if (valB === undefined || valB === null) valB = '';
+
+      if (typeof valA === 'number' && typeof valB === 'number') {
+        return sortOrder === 'asc' ? valA - valB : valB - valA;
+      }
+      return sortOrder === 'asc' 
+        ? String(valA).localeCompare(String(valB)) 
+        : String(valB).localeCompare(String(valA));
+    });
+  };
+
+  // Open Edit Classification Modal for Campaign
+  const handleOpenEditModal = (camp) => {
+    setEditingClassification({
+      campaign_name: camp.campaign_name || '',
+      code: camp.code || '',
+      heading: camp.heading || '',
+      sub_heading: camp.sub_heading || '',
+      country: camp.country || '',
+      zakat_eligibility: camp.zakat || camp.zakat_eligibility || 'Unassigned'
+    });
+    setEditMsg('');
+  };
+
+  // Handle Quick Code Pick within Edit Modal
+  const handleSelectCodeInModal = (newCode) => {
+    const cleanCode = String(newCode).trim().toUpperCase();
+    const mapped = codeMap[cleanCode.toLowerCase()];
+    if (mapped) {
+      setEditingClassification(prev => ({
+        ...prev,
+        code: cleanCode,
+        heading: mapped.Heading || prev.heading,
+        sub_heading: mapped['Sub-Heading'] || prev.sub_heading,
+        country: mapped.Country || prev.country,
+        zakat_eligibility: mapped['Zakat Eligibility'] || prev.zakat_eligibility
+      }));
+    } else {
+      setEditingClassification(prev => ({ ...prev, code: cleanCode }));
+    }
+  };
+
+  // Save Classification Handler with Real-time Sync
+  const handleSaveClassification = async () => {
+    if (!canEdit || !editingClassification) return;
+    setEditSaving(true);
+    setEditMsg('');
+
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/payouts/update-classification`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_role: user?.role || 'admin',
+          campaign_name: editingClassification.campaign_name,
+          code: editingClassification.code,
+          heading: editingClassification.heading,
+          sub_heading: editingClassification.sub_heading,
+          country: editingClassification.country,
+          zakat_eligibility: editingClassification.zakat_eligibility,
+          can_edit: true
+        })
+      });
+
+      const data = await res.json();
+      setEditSaving(false);
+
+      if (res.ok && data.status === 'success') {
+        setSaveNotification({
+          type: 'success',
+          title: 'Classification Synchronized',
+          message: data.message,
+          timestamp: new Date().toLocaleTimeString()
+        });
+        setEditingClassification(null);
+        fetchPayoutData(debouncedSearch, selectedBatch);
+        if (typeof onDataChange === 'function') {
+          onDataChange();
+        }
+      } else {
+        setEditMsg(data.detail || data.message || 'Failed to update classification.');
+      }
+    } catch (err) {
+      setEditSaving(false);
+      setEditMsg(`Network error: ${err.message}`);
+    }
   };
 
   const handlePurgePayouts = () => {
@@ -161,6 +344,7 @@ export default function PayoutsView({ user, accentColor }) {
             setPurgeConfirm(false);
             setPurgeMsg('');
             fetchPayoutData();
+            if (typeof onDataChange === 'function') onDataChange();
           }, 1500);
         } else {
           setPurgeMsg(`❌ ${res?.detail || 'Failed to purge payout data.'}`);
@@ -197,28 +381,70 @@ export default function PayoutsView({ user, accentColor }) {
     }
   };
 
-  // Code Breakdown Pagination Calculations (Directly Synced with Backend Data)
-  const effectiveCodePageSize = codePageSize === 'All' ? Math.max(1, codeGroups.length) : Number(codePageSize);
-  const totalCodePages = Math.max(1, Math.ceil(codeGroups.length / effectiveCodePageSize));
+  // Sorted and Paginated Data for all 4 View Modes
+  const sortedCodes = useMemo(() => sortItems(codeGroups), [codeGroups, sortBy, sortOrder]);
+  const effectiveCodePageSize = codePageSize === 'All' ? Math.max(1, sortedCodes.length) : Number(codePageSize);
+  const totalCodePages = Math.max(1, Math.ceil(sortedCodes.length / effectiveCodePageSize));
   const safeCodePage = Math.min(Math.max(1, codePage), totalCodePages);
-
   const paginatedCodes = codePageSize === 'All' 
-    ? codeGroups 
-    : codeGroups.slice((safeCodePage - 1) * effectiveCodePageSize, safeCodePage * effectiveCodePageSize);
+    ? sortedCodes 
+    : sortedCodes.slice((safeCodePage - 1) * effectiveCodePageSize, safeCodePage * effectiveCodePageSize);
 
-  // Campaign Breakdown Pagination Calculations (Directly Synced with Backend Data)
-  const effectiveCampPageSize = campPageSize === 'All' ? Math.max(1, campaignData.length) : Number(campPageSize);
-  const totalCampPages = Math.max(1, Math.ceil(campaignData.length / effectiveCampPageSize));
+  const sortedHeadings = useMemo(() => sortItems(headingGroups), [headingGroups, sortBy, sortOrder]);
+  const effectiveHeadingPageSize = headingPageSize === 'All' ? Math.max(1, sortedHeadings.length) : Number(headingPageSize);
+  const totalHeadingPages = Math.max(1, Math.ceil(sortedHeadings.length / effectiveHeadingPageSize));
+  const safeHeadingPage = Math.min(Math.max(1, headingPage), totalHeadingPages);
+  const paginatedHeadings = headingPageSize === 'All'
+    ? sortedHeadings
+    : sortedHeadings.slice((safeHeadingPage - 1) * effectiveHeadingPageSize, safeHeadingPage * effectiveHeadingPageSize);
+
+  const sortedCountries = useMemo(() => sortItems(countryGroups), [countryGroups, sortBy, sortOrder]);
+  const effectiveCountryPageSize = countryPageSize === 'All' ? Math.max(1, sortedCountries.length) : Number(countryPageSize);
+  const totalCountryPages = Math.max(1, Math.ceil(sortedCountries.length / effectiveCountryPageSize));
+  const safeCountryPage = Math.min(Math.max(1, countryPage), totalCountryPages);
+  const paginatedCountries = countryPageSize === 'All'
+    ? sortedCountries
+    : sortedCountries.slice((safeCountryPage - 1) * effectiveCountryPageSize, safeCountryPage * effectiveCountryPageSize);
+
+  const sortedCampaigns = useMemo(() => sortItems(campaignData), [campaignData, sortBy, sortOrder]);
+  const effectiveCampPageSize = campPageSize === 'All' ? Math.max(1, sortedCampaigns.length) : Number(campPageSize);
+  const totalCampPages = Math.max(1, Math.ceil(sortedCampaigns.length / effectiveCampPageSize));
   const safeCampPage = Math.min(Math.max(1, campPage), totalCampPages);
-
   const paginatedCampaigns = campPageSize === 'All' 
-    ? campaignData 
-    : campaignData.slice((safeCampPage - 1) * effectiveCampPageSize, safeCampPage * effectiveCampPageSize);
+    ? sortedCampaigns 
+    : sortedCampaigns.slice((safeCampPage - 1) * effectiveCampPageSize, safeCampPage * effectiveCampPageSize);
 
   const disb = summary.disbursement_summary || {};
 
   return (
-    <div className="flex flex-col gap-6 animate-fade-in pb-16">
+    <div className="flex flex-col gap-6 animate-fade-in pb-16 relative">
+      
+      {/* Floating Save & Sync Notification Toast */}
+      {saveNotification && (
+        <div className="fixed top-6 right-6 z-[9999] flex items-start gap-3 p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 shadow-2xl backdrop-blur-xl animate-fade-in max-w-md">
+          <div className={`p-2 rounded-xl shrink-0 ${saveNotification.type === 'success' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-rose-500/10 text-rose-500'}`}>
+            {saveNotification.type === 'success' ? <CheckCircle className="w-5 h-5" /> : <AlertCircle className="w-5 h-5" />}
+          </div>
+          <div className="flex-1 min-w-0">
+            <h4 className="text-xs font-black uppercase tracking-wider text-slate-800 dark:text-white">
+              {saveNotification.title}
+            </h4>
+            <p className="text-xs text-slate-600 dark:text-slate-300 mt-0.5">
+              {saveNotification.message}
+            </p>
+            <span className="text-[10px] text-slate-400 font-mono mt-1 block">
+              {saveNotification.timestamp}
+            </span>
+          </div>
+          <button 
+            onClick={() => setSaveNotification(null)}
+            className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
       {/* Header & Control Bar */}
       <div className="flex flex-wrap items-center justify-between gap-4 pb-2 border-b border-slate-200 dark:border-white/10">
         <div className="flex items-center gap-3">
@@ -425,7 +651,7 @@ export default function PayoutsView({ user, accentColor }) {
       {/* Sub-Tab Navigation & Search Bar */}
       <div className="flex flex-wrap items-center justify-between gap-4 p-4 rounded-2xl border border-slate-200 dark:border-white/10 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl shadow-sm">
         {/* Tab Buttons */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <button 
             onClick={() => setActiveTab('disbursement')}
             className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
@@ -485,6 +711,9 @@ export default function PayoutsView({ user, accentColor }) {
             onChange={(e) => {
               setSearch(e.target.value);
               setCurrentPage(1);
+              setCodePage(1);
+              setHeadingPage(1);
+              setCountryPage(1);
               setCampPage(1);
             }}
             className="w-full pl-9 pr-4 py-2 text-xs rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-800/60 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
@@ -665,20 +894,21 @@ export default function PayoutsView({ user, accentColor }) {
                     <td className="p-3.5 text-center font-mono text-slate-600 dark:text-slate-400">
                       {Number(disb.foreign_exchange_count || 0)}
                     </td>
-                    <td className={`p-3.5 pr-6 text-right font-mono font-bold ${Number(disb.foreign_exchange || 0) < 0 ? 'text-rose-600 dark:text-rose-400' : 'text-cyan-600 dark:text-cyan-400'}`}>
+                    <td className="p-3.5 pr-6 text-right font-mono font-bold text-slate-900 dark:text-white">
                       {currSymbol}{Number(disb.foreign_exchange || 0).toLocaleString('en-GB', { minimumFractionDigits: 2 })}
                     </td>
                   </tr>
 
-                  {/* Total Disbursement Final Highlight */}
-                  <tr className="bg-emerald-50/80 dark:bg-emerald-950/40 border-t-2 border-emerald-500/40">
-                    <td className="p-4 pl-6 text-emerald-900 dark:text-emerald-200 font-black text-sm uppercase tracking-wider">
-                      Total Disbursement
+                  {/* Total Disbursement Highlight Row */}
+                  <tr className="bg-emerald-500/10 font-black border-t-2 border-emerald-500/30">
+                    <td className="p-3.5 pl-6 text-emerald-800 dark:text-emerald-300 uppercase tracking-wider text-[11px] flex items-center gap-2">
+                      <CheckCircle className="w-4 h-4 text-emerald-500" />
+                      <span>Total Disbursement</span>
                     </td>
-                    <td className="p-4 text-center font-mono font-bold text-emerald-800 dark:text-emerald-300">
-                      {Number(disb.total_disbursement_count || 0)} batches
+                    <td className="p-3.5 text-center font-mono text-emerald-800 dark:text-emerald-300">
+                      {Number(disb.total_disbursement_count || 0).toLocaleString()}
                     </td>
-                    <td className="p-4 pr-6 text-right font-mono font-black text-emerald-600 dark:text-emerald-400 text-base">
+                    <td className="p-3.5 pr-6 text-right font-mono text-emerald-600 dark:text-emerald-400 text-base font-black">
                       {currSymbol}{Number(disb.total_disbursement || 0).toLocaleString('en-GB', { minimumFractionDigits: 2 })}
                     </td>
                   </tr>
@@ -688,86 +918,76 @@ export default function PayoutsView({ user, accentColor }) {
           </div>
         </div>
       ) : activeTab === 'batches' ? (
-        /* Tab 1: Payout Transfer Batches Table */
+        /* Tab 1: Payout Batches Table */
         <div className="flex flex-col gap-4">
           <div className="rounded-2xl border border-slate-200 dark:border-white/10 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl shadow-sm overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="bg-slate-100/70 dark:bg-slate-800/60 text-[11px] uppercase font-bold text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-white/10">
-                    <th className="p-3.5 pl-5">Transfer ID</th>
-                    <th className="p-3.5">Date</th>
-                    <th className="p-3.5">Campaigns</th>
-                    <th className="p-3.5">Donations</th>
-                    <th className="p-3.5">Gross Amount</th>
-                    <th className="p-3.5">Processing Fees</th>
-                    <th className="p-3.5">Net Payout</th>
-                    <th className="p-3.5 pr-5 text-right">Actions</th>
+                    <th className="p-3.5 pl-6">Transfer ID / Batch</th>
+                    <th className="p-3.5">Settlement Date</th>
+                    <th className="p-3.5 text-center">Campaigns</th>
+                    <th className="p-3.5 text-center">Donations</th>
+                    <th className="p-3.5">Gross Settlement</th>
+                    <th className="p-3.5">Fees Deducted</th>
+                    <th className="p-3.5 pr-6">Net Bank Payout</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200 dark:divide-white/5 text-xs text-slate-800 dark:text-slate-200 font-medium">
-                  {batchesData.batches.filter(b => b.transfer_id && !['N/A', 'nan', 'none', ''].includes(String(b.transfer_id).toLowerCase())).length === 0 ? (
+                  {batchesData.batches.length === 0 ? (
                     <tr>
-                      <td colSpan="8" className="p-8 text-center text-slate-500 dark:text-slate-400 font-semibold">
-                        No payout transfer batches found.
+                      <td colSpan="7" className="p-8 text-center text-slate-500 dark:text-slate-400 font-semibold">
+                        No payout batches found matching your search.
                       </td>
                     </tr>
                   ) : (
-                    batchesData.batches
-                      .filter(b => b.transfer_id && !['N/A', 'nan', 'none', ''].includes(String(b.transfer_id).toLowerCase()))
-                      .map((batch, idx) => {
-                        const cleanId = String(batch.transfer_id).replace('.0', '');
-                        const isSelected = selectedBatch === cleanId;
-                        return (
-                          <tr key={idx} className={`hover:bg-slate-50/60 dark:hover:bg-slate-800/40 transition-colors ${isSelected ? 'bg-emerald-50/50 dark:bg-emerald-950/20' : ''}`}>
-                            <td className="p-3.5 pl-5 font-mono font-bold text-emerald-600 dark:text-emerald-400">
-                              #{cleanId}
-                            </td>
-                            <td className="p-3.5 font-medium text-slate-600 dark:text-slate-400">
-                              {batch.created_date}
-                            </td>
-                            <td className="p-3.5">
-                              <span className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
-                                {batch.campaigns_count} campaigns
+                    batchesData.batches.map((batch, idx) => {
+                      const cleanId = String(batch.transfer_id).replace('.0', '');
+                      const isSelected = selectedBatch === cleanId;
+                      return (
+                        <tr 
+                          key={idx} 
+                          className={`transition-colors cursor-pointer ${
+                            isSelected 
+                              ? 'bg-emerald-500/10 hover:bg-emerald-500/15' 
+                              : 'hover:bg-slate-50/60 dark:hover:bg-slate-800/40'
+                          }`}
+                          onClick={() => setSelectedBatch(cleanId)}
+                        >
+                          <td className="p-3.5 pl-6">
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono font-black text-slate-900 dark:text-white px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-white/10">
+                                #{cleanId}
                               </span>
-                            </td>
-                            <td className="p-3.5">
-                              <span className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-teal-50 text-teal-700 dark:bg-teal-950/40 dark:text-teal-300 border border-teal-500/20">
-                                {batch.donations_count} transactions
-                              </span>
-                            </td>
-                            <td className="p-3.5 font-bold text-slate-900 dark:text-white">
-                              £{Number(batch.gross_amount).toLocaleString('en-GB', { minimumFractionDigits: 2 })}
-                            </td>
-                            <td className="p-3.5 font-semibold text-rose-600 dark:text-rose-400">
-                              £{Number(batch.processing_fees).toLocaleString('en-GB', { minimumFractionDigits: 2 })}
-                            </td>
-                            <td className="p-3.5 font-extrabold text-emerald-600 dark:text-emerald-400">
-                              £{Number(batch.transfer_amount).toLocaleString('en-GB', { minimumFractionDigits: 2 })}
-                            </td>
-                            <td className="p-3.5 pr-5 text-right">
-                              {isSelected ? (
-                                <button
-                                  onClick={() => setSelectedBatch('ALL')}
-                                  className="px-3 py-1.5 rounded-xl text-[11px] font-bold bg-emerald-600 text-white shadow-sm hover:bg-emerald-500 transition-all cursor-pointer"
-                                >
-                                  Filtered (Clear)
-                                </button>
-                              ) : (
-                                <button
-                                  onClick={() => {
-                                    setSelectedBatch(cleanId);
-                                    setActiveTab('campaigns');
-                                  }}
-                                  className="px-3 py-1.5 rounded-xl text-[11px] font-bold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 hover:text-emerald-600 dark:hover:text-emerald-400 transition-all border border-slate-200 dark:border-white/10 cursor-pointer"
-                                >
-                                  View Breakdown
-                                </button>
+                              {isSelected && (
+                                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-400">
+                                  Active Filter
+                                </span>
                               )}
-                            </td>
-                          </tr>
-                        );
-                      })
+                            </div>
+                          </td>
+                          <td className="p-3.5 text-slate-600 dark:text-slate-400">
+                            {batch.created_date || 'N/A'}
+                          </td>
+                          <td className="p-3.5 text-center font-bold text-slate-700 dark:text-slate-300 font-mono">
+                            {batch.campaigns_count}
+                          </td>
+                          <td className="p-3.5 text-center font-bold text-slate-700 dark:text-slate-300 font-mono">
+                            {batch.donations_count}
+                          </td>
+                          <td className="p-3.5 font-bold text-slate-900 dark:text-white font-mono">
+                            {currSymbol}{Number(batch.gross_amount || 0).toLocaleString('en-GB', { minimumFractionDigits: 2 })}
+                          </td>
+                          <td className="p-3.5 font-semibold text-rose-600 dark:text-rose-400 font-mono">
+                            {currSymbol}{Number(batch.processing_fees || 0).toLocaleString('en-GB', { minimumFractionDigits: 2 })}
+                          </td>
+                          <td className="p-3.5 pr-6 font-black text-emerald-600 dark:text-emerald-400 font-mono text-sm">
+                            {currSymbol}{Number(batch.transfer_amount || 0).toLocaleString('en-GB', { minimumFractionDigits: 2 })}
+                          </td>
+                        </tr>
+                      );
+                    })
                   )}
                 </tbody>
               </table>
@@ -776,21 +996,21 @@ export default function PayoutsView({ user, accentColor }) {
 
           {/* Batches Pagination Footer */}
           {batchesData.total_pages > 1 && (
-            <div className="flex items-center justify-between gap-4 p-4 rounded-2xl border border-slate-200 dark:border-white/10 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl shadow-sm text-xs font-semibold">
-              <div className="text-slate-500 dark:text-slate-400">
+            <div className="flex items-center justify-between p-4 rounded-2xl border border-slate-200 dark:border-white/10 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl shadow-sm text-xs font-semibold">
+              <span className="text-slate-500 dark:text-slate-400">
                 Showing Page <span className="text-slate-900 dark:text-white font-bold">{batchesData.page}</span> of <span className="text-slate-900 dark:text-white font-bold">{batchesData.total_pages}</span> ({batchesData.total_batches} total batches)
-              </div>
+              </span>
               <div className="flex items-center gap-2">
                 <button 
-                  onClick={() => handlePageChange(batchesData.page - 1)}
-                  disabled={batchesData.page <= 1}
+                  onClick={() => handlePageChange(currentPage - 1)}
+                  disabled={currentPage <= 1}
                   className="p-2 rounded-xl border border-slate-200 dark:border-white/10 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-40 transition-all cursor-pointer"
                 >
                   <ChevronLeft className="w-4 h-4 text-slate-700 dark:text-slate-300" />
                 </button>
                 <button 
-                  onClick={() => handlePageChange(batchesData.page + 1)}
-                  disabled={batchesData.page >= batchesData.total_pages}
+                  onClick={() => handlePageChange(currentPage + 1)}
+                  disabled={currentPage >= batchesData.total_pages}
                   className="p-2 rounded-xl border border-slate-200 dark:border-white/10 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-40 transition-all cursor-pointer"
                 >
                   <ChevronRight className="w-4 h-4 text-slate-700 dark:text-slate-300" />
@@ -800,12 +1020,13 @@ export default function PayoutsView({ user, accentColor }) {
           )}
         </div>
       ) : activeTab === 'campaigns' ? (
-        /* Tab 2: Code & Campaign Fee Breakdown (Hierarchical Drilldown) */
+        /* Tab 2: Code & Campaign Breakdown (Rich Multi-Hierarchy Drilldown like Data Explorer) */
         <div className="flex flex-col gap-4">
-          {/* Sub-Header Toolbar: View Mode Switcher & Expand/Collapse */}
+          {/* Sub-Header Toolbar: View Mode Switcher, Expand/Collapse, and Sorting */}
           <div className="flex flex-wrap items-center justify-between gap-4 p-4 rounded-2xl border border-slate-200 dark:border-white/10 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl shadow-sm">
-            <div className="flex items-center gap-3">
-              <div className="flex items-center p-1 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-white/10 shadow-inner text-xs font-bold">
+            <div className="flex items-center gap-3 flex-wrap">
+              <div className="flex items-center p-1 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-white/10 shadow-inner text-xs font-bold flex-wrap">
+                {/* 1. Group by Code */}
                 <button
                   onClick={() => setBreakdownViewMode('code_groups')}
                   className={`px-3.5 py-1.5 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
@@ -815,8 +1036,36 @@ export default function PayoutsView({ user, accentColor }) {
                   }`}
                 >
                   <FolderOpen className="w-3.5 h-3.5" />
-                  <span>Group by Classification Code ({codeGroups.length})</span>
+                  <span>Group by Code ({codeGroups.length})</span>
                 </button>
+
+                {/* 2. Group by Heading */}
+                <button
+                  onClick={() => setBreakdownViewMode('heading_groups')}
+                  className={`px-3.5 py-1.5 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
+                    breakdownViewMode === 'heading_groups'
+                      ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-sm shadow-emerald-500/20'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                  }`}
+                >
+                  <Tag className="w-3.5 h-3.5" />
+                  <span>Group by Heading ({headingGroups.length})</span>
+                </button>
+
+                {/* 3. Group by Country */}
+                <button
+                  onClick={() => setBreakdownViewMode('country_groups')}
+                  className={`px-3.5 py-1.5 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
+                    breakdownViewMode === 'country_groups'
+                      ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-sm shadow-emerald-500/20'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                  }`}
+                >
+                  <Globe className="w-3.5 h-3.5" />
+                  <span>Group by Country ({countryGroups.length})</span>
+                </button>
+
+                {/* 4. Flat Campaigns List */}
                 <button
                   onClick={() => setBreakdownViewMode('flat')}
                   className={`px-3.5 py-1.5 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
@@ -826,22 +1075,23 @@ export default function PayoutsView({ user, accentColor }) {
                   }`}
                 >
                   <Layers className="w-3.5 h-3.5" />
-                  <span>Flat Campaigns List ({campaignData.length})</span>
+                  <span>Flat Campaigns ({campaignData.length})</span>
                 </button>
               </div>
             </div>
 
-            {breakdownViewMode === 'code_groups' && codeGroups.length > 0 && (
+            {/* Expand / Collapse Toolbar for Grouped Modes */}
+            {breakdownViewMode !== 'flat' && (
               <div className="flex items-center gap-2 text-xs font-semibold">
                 <button
-                  onClick={expandAllCodes}
+                  onClick={expandAll}
                   className="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-800/60 hover:bg-slate-100 dark:hover:bg-slate-700/60 text-slate-700 dark:text-slate-300 transition-all flex items-center gap-1.5 cursor-pointer"
                 >
                   <Maximize2 className="w-3.5 h-3.5 text-emerald-500" />
-                  <span>Expand All Codes</span>
+                  <span>Expand All</span>
                 </button>
                 <button
-                  onClick={collapseAllCodes}
+                  onClick={collapseAll}
                   className="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-800/60 hover:bg-slate-100 dark:hover:bg-slate-700/60 text-slate-700 dark:text-slate-300 transition-all flex items-center gap-1.5 cursor-pointer"
                 >
                   <Minimize2 className="w-3.5 h-3.5 text-slate-400" />
@@ -851,27 +1101,57 @@ export default function PayoutsView({ user, accentColor }) {
             )}
           </div>
 
-          {breakdownViewMode === 'code_groups' ? (
-            /* Mode A: Hierarchical Code Groups Table with Expandable Sub-Campaigns */
+          {/* VIEW MODE 1: Group by Classification Code */}
+          {breakdownViewMode === 'code_groups' && (
             <div className="flex flex-col gap-4">
               <div className="rounded-2xl border border-slate-200 dark:border-white/10 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl shadow-sm overflow-hidden">
                 <div className="overflow-x-auto">
                   <table className="w-full text-left border-collapse">
                     <thead>
                       <tr className="bg-slate-100/70 dark:bg-slate-800/60 text-[11px] uppercase font-bold text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-white/10">
-                        <th className="p-3.5 pl-6">Classification Code & Campaigns</th>
-                        <th className="p-3.5">Category & Details</th>
-                        <th className="p-3.5">Gross Raised</th>
-                        <th className="p-3.5">CC & Platform Fees</th>
-                        <th className="p-3.5">Fee Ratio</th>
-                        <th className="p-3.5 pr-6">Net Settlement</th>
+                        <th className="p-3.5 pl-6 cursor-pointer select-none" onClick={() => handleSort('code')}>
+                          <div className="flex items-center gap-1.5">
+                            <span>Classification Code</span>
+                            <ArrowUpDown className="w-3 h-3 text-slate-400" />
+                          </div>
+                        </th>
+                        <th className="p-3.5 cursor-pointer select-none" onClick={() => handleSort('heading')}>
+                          <div className="flex items-center gap-1.5">
+                            <span>Category & Details</span>
+                            <ArrowUpDown className="w-3 h-3 text-slate-400" />
+                          </div>
+                        </th>
+                        <th className="p-3.5 cursor-pointer select-none" onClick={() => handleSort('gross_amount')}>
+                          <div className="flex items-center gap-1.5">
+                            <span>Gross Raised</span>
+                            <ArrowUpDown className="w-3 h-3 text-slate-400" />
+                          </div>
+                        </th>
+                        <th className="p-3.5 cursor-pointer select-none" onClick={() => handleSort('processing_fees')}>
+                          <div className="flex items-center gap-1.5">
+                            <span>CC & Platform Fees</span>
+                            <ArrowUpDown className="w-3 h-3 text-slate-400" />
+                          </div>
+                        </th>
+                        <th className="p-3.5 cursor-pointer select-none" onClick={() => handleSort('fee_percentage')}>
+                          <div className="flex items-center gap-1.5">
+                            <span>Fee Ratio</span>
+                            <ArrowUpDown className="w-3 h-3 text-slate-400" />
+                          </div>
+                        </th>
+                        <th className="p-3.5 pr-6 cursor-pointer select-none" onClick={() => handleSort('transfer_amount')}>
+                          <div className="flex items-center gap-1.5">
+                            <span>Net Settlement</span>
+                            <ArrowUpDown className="w-3 h-3 text-slate-400" />
+                          </div>
+                        </th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-200 dark:divide-white/5 text-xs text-slate-800 dark:text-slate-200 font-medium">
                       {paginatedCodes.length === 0 ? (
                         <tr>
                           <td colSpan="6" className="p-8 text-center text-slate-500 dark:text-slate-400 font-semibold">
-                            No classification code revenue breakdown data found.
+                            No classification code breakdown data found.
                           </td>
                         </tr>
                       ) : (
@@ -879,7 +1159,7 @@ export default function PayoutsView({ user, accentColor }) {
                           const isExp = !!expandedCodes[cg.code];
                           return (
                             <React.Fragment key={idx}>
-                              {/* Parent Code Group Row */}
+                              {/* Parent Code Row */}
                               <tr 
                                 onClick={() => toggleCodeExpand(cg.code)}
                                 className={`transition-colors cursor-pointer select-none ${
@@ -949,7 +1229,7 @@ export default function PayoutsView({ user, accentColor }) {
                                 </td>
                               </tr>
 
-                              {/* Nested Sub-Campaigns Breakdown Card */}
+                              {/* Nested Sub-Campaigns Drilldown */}
                               {isExp && (
                                 <tr>
                                   <td colSpan="6" className="p-0 bg-slate-100/50 dark:bg-slate-950/40 border-y border-slate-200 dark:border-white/10">
@@ -973,7 +1253,8 @@ export default function PayoutsView({ user, accentColor }) {
                                               <th className="p-2.5">Gross Raised</th>
                                               <th className="p-2.5">CC Fees</th>
                                               <th className="p-2.5">Fee Ratio</th>
-                                              <th className="p-2.5 pr-4">Net Settlement</th>
+                                              <th className="p-2.5">Net Settlement</th>
+                                              {canEdit && <th className="p-2.5 pr-4 text-right">Classify</th>}
                                             </tr>
                                           </thead>
                                           <tbody className="divide-y divide-slate-100 dark:divide-white/5 text-xs text-slate-700 dark:text-slate-300">
@@ -996,11 +1277,25 @@ export default function PayoutsView({ user, accentColor }) {
                                                 <td className="p-2.5 font-mono text-[11px] text-rose-600 dark:text-rose-400 font-bold">
                                                   {sc.fee_percentage}%
                                                 </td>
-                                                <td className={`p-2.5 pr-4 font-black font-mono ${Number(sc.transfer_amount) < 0 ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                                                <td className={`p-2.5 font-black font-mono ${Number(sc.transfer_amount) < 0 ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
                                                   {Number(sc.transfer_amount) < 0 
                                                     ? `-${currSymbol}${Math.abs(Number(sc.transfer_amount)).toLocaleString('en-GB', { minimumFractionDigits: 2 })}` 
                                                     : `${currSymbol}${Number(sc.transfer_amount).toLocaleString('en-GB', { minimumFractionDigits: 2 })}`}
                                                 </td>
+                                                {canEdit && (
+                                                  <td className="p-2.5 pr-4 text-right">
+                                                    <button
+                                                      onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleOpenEditModal(sc);
+                                                      }}
+                                                      className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-emerald-500/10 hover:text-emerald-500 text-slate-500 transition-all cursor-pointer"
+                                                      title="Edit Classification & Sync to Database"
+                                                    >
+                                                      <Edit3 className="w-3.5 h-3.5" />
+                                                    </button>
+                                                  </td>
+                                                )}
                                               </tr>
                                             ))}
                                           </tbody>
@@ -1019,7 +1314,7 @@ export default function PayoutsView({ user, accentColor }) {
                 </div>
               </div>
 
-              {/* Code Groups Pagination Footer */}
+              {/* Code Pagination Footer */}
               <div className="flex flex-wrap items-center justify-between gap-4 p-4 rounded-2xl border border-slate-200 dark:border-white/10 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl shadow-sm text-xs font-semibold">
                 <div className="flex items-center gap-3">
                   <span className="text-slate-500 dark:text-slate-400">Page Size:</span>
@@ -1034,10 +1329,10 @@ export default function PayoutsView({ user, accentColor }) {
                     <option value={25}>25 codes</option>
                     <option value={50}>50 codes</option>
                     <option value={100}>100 codes</option>
-                    <option value="All">All ({codeGroups.length})</option>
+                    <option value="All">All ({sortedCodes.length})</option>
                   </select>
                   <span className="text-slate-500 dark:text-slate-400 border-l border-slate-200 dark:border-white/10 pl-3">
-                    Showing Page <span className="text-slate-900 dark:text-white font-bold">{safeCodePage}</span> of <span className="text-slate-900 dark:text-white font-bold">{totalCodePages}</span> ({codeGroups.length} total codes)
+                    Showing Page <span className="text-slate-900 dark:text-white font-bold">{safeCodePage}</span> of <span className="text-slate-900 dark:text-white font-bold">{totalCodePages}</span> ({sortedCodes.length} total codes)
                   </span>
                 </div>
 
@@ -1061,26 +1356,511 @@ export default function PayoutsView({ user, accentColor }) {
                 )}
               </div>
             </div>
-          ) : (
-            /* Mode B: Flat Individual Campaigns List */
+          )}
+
+          {/* VIEW MODE 2: Group by Heading */}
+          {breakdownViewMode === 'heading_groups' && (
             <div className="flex flex-col gap-4">
               <div className="rounded-2xl border border-slate-200 dark:border-white/10 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl shadow-sm overflow-hidden">
                 <div className="overflow-x-auto">
                   <table className="w-full text-left border-collapse">
                     <thead>
                       <tr className="bg-slate-100/70 dark:bg-slate-800/60 text-[11px] uppercase font-bold text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-white/10">
-                        <th className="p-3.5 pl-5">Campaign / Project Name</th>
-                        <th className="p-3.5">Classification Code</th>
-                        <th className="p-3.5">Gross Raised</th>
-                        <th className="p-3.5">CC & Platform Fees</th>
-                        <th className="p-3.5">Fee Ratio</th>
-                        <th className="p-3.5 pr-5">Net Settlement</th>
+                        <th className="p-3.5 pl-6 cursor-pointer select-none" onClick={() => handleSort('heading')}>
+                          <div className="flex items-center gap-1.5">
+                            <span>Classification Heading</span>
+                            <ArrowUpDown className="w-3 h-3 text-slate-400" />
+                          </div>
+                        </th>
+                        <th className="p-3.5 text-center">Codes Covered</th>
+                        <th className="p-3.5 cursor-pointer select-none" onClick={() => handleSort('gross_amount')}>
+                          <div className="flex items-center gap-1.5">
+                            <span>Gross Raised</span>
+                            <ArrowUpDown className="w-3 h-3 text-slate-400" />
+                          </div>
+                        </th>
+                        <th className="p-3.5 cursor-pointer select-none" onClick={() => handleSort('processing_fees')}>
+                          <div className="flex items-center gap-1.5">
+                            <span>CC & Platform Fees</span>
+                            <ArrowUpDown className="w-3 h-3 text-slate-400" />
+                          </div>
+                        </th>
+                        <th className="p-3.5 cursor-pointer select-none" onClick={() => handleSort('fee_percentage')}>
+                          <div className="flex items-center gap-1.5">
+                            <span>Fee Ratio</span>
+                            <ArrowUpDown className="w-3 h-3 text-slate-400" />
+                          </div>
+                        </th>
+                        <th className="p-3.5 pr-6 cursor-pointer select-none" onClick={() => handleSort('transfer_amount')}>
+                          <div className="flex items-center gap-1.5">
+                            <span>Net Settlement</span>
+                            <ArrowUpDown className="w-3 h-3 text-slate-400" />
+                          </div>
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200 dark:divide-white/5 text-xs text-slate-800 dark:text-slate-200 font-medium">
+                      {paginatedHeadings.length === 0 ? (
+                        <tr>
+                          <td colSpan="6" className="p-8 text-center text-slate-500 dark:text-slate-400 font-semibold">
+                            No heading breakdown data found.
+                          </td>
+                        </tr>
+                      ) : (
+                        paginatedHeadings.map((hg, idx) => {
+                          const isExp = !!expandedHeadings[hg.heading];
+                          return (
+                            <React.Fragment key={idx}>
+                              <tr 
+                                onClick={() => toggleHeadingExpand(hg.heading)}
+                                className={`transition-colors cursor-pointer select-none ${
+                                  isExp 
+                                    ? 'bg-emerald-50/50 dark:bg-emerald-950/20 hover:bg-emerald-50/80 dark:hover:bg-emerald-950/30' 
+                                    : 'hover:bg-slate-50/80 dark:hover:bg-slate-800/50'
+                                }`}
+                              >
+                                <td className="p-3.5 pl-6">
+                                  <div className="flex items-center gap-3">
+                                    <div className={`p-1 rounded-lg transition-transform duration-200 ${isExp ? 'rotate-90 text-emerald-600 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-500/20' : 'text-slate-400 hover:text-slate-600'}`}>
+                                      <ChevronRight className="w-4 h-4" />
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-bold text-slate-900 dark:text-white text-sm">
+                                        {hg.heading}
+                                      </span>
+                                      <span className="px-2 py-0.5 rounded-md text-[11px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-white/10">
+                                        {hg.campaigns_count} {hg.campaigns_count === 1 ? 'campaign' : 'campaigns'}
+                                      </span>
+                                    </div>
+                                  </div>
+                                </td>
+
+                                <td className="p-3.5 text-center">
+                                  <span className="font-mono text-[11px] font-bold text-slate-600 dark:text-slate-400">
+                                    {hg.codes_count} {hg.codes_count === 1 ? 'code' : 'codes'}
+                                  </span>
+                                </td>
+
+                                <td className={`p-3.5 font-black font-mono ${Number(hg.gross_amount) < 0 ? 'text-rose-600 dark:text-rose-400' : 'text-slate-900 dark:text-white'}`}>
+                                  {Number(hg.gross_amount) < 0 
+                                    ? `-${currSymbol}${Math.abs(Number(hg.gross_amount)).toLocaleString('en-GB', { minimumFractionDigits: 2 })}` 
+                                    : `${currSymbol}${Number(hg.gross_amount).toLocaleString('en-GB', { minimumFractionDigits: 2 })}`}
+                                </td>
+
+                                <td className="p-3.5 font-bold text-rose-600 dark:text-rose-400 font-mono">
+                                  {currSymbol}{Number(hg.processing_fees).toLocaleString('en-GB', { minimumFractionDigits: 2 })}
+                                </td>
+
+                                <td className="p-3.5">
+                                  <div className="flex items-center gap-2 min-w-[100px]">
+                                    <div className="w-16 bg-slate-200 dark:bg-slate-800 rounded-full h-1.5 overflow-hidden">
+                                      <div 
+                                        className="bg-rose-500 h-full rounded-full" 
+                                        style={{ width: `${Math.min(100, hg.fee_percentage * 5)}%` }}
+                                      ></div>
+                                    </div>
+                                    <span className="text-[11px] font-bold text-rose-600 dark:text-rose-400 font-mono">{hg.fee_percentage}%</span>
+                                  </div>
+                                </td>
+
+                                <td className={`p-3.5 pr-6 font-black font-mono text-sm ${Number(hg.transfer_amount) < 0 ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                                  {Number(hg.transfer_amount) < 0 
+                                    ? `-${currSymbol}${Math.abs(Number(hg.transfer_amount)).toLocaleString('en-GB', { minimumFractionDigits: 2 })}` 
+                                    : `${currSymbol}${Number(hg.transfer_amount).toLocaleString('en-GB', { minimumFractionDigits: 2 })}`}
+                                </td>
+                              </tr>
+
+                              {/* Nested Sub-Campaigns */}
+                              {isExp && (
+                                <tr>
+                                  <td colSpan="6" className="p-0 bg-slate-100/50 dark:bg-slate-950/40 border-y border-slate-200 dark:border-white/10">
+                                    <div className="p-4 pl-12 pr-6 flex flex-col gap-3">
+                                      <div className="rounded-xl border border-slate-200/80 dark:border-white/10 bg-white/90 dark:bg-slate-900/90 shadow-sm overflow-hidden">
+                                        <table className="w-full text-left border-collapse">
+                                          <thead>
+                                            <tr className="bg-slate-50/80 dark:bg-slate-800/80 text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-white/10">
+                                              <th className="p-2.5 pl-4">Campaign Name</th>
+                                              <th className="p-2.5">Code</th>
+                                              <th className="p-2.5">Sub-Heading</th>
+                                              <th className="p-2.5">Country</th>
+                                              <th className="p-2.5">Gross Raised</th>
+                                              <th className="p-2.5">Net Settlement</th>
+                                              {canEdit && <th className="p-2.5 pr-4 text-right">Classify</th>}
+                                            </tr>
+                                          </thead>
+                                          <tbody className="divide-y divide-slate-100 dark:divide-white/5 text-xs text-slate-700 dark:text-slate-300">
+                                            {hg.campaigns.map((sc, scIdx) => (
+                                              <tr key={scIdx} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
+                                                <td className="p-2.5 pl-4 font-semibold text-slate-800 dark:text-slate-200">
+                                                  {sc.campaign_name}
+                                                </td>
+                                                <td className="p-2.5 font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                                                  {sc.code}
+                                                </td>
+                                                <td className="p-2.5 text-slate-500 dark:text-slate-400">
+                                                  {sc.sub_heading}
+                                                </td>
+                                                <td className="p-2.5 text-slate-500 dark:text-slate-400">
+                                                  {sc.country}
+                                                </td>
+                                                <td className="p-2.5 font-bold font-mono text-slate-900 dark:text-white">
+                                                  {currSymbol}{Number(sc.gross_amount).toLocaleString('en-GB', { minimumFractionDigits: 2 })}
+                                                </td>
+                                                <td className="p-2.5 font-black font-mono text-emerald-600 dark:text-emerald-400">
+                                                  {currSymbol}{Number(sc.transfer_amount).toLocaleString('en-GB', { minimumFractionDigits: 2 })}
+                                                </td>
+                                                {canEdit && (
+                                                  <td className="p-2.5 pr-4 text-right">
+                                                    <button
+                                                      onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleOpenEditModal(sc);
+                                                      }}
+                                                      className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-emerald-500/10 hover:text-emerald-500 text-slate-500 transition-all cursor-pointer"
+                                                      title="Edit Classification & Sync to Database"
+                                                    >
+                                                      <Edit3 className="w-3.5 h-3.5" />
+                                                    </button>
+                                                  </td>
+                                                )}
+                                              </tr>
+                                            ))}
+                                          </tbody>
+                                        </table>
+                                      </div>
+                                    </div>
+                                  </td>
+                                </tr>
+                              )}
+                            </React.Fragment>
+                          );
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Heading Pagination Footer */}
+              <div className="flex flex-wrap items-center justify-between gap-4 p-4 rounded-2xl border border-slate-200 dark:border-white/10 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl shadow-sm text-xs font-semibold">
+                <div className="flex items-center gap-3">
+                  <span className="text-slate-500 dark:text-slate-400">Page Size:</span>
+                  <select 
+                    value={headingPageSize}
+                    onChange={(e) => {
+                      setHeadingPageSize(e.target.value);
+                      setHeadingPage(1);
+                    }}
+                    className="bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-white/10 rounded-xl px-3 py-1.5 text-xs text-slate-800 dark:text-white focus:outline-none cursor-pointer"
+                  >
+                    <option value={25}>25 headings</option>
+                    <option value={50}>50 headings</option>
+                    <option value="All">All ({sortedHeadings.length})</option>
+                  </select>
+                  <span className="text-slate-500 dark:text-slate-400 border-l border-slate-200 dark:border-white/10 pl-3">
+                    Showing Page <span className="text-slate-900 dark:text-white font-bold">{safeHeadingPage}</span> of <span className="text-slate-900 dark:text-white font-bold">{totalHeadingPages}</span> ({sortedHeadings.length} total headings)
+                  </span>
+                </div>
+
+                {headingPageSize !== 'All' && totalHeadingPages > 1 && (
+                  <div className="flex items-center gap-2">
+                    <button 
+                      onClick={() => setHeadingPage(p => Math.max(1, p - 1))}
+                      disabled={safeHeadingPage <= 1}
+                      className="p-2 rounded-xl border border-slate-200 dark:border-white/10 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-40 transition-all cursor-pointer"
+                    >
+                      <ChevronLeft className="w-4 h-4 text-slate-700 dark:text-slate-300" />
+                    </button>
+                    <button 
+                      onClick={() => setHeadingPage(p => Math.min(totalHeadingPages, p + 1))}
+                      disabled={safeHeadingPage >= totalHeadingPages}
+                      className="p-2 rounded-xl border border-slate-200 dark:border-white/10 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-40 transition-all cursor-pointer"
+                    >
+                      <ChevronRight className="w-4 h-4 text-slate-700 dark:text-slate-300" />
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* VIEW MODE 3: Group by Country */}
+          {breakdownViewMode === 'country_groups' && (
+            <div className="flex flex-col gap-4">
+              <div className="rounded-2xl border border-slate-200 dark:border-white/10 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl shadow-sm overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-slate-100/70 dark:bg-slate-800/60 text-[11px] uppercase font-bold text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-white/10">
+                        <th className="p-3.5 pl-6 cursor-pointer select-none" onClick={() => handleSort('country')}>
+                          <div className="flex items-center gap-1.5">
+                            <span>Project Country</span>
+                            <ArrowUpDown className="w-3 h-3 text-slate-400" />
+                          </div>
+                        </th>
+                        <th className="p-3.5 text-center">Codes Covered</th>
+                        <th className="p-3.5 cursor-pointer select-none" onClick={() => handleSort('gross_amount')}>
+                          <div className="flex items-center gap-1.5">
+                            <span>Gross Raised</span>
+                            <ArrowUpDown className="w-3 h-3 text-slate-400" />
+                          </div>
+                        </th>
+                        <th className="p-3.5 cursor-pointer select-none" onClick={() => handleSort('processing_fees')}>
+                          <div className="flex items-center gap-1.5">
+                            <span>CC & Platform Fees</span>
+                            <ArrowUpDown className="w-3 h-3 text-slate-400" />
+                          </div>
+                        </th>
+                        <th className="p-3.5 cursor-pointer select-none" onClick={() => handleSort('fee_percentage')}>
+                          <div className="flex items-center gap-1.5">
+                            <span>Fee Ratio</span>
+                            <ArrowUpDown className="w-3 h-3 text-slate-400" />
+                          </div>
+                        </th>
+                        <th className="p-3.5 pr-6 cursor-pointer select-none" onClick={() => handleSort('transfer_amount')}>
+                          <div className="flex items-center gap-1.5">
+                            <span>Net Settlement</span>
+                            <ArrowUpDown className="w-3 h-3 text-slate-400" />
+                          </div>
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200 dark:divide-white/5 text-xs text-slate-800 dark:text-slate-200 font-medium">
+                      {paginatedCountries.length === 0 ? (
+                        <tr>
+                          <td colSpan="6" className="p-8 text-center text-slate-500 dark:text-slate-400 font-semibold">
+                            No country breakdown data found.
+                          </td>
+                        </tr>
+                      ) : (
+                        paginatedCountries.map((ctg, idx) => {
+                          const isExp = !!expandedCountries[ctg.country];
+                          return (
+                            <React.Fragment key={idx}>
+                              <tr 
+                                onClick={() => toggleCountryExpand(ctg.country)}
+                                className={`transition-colors cursor-pointer select-none ${
+                                  isExp 
+                                    ? 'bg-emerald-50/50 dark:bg-emerald-950/20 hover:bg-emerald-50/80 dark:hover:bg-emerald-950/30' 
+                                    : 'hover:bg-slate-50/80 dark:hover:bg-slate-800/50'
+                                }`}
+                              >
+                                <td className="p-3.5 pl-6">
+                                  <div className="flex items-center gap-3">
+                                    <div className={`p-1 rounded-lg transition-transform duration-200 ${isExp ? 'rotate-90 text-emerald-600 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-500/20' : 'text-slate-400 hover:text-slate-600'}`}>
+                                      <ChevronRight className="w-4 h-4" />
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-bold text-slate-900 dark:text-white text-sm">
+                                        {ctg.country}
+                                      </span>
+                                      <span className="px-2 py-0.5 rounded-md text-[11px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-white/10">
+                                        {ctg.campaigns_count} {ctg.campaigns_count === 1 ? 'campaign' : 'campaigns'}
+                                      </span>
+                                    </div>
+                                  </div>
+                                </td>
+
+                                <td className="p-3.5 text-center">
+                                  <span className="font-mono text-[11px] font-bold text-slate-600 dark:text-slate-400">
+                                    {ctg.codes_count} {ctg.codes_count === 1 ? 'code' : 'codes'}
+                                  </span>
+                                </td>
+
+                                <td className={`p-3.5 font-black font-mono ${Number(ctg.gross_amount) < 0 ? 'text-rose-600 dark:text-rose-400' : 'text-slate-900 dark:text-white'}`}>
+                                  {Number(ctg.gross_amount) < 0 
+                                    ? `-${currSymbol}${Math.abs(Number(ctg.gross_amount)).toLocaleString('en-GB', { minimumFractionDigits: 2 })}` 
+                                    : `${currSymbol}${Number(ctg.gross_amount).toLocaleString('en-GB', { minimumFractionDigits: 2 })}`}
+                                </td>
+
+                                <td className="p-3.5 font-bold text-rose-600 dark:text-rose-400 font-mono">
+                                  {currSymbol}{Number(ctg.processing_fees).toLocaleString('en-GB', { minimumFractionDigits: 2 })}
+                                </td>
+
+                                <td className="p-3.5">
+                                  <div className="flex items-center gap-2 min-w-[100px]">
+                                    <div className="w-16 bg-slate-200 dark:bg-slate-800 rounded-full h-1.5 overflow-hidden">
+                                      <div 
+                                        className="bg-rose-500 h-full rounded-full" 
+                                        style={{ width: `${Math.min(100, ctg.fee_percentage * 5)}%` }}
+                                      ></div>
+                                    </div>
+                                    <span className="text-[11px] font-bold text-rose-600 dark:text-rose-400 font-mono">{ctg.fee_percentage}%</span>
+                                  </div>
+                                </td>
+
+                                <td className={`p-3.5 pr-6 font-black font-mono text-sm ${Number(ctg.transfer_amount) < 0 ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                                  {Number(ctg.transfer_amount) < 0 
+                                    ? `-${currSymbol}${Math.abs(Number(ctg.transfer_amount)).toLocaleString('en-GB', { minimumFractionDigits: 2 })}` 
+                                    : `${currSymbol}${Number(ctg.transfer_amount).toLocaleString('en-GB', { minimumFractionDigits: 2 })}`}
+                                </td>
+                              </tr>
+
+                              {/* Nested Sub-Campaigns */}
+                              {isExp && (
+                                <tr>
+                                  <td colSpan="6" className="p-0 bg-slate-100/50 dark:bg-slate-950/40 border-y border-slate-200 dark:border-white/10">
+                                    <div className="p-4 pl-12 pr-6 flex flex-col gap-3">
+                                      <div className="rounded-xl border border-slate-200/80 dark:border-white/10 bg-white/90 dark:bg-slate-900/90 shadow-sm overflow-hidden">
+                                        <table className="w-full text-left border-collapse">
+                                          <thead>
+                                            <tr className="bg-slate-50/80 dark:bg-slate-800/80 text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-white/10">
+                                              <th className="p-2.5 pl-4">Campaign Name</th>
+                                              <th className="p-2.5">Code</th>
+                                              <th className="p-2.5">Heading</th>
+                                              <th className="p-2.5">Sub-Heading</th>
+                                              <th className="p-2.5">Gross Raised</th>
+                                              <th className="p-2.5">Net Settlement</th>
+                                              {canEdit && <th className="p-2.5 pr-4 text-right">Classify</th>}
+                                            </tr>
+                                          </thead>
+                                          <tbody className="divide-y divide-slate-100 dark:divide-white/5 text-xs text-slate-700 dark:text-slate-300">
+                                            {ctg.campaigns.map((sc, scIdx) => (
+                                              <tr key={scIdx} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
+                                                <td className="p-2.5 pl-4 font-semibold text-slate-800 dark:text-slate-200">
+                                                  {sc.campaign_name}
+                                                </td>
+                                                <td className="p-2.5 font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                                                  {sc.code}
+                                                </td>
+                                                <td className="p-2.5 text-slate-500 dark:text-slate-400">
+                                                  {sc.heading}
+                                                </td>
+                                                <td className="p-2.5 text-slate-500 dark:text-slate-400">
+                                                  {sc.sub_heading}
+                                                </td>
+                                                <td className="p-2.5 font-bold font-mono text-slate-900 dark:text-white">
+                                                  {currSymbol}{Number(sc.gross_amount).toLocaleString('en-GB', { minimumFractionDigits: 2 })}
+                                                </td>
+                                                <td className="p-2.5 font-black font-mono text-emerald-600 dark:text-emerald-400">
+                                                  {currSymbol}{Number(sc.transfer_amount).toLocaleString('en-GB', { minimumFractionDigits: 2 })}
+                                                </td>
+                                                {canEdit && (
+                                                  <td className="p-2.5 pr-4 text-right">
+                                                    <button
+                                                      onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleOpenEditModal(sc);
+                                                      }}
+                                                      className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-emerald-500/10 hover:text-emerald-500 text-slate-500 transition-all cursor-pointer"
+                                                      title="Edit Classification & Sync to Database"
+                                                    >
+                                                      <Edit3 className="w-3.5 h-3.5" />
+                                                    </button>
+                                                  </td>
+                                                )}
+                                              </tr>
+                                            ))}
+                                          </tbody>
+                                        </table>
+                                      </div>
+                                    </div>
+                                  </td>
+                                </tr>
+                              )}
+                            </React.Fragment>
+                          );
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Country Pagination Footer */}
+              <div className="flex flex-wrap items-center justify-between gap-4 p-4 rounded-2xl border border-slate-200 dark:border-white/10 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl shadow-sm text-xs font-semibold">
+                <div className="flex items-center gap-3">
+                  <span className="text-slate-500 dark:text-slate-400">Page Size:</span>
+                  <select 
+                    value={countryPageSize}
+                    onChange={(e) => {
+                      setCountryPageSize(e.target.value);
+                      setCountryPage(1);
+                    }}
+                    className="bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-white/10 rounded-xl px-3 py-1.5 text-xs text-slate-800 dark:text-white focus:outline-none cursor-pointer"
+                  >
+                    <option value={25}>25 countries</option>
+                    <option value={50}>50 countries</option>
+                    <option value="All">All ({sortedCountries.length})</option>
+                  </select>
+                  <span className="text-slate-500 dark:text-slate-400 border-l border-slate-200 dark:border-white/10 pl-3">
+                    Showing Page <span className="text-slate-900 dark:text-white font-bold">{safeCountryPage}</span> of <span className="text-slate-900 dark:text-white font-bold">{totalCountryPages}</span> ({sortedCountries.length} total countries)
+                  </span>
+                </div>
+
+                {countryPageSize !== 'All' && totalCountryPages > 1 && (
+                  <div className="flex items-center gap-2">
+                    <button 
+                      onClick={() => setCountryPage(p => Math.max(1, p - 1))}
+                      disabled={safeCountryPage <= 1}
+                      className="p-2 rounded-xl border border-slate-200 dark:border-white/10 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-40 transition-all cursor-pointer"
+                    >
+                      <ChevronLeft className="w-4 h-4 text-slate-700 dark:text-slate-300" />
+                    </button>
+                    <button 
+                      onClick={() => setCountryPage(p => Math.min(totalCountryPages, p + 1))}
+                      disabled={safeCountryPage >= totalCountryPages}
+                      className="p-2 rounded-xl border border-slate-200 dark:border-white/10 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-40 transition-all cursor-pointer"
+                    >
+                      <ChevronRight className="w-4 h-4 text-slate-700 dark:text-slate-300" />
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* VIEW MODE 4: Flat Individual Campaigns List */}
+          {breakdownViewMode === 'flat' && (
+            <div className="flex flex-col gap-4">
+              <div className="rounded-2xl border border-slate-200 dark:border-white/10 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl shadow-sm overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-slate-100/70 dark:bg-slate-800/60 text-[11px] uppercase font-bold text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-white/10">
+                        <th className="p-3.5 pl-5 cursor-pointer select-none" onClick={() => handleSort('campaign_name')}>
+                          <div className="flex items-center gap-1.5">
+                            <span>Campaign / Project Name</span>
+                            <ArrowUpDown className="w-3 h-3 text-slate-400" />
+                          </div>
+                        </th>
+                        <th className="p-3.5 cursor-pointer select-none" onClick={() => handleSort('code')}>
+                          <div className="flex items-center gap-1.5">
+                            <span>Classification</span>
+                            <ArrowUpDown className="w-3 h-3 text-slate-400" />
+                          </div>
+                        </th>
+                        <th className="p-3.5 cursor-pointer select-none" onClick={() => handleSort('gross_amount')}>
+                          <div className="flex items-center gap-1.5">
+                            <span>Gross Raised</span>
+                            <ArrowUpDown className="w-3 h-3 text-slate-400" />
+                          </div>
+                        </th>
+                        <th className="p-3.5 cursor-pointer select-none" onClick={() => handleSort('processing_fees')}>
+                          <div className="flex items-center gap-1.5">
+                            <span>CC Fees</span>
+                            <ArrowUpDown className="w-3 h-3 text-slate-400" />
+                          </div>
+                        </th>
+                        <th className="p-3.5 cursor-pointer select-none" onClick={() => handleSort('fee_percentage')}>
+                          <div className="flex items-center gap-1.5">
+                            <span>Fee Ratio</span>
+                            <ArrowUpDown className="w-3 h-3 text-slate-400" />
+                          </div>
+                        </th>
+                        <th className="p-3.5 cursor-pointer select-none" onClick={() => handleSort('transfer_amount')}>
+                          <div className="flex items-center gap-1.5">
+                            <span>Net Settlement</span>
+                            <ArrowUpDown className="w-3 h-3 text-slate-400" />
+                          </div>
+                        </th>
+                        {canEdit && <th className="p-3.5 pr-5 text-right">Classify</th>}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-200 dark:divide-white/5 text-xs text-slate-800 dark:text-slate-200 font-medium">
                       {paginatedCampaigns.length === 0 ? (
                         <tr>
-                          <td colSpan="6" className="p-8 text-center text-slate-500 dark:text-slate-400 font-semibold">
+                          <td colSpan={canEdit ? 7 : 6} className="p-8 text-center text-slate-500 dark:text-slate-400 font-semibold">
                             No campaign settlement breakdown data found.
                           </td>
                         </tr>
@@ -1092,8 +1872,15 @@ export default function PayoutsView({ user, accentColor }) {
                             </td>
                             <td className="p-3.5">
                               <div className="flex flex-col gap-0.5 text-[11px]">
-                                <span className="font-bold text-slate-700 dark:text-slate-300">{camp.heading}</span>
-                                <span className="text-slate-500 dark:text-slate-400 text-[10px] font-mono font-bold">{camp.code !== 'Unassigned' ? camp.code : camp.sub_heading}</span>
+                                <div className="flex items-center gap-1.5">
+                                  <span className="font-bold text-slate-700 dark:text-slate-300">{camp.heading}</span>
+                                  {camp.zakat !== 'Unassigned' && (
+                                    <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300">
+                                      {camp.zakat}
+                                    </span>
+                                  )}
+                                </div>
+                                <span className="text-emerald-600 dark:text-emerald-400 text-[10px] font-mono font-black">{camp.code}</span>
                               </div>
                             </td>
                             <td className={`p-3.5 font-bold font-mono ${Number(camp.gross_amount) < 0 ? 'text-rose-600 dark:text-rose-400' : 'text-slate-900 dark:text-white'}`}>
@@ -1115,11 +1902,22 @@ export default function PayoutsView({ user, accentColor }) {
                                 <span className="text-[11px] font-bold text-rose-600 dark:text-rose-400 font-mono">{camp.fee_percentage}%</span>
                               </div>
                             </td>
-                            <td className={`p-3.5 pr-5 font-black font-mono ${Number(camp.transfer_amount) < 0 ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                            <td className={`p-3.5 font-black font-mono ${Number(camp.transfer_amount) < 0 ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
                               {Number(camp.transfer_amount) < 0 
                                 ? `-${currSymbol}${Math.abs(Number(camp.transfer_amount)).toLocaleString('en-GB', { minimumFractionDigits: 2 })}` 
                                 : `${currSymbol}${Number(camp.transfer_amount).toLocaleString('en-GB', { minimumFractionDigits: 2 })}`}
                             </td>
+                            {canEdit && (
+                              <td className="p-3.5 pr-5 text-right">
+                                <button
+                                  onClick={() => handleOpenEditModal(camp)}
+                                  className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-emerald-500/10 hover:text-emerald-500 text-slate-500 transition-all cursor-pointer"
+                                  title="Edit Classification & Sync to Database"
+                                >
+                                  <Edit3 className="w-3.5 h-3.5" />
+                                </button>
+                              </td>
+                            )}
                           </tr>
                         ))
                       )}
@@ -1143,10 +1941,10 @@ export default function PayoutsView({ user, accentColor }) {
                     <option value={25}>25 campaigns</option>
                     <option value={50}>50 campaigns</option>
                     <option value={100}>100 campaigns</option>
-                    <option value="All">All ({campaignData.length})</option>
+                    <option value="All">All ({sortedCampaigns.length})</option>
                   </select>
                   <span className="text-slate-500 dark:text-slate-400 border-l border-slate-200 dark:border-white/10 pl-3">
-                    Showing Page <span className="text-slate-900 dark:text-white font-bold">{safeCampPage}</span> of <span className="text-slate-900 dark:text-white font-bold">{totalCampPages}</span> ({campaignData.length} total campaigns)
+                    Showing Page <span className="text-slate-900 dark:text-white font-bold">{safeCampPage}</span> of <span className="text-slate-900 dark:text-white font-bold">{totalCampPages}</span> ({sortedCampaigns.length} total campaigns)
                   </span>
                 </div>
 
@@ -1239,6 +2037,135 @@ export default function PayoutsView({ user, accentColor }) {
         </div>
       )}
 
+      {/* Edit Classification Modal (Real-Time Bidirectional Sync) */}
+      {editingClassification && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-2xl max-w-lg w-full p-6 shadow-2xl flex flex-col gap-4 text-slate-900 dark:text-white animate-fade-in">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-white/10 pb-3">
+              <h3 className="text-base font-extrabold flex items-center gap-2 text-emerald-600 dark:text-emerald-400">
+                <Edit3 className="w-5 h-5" /> Edit Campaign Classification
+              </h3>
+              <button 
+                onClick={() => setEditingClassification(null)} 
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-white cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="flex flex-col gap-3">
+              <div>
+                <label className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400 block mb-1">
+                  Campaign Name
+                </label>
+                <div className="p-3 rounded-xl bg-slate-100 dark:bg-slate-800/80 font-bold text-xs border border-slate-200 dark:border-white/5 text-slate-700 dark:text-slate-300">
+                  {editingClassification.campaign_name}
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400 block mb-1">
+                  Classification Code <span className="text-emerald-500 font-normal">(Select or Type to Auto-Fill)</span>
+                </label>
+                <input 
+                  type="text"
+                  value={editingClassification.code}
+                  onChange={(e) => handleSelectCodeInModal(e.target.value)}
+                  placeholder="e.g. GAZ-EMR, SYR-SPN-HUF..."
+                  list="payout-modal-codes-list"
+                  className="w-full px-3.5 py-2 rounded-xl border border-slate-300 dark:border-white/10 bg-white dark:bg-slate-800 text-xs font-mono font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500 uppercase"
+                />
+                <datalist id="payout-modal-codes-list">
+                  {Object.keys(codeMap).map((k) => (
+                    <option key={k} value={k.toUpperCase()}>
+                      {codeMap[k].Heading} • {codeMap[k]['Sub-Heading']} ({codeMap[k].Country})
+                    </option>
+                  ))}
+                </datalist>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400 block mb-1">
+                    Heading
+                  </label>
+                  <input 
+                    type="text"
+                    value={editingClassification.heading}
+                    onChange={(e) => setEditingClassification(prev => ({ ...prev, heading: e.target.value }))}
+                    className="w-full px-3.5 py-2 rounded-xl border border-slate-300 dark:border-white/10 bg-white dark:bg-slate-800 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400 block mb-1">
+                    Sub-Heading
+                  </label>
+                  <input 
+                    type="text"
+                    value={editingClassification.sub_heading}
+                    onChange={(e) => setEditingClassification(prev => ({ ...prev, sub_heading: e.target.value }))}
+                    className="w-full px-3.5 py-2 rounded-xl border border-slate-300 dark:border-white/10 bg-white dark:bg-slate-800 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400 block mb-1">
+                    Country
+                  </label>
+                  <input 
+                    type="text"
+                    value={editingClassification.country}
+                    onChange={(e) => setEditingClassification(prev => ({ ...prev, country: e.target.value }))}
+                    className="w-full px-3.5 py-2 rounded-xl border border-slate-300 dark:border-white/10 bg-white dark:bg-slate-800 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400 block mb-1">
+                    Zakat Eligibility
+                  </label>
+                  <select 
+                    value={editingClassification.zakat_eligibility}
+                    onChange={(e) => setEditingClassification(prev => ({ ...prev, zakat_eligibility: e.target.value }))}
+                    className="w-full px-3.5 py-2 rounded-xl border border-slate-300 dark:border-white/10 bg-white dark:bg-slate-800 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer"
+                  >
+                    <option value="Zakat">Zakat</option>
+                    <option value="Non-Zakat">Non-Zakat</option>
+                    <option value="Zakat Eligible">Zakat Eligible</option>
+                    <option value="Unassigned">Unassigned</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {editMsg && (
+              <div className="p-3 rounded-xl bg-rose-500/10 text-rose-500 text-xs font-bold flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{editMsg}</span>
+              </div>
+            )}
+
+            <div className="flex items-center justify-end gap-2 border-t border-slate-100 dark:border-white/10 pt-4">
+              <button
+                onClick={() => setEditingClassification(null)}
+                className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveClassification}
+                disabled={editSaving || !editingClassification.code.trim()}
+                className="px-5 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 shadow-md shadow-emerald-500/20 transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
+              >
+                {editSaving ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                <span>{editSaving ? 'Saving & Syncing...' : 'Save & Sync Classification'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Super Admin Purge Payout Data Modal */}
       {showPurgeModal && (
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
@@ -1253,48 +2180,48 @@ export default function PayoutsView({ user, accentColor }) {
             </div>
 
             <p className="text-xs text-slate-300 leading-relaxed">
-              This action will permanently delete all LaunchGood payout settlement transactions from the database. Raw donor contribution records will <span className="font-bold text-emerald-400">NOT</span> be affected.
+              This action will delete all LaunchGood payout settlement batches and transaction reconciliation records from the system.
             </p>
 
-            <div className="flex items-center gap-3 p-3 rounded-xl bg-rose-950/40 border border-rose-500/30">
+            <label className="flex items-center gap-2.5 p-3 rounded-xl bg-slate-800/80 border border-white/10 cursor-pointer">
               <input 
                 type="checkbox" 
-                id="purgeConfirmCheck"
                 checked={purgeConfirm}
-                onChange={e => setPurgeConfirm(e.target.checked)}
-                className="w-4 h-4 rounded border-rose-400 text-rose-600 focus:ring-rose-500 cursor-pointer"
+                onChange={(e) => setPurgeConfirm(e.target.checked)}
+                className="w-4 h-4 accent-rose-500 cursor-pointer rounded"
               />
-              <label htmlFor="purgeConfirmCheck" className="text-xs font-bold text-rose-200 cursor-pointer">
-                I understand this will delete all payout settlement rows.
-              </label>
-            </div>
+              <span className="text-xs font-semibold text-slate-200">
+                I understand this will purge all LaunchGood payout data.
+              </span>
+            </label>
 
             {purgeMsg && (
-              <div className={`text-xs font-bold ${purgeMsg.includes('✅') ? 'text-emerald-400' : 'text-rose-400'}`}>
-                {purgeMsg}
+              <div className="p-3 rounded-xl bg-rose-500/10 text-rose-400 text-xs font-bold flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{purgeMsg}</span>
               </div>
             )}
 
-            <div className="flex items-center justify-end gap-3 pt-2">
-              <button 
+            <div className="flex items-center justify-end gap-2 border-t border-white/10 pt-4">
+              <button
                 onClick={() => setShowPurgeModal(false)}
-                className="px-4 py-2 text-xs font-bold rounded-xl bg-slate-800 text-slate-300 hover:bg-slate-700"
+                className="px-4 py-2 rounded-xl text-xs font-bold text-slate-400 hover:text-white transition-all cursor-pointer"
               >
                 Cancel
               </button>
-              <button 
+              <button
                 onClick={handlePurgePayouts}
-                disabled={!purgeConfirm || purging}
-                className="px-4 py-2 text-xs font-extrabold rounded-xl bg-rose-600 text-white hover:bg-rose-500 disabled:opacity-40 flex items-center gap-1.5 shadow-md shadow-rose-600/30"
+                disabled={purging || !purgeConfirm}
+                className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-rose-600 hover:bg-rose-500 transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
               >
                 {purging ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
-                <span>Permanently Purge Payouts</span>
+                <span>{purging ? 'Purging...' : 'Confirm Purge'}</span>
               </button>
             </div>
           </div>
         </div>
       )}
+
     </div>
   );
 }
-

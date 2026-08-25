@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Query, HTTPException, Response
+from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 import sqlite3
 import pandas as pd
@@ -11,7 +12,20 @@ import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 
-from core.data_processor import LOCAL_DB_PATH, load_data, load_payouts_data
+from core.data_processor import (
+    LOCAL_DB_PATH,
+    PAYOUTS_PARQUET_PATH,
+    PARQUET_PATH,
+    load_data,
+    load_payouts_data,
+    fix_mojibake,
+    get_code_to_classification_map,
+    sync_matrix_classifications_to_donors,
+    get_classification_matrix,
+    save_classification_matrix,
+    invalidate_data_cache,
+)
+from core.database import get_db_connection, _DB_LOCK
 
 router = APIRouter(prefix="/api/payouts", tags=["Payouts Reconciliation"])
 
@@ -27,68 +41,32 @@ def invalidate_payouts_cache():
 
 def clean_mojibake_text(text: Any) -> str:
     """Repairs common UTF-8 mojibake, curly quotes, and unwanted encoding artifacts."""
-    if not isinstance(text, str) or pd.isna(text):
-        return "" if pd.isna(text) else str(text)
-    
-    s = str(text)
-    replacements = {
-        'â€™': "'",
-        'â€˜': "'",
-        'â€œ': '"',
-        'â€\x9d': '"',
-        'â€': '"',
-        'â€“': '-',
-        'â€”': '-',
-        'Â': '',
-        '\xa0': ' ',
-        '\xad': '',
-        '\u200b': '',
-        '\ufeff': '',
-        '\ufffd': '',
-        '\x81': 'a',
-        '’': "'",
-        '‘': "'",
-        '“': '"',
-        '”': '"',
-        '–': '-',
-        '—': '-',
-        'ā': 'a',
-        'ū': 'u',
-        'ī': 'i',
-        'Abū': 'Abu'
-    }
-    for k, v in replacements.items():
-        if k in s:
-            s = s.replace(k, v)
-            
-    if any(c in s for c in ['â', 'Ã']):
-        try:
-            s = s.encode('latin1').decode('utf-8')
-        except Exception:
-            pass
-            
-    for k, v in replacements.items():
-        if k in s:
-            s = s.replace(k, v)
-            
-    if 'Their Right Upon Us' in s:
-        s = 'Their Right Upon Us | حقهن علينا'
-            
-    return re.sub(r'[ \t]+', ' ', s).strip()
+    return fix_mojibake(text)
 
-def _get_classification_matrix_dict() -> Dict[str, Dict[str, str]]:
+def _get_classification_matrix_dict() -> Dict[Any, Dict[str, str]]:
     global _CLASSIFICATION_MATRIX_CACHE
     if _CLASSIFICATION_MATRIX_CACHE is not None:
         return _CLASSIFICATION_MATRIX_CACHE
     try:
-        conn = sqlite3.connect(LOCAL_DB_PATH, timeout=5.0)
-        matrix_df = pd.read_sql_query("SELECT campaign_name, heading, sub_heading, country, code, zakat_eligibility FROM campaign_classifications", conn)
+        conn = get_db_connection(timeout=10.0)
+        matrix_df = pd.read_sql_query("""
+            SELECT campaign_name, heading, sub_heading, country, code, zakat_eligibility, is_primary 
+            FROM campaign_classifications
+        """, conn)
         conn.close()
         if not matrix_df.empty:
             for c in ["campaign_name", "heading", "sub_heading", "country", "code", "zakat_eligibility"]:
                 if c in matrix_df.columns:
-                    matrix_df[c] = matrix_df[c].apply(clean_mojibake_text)
-            _CLASSIFICATION_MATRIX_CACHE = {clean_mojibake_text(c).strip().lower(): r for c, r in zip(matrix_df["campaign_name"], matrix_df.to_dict('records'))}
+                    matrix_df[c] = matrix_df[c].apply(fix_mojibake)
+            cache = {}
+            for _, r in matrix_df.iterrows():
+                c_clean = fix_mojibake(r["campaign_name"]).strip().lower()
+                code_clean = str(r["code"]).strip().lower()
+                if c_clean:
+                    cache[(c_clean, code_clean)] = r.to_dict()
+                    if c_clean not in cache or bool(r.get("is_primary") in [1, True, "1", "true"]):
+                        cache[c_clean] = r.to_dict()
+            _CLASSIFICATION_MATRIX_CACHE = cache
             return _CLASSIFICATION_MATRIX_CACHE
     except Exception as e:
         print(f"[Matrix Overlay Notice]: {e}")
@@ -104,7 +82,7 @@ def _get_payout_data_from_db(force_reload: bool = False):
         if df_p is not None and not df_p.empty:
             df = df_p.copy()
             # Normalize column aliases and clean text artifacts
-            c_name = df.get("Campaign Name", pd.Series("Unassigned Campaign", index=df.index)).fillna("Unassigned Campaign").apply(clean_mojibake_text)
+            c_name = df.get("Campaign Name", pd.Series("Unassigned Campaign", index=df.index)).fillna("Unassigned Campaign").apply(fix_mojibake)
             df["campaign_name"] = c_name
             df["Campaign Name"] = c_name
             df["row_type"] = df.get("Type", df.get("Transaction Type", pd.Series("donation", index=df.index))).fillna("donation").astype(str).str.lower()
@@ -120,24 +98,34 @@ def _get_payout_data_from_db(force_reload: bool = False):
             valid_payout_mask = ~df["transfer_id"].str.lower().isin(["n/a", "nan", "none", ""]) & (df["campaign_name"] != "Unassigned Campaign")
             df = df[valid_payout_mask].copy()
 
-            df["heading"] = df.get("Heading", pd.Series("Unassigned", index=df.index)).fillna("Unassigned").apply(clean_mojibake_text)
-            df["sub_heading"] = df.get("Sub-Heading", pd.Series("Unassigned", index=df.index)).fillna("Unassigned").apply(clean_mojibake_text)
-            df["country"] = df.get("Country", pd.Series("Unassigned", index=df.index)).fillna("Unassigned").apply(clean_mojibake_text)
-            df["code"] = df.get("Code", pd.Series("Unassigned", index=df.index)).fillna("Unassigned").apply(clean_mojibake_text)
-            df["zakat"] = df.get("Zakat Eligibility", pd.Series("Unassigned", index=df.index)).fillna("Unassigned").apply(clean_mojibake_text)
+            df["heading"] = df.get("Heading", pd.Series("Unassigned", index=df.index)).fillna("Unassigned").apply(fix_mojibake)
+            df["sub_heading"] = df.get("Sub-Heading", pd.Series("Unassigned", index=df.index)).fillna("Unassigned").apply(fix_mojibake)
+            df["country"] = df.get("Country", pd.Series("Unassigned", index=df.index)).fillna("Unassigned").apply(fix_mojibake)
+            df["code"] = df.get("Code", pd.Series("Unassigned", index=df.index)).fillna("Unassigned").apply(fix_mojibake)
+            df["zakat"] = df.get("Zakat Eligibility", pd.Series("Unassigned", index=df.index)).fillna("Unassigned").apply(fix_mojibake)
             df["settlement_currency"] = df.get("Settlement Currency", pd.Series("GBP", index=df.index)).fillna("GBP").astype(str).str.strip().str.upper()
             df["Settlement Currency"] = df["settlement_currency"]
 
             # Overlay matrix classifications
             rule_dict = _get_classification_matrix_dict()
             if rule_dict:
-                c_keys = df["campaign_name"].astype(str).str.strip().str.lower()
+                c_keys = df["campaign_name"].astype(str).str.strip().str.lower().tolist()
+                code_keys = df["code"].astype(str).str.strip().str.lower().tolist()
+                
                 for f, db_f in [("heading", "heading"), ("sub_heading", "sub_heading"), ("country", "country"), ("code", "code"), ("zakat", "zakat_eligibility")]:
-                    col_map = {k: clean_mojibake_text(v[db_f]) for k, v in rule_dict.items() if db_f in v and str(v[db_f]).lower() not in ["", "nan", "none", "unassigned"]}
-                    mapped = c_keys.map(col_map)
-                    valid_m = mapped.notna()
-                    if valid_m.any():
-                        df.loc[valid_m, f] = mapped[valid_m]
+                    updated_vals = []
+                    for cn, cc in zip(c_keys, code_keys):
+                        entry = rule_dict.get((cn, cc), rule_dict.get(cn, {}))
+                        val = entry.get(db_f, "")
+                        if val and str(val).strip().lower() not in ["", "nan", "none", "unassigned"]:
+                            updated_vals.append(fix_mojibake(val))
+                        else:
+                            updated_vals.append(None)
+                    
+                    series_updated = pd.Series(updated_vals, index=df.index)
+                    mask_valid = series_updated.notna()
+                    if mask_valid.any():
+                        df.loc[mask_valid, f] = series_updated[mask_valid]
 
             _CLASSIFIED_PAYOUTS_CACHE = df
             return _CLASSIFIED_PAYOUTS_CACHE
@@ -249,6 +237,14 @@ def _generate_ledger_breakdown(df: pd.DataFrame) -> List[Dict[str, Any]]:
     return breakdown
 
 
+def _clean_str(val: Any, default: str = "") -> str:
+    if hasattr(val, 'default'):
+        val = val.default
+    if val is None or val is ...:
+        return default
+    return str(val).strip()
+
+
 @router.get("/summary")
 def get_payouts_summary(
     currency: Optional[str] = Query("GBP", description="Filter by settlement currency: GBP, USD, or ALL"),
@@ -259,12 +255,15 @@ def get_payouts_summary(
     transfer_id: Optional[str] = None
 ):
     """Returns top KPI metrics, Finance Disbursement Summary, and Accounting Ledger breakdown."""
+    curr_selected = _clean_str(currency, "GBP").upper()
+    target_batch = _clean_str(transfer_id or batch, "ALL")
+
     try:
         df_all = _get_payout_data_from_db()
         if df_all.empty:
             return {
-                "currency": currency or "GBP",
-                "batch": batch or "ALL",
+                "currency": curr_selected,
+                "batch": target_batch,
                 "total_gross": 0.0,
                 "total_fees": 0.0,
                 "total_reserves": 0.0,
@@ -279,23 +278,23 @@ def get_payouts_summary(
         df = df_all.copy()
 
         # Currency Filter
-        curr_selected = (currency or "GBP").strip().upper()
         if curr_selected in ["GBP", "USD"]:
             df = df[df["settlement_currency"] == curr_selected]
         else:
             curr_selected = "ALL"
 
         # Batch / Transfer ID Filter
-        target_batch = str(transfer_id or batch or "ALL").strip()
         if target_batch and target_batch.upper() != "ALL":
             target_clean = target_batch.replace(".0", "").replace("#", "").strip().lower()
             df = df[df["transfer_id"].astype(str).str.replace(".0", "").str.strip().str.lower() == target_clean]
 
         # Date Filters
-        if start_date and str(start_date).strip():
-            df = df[pd.to_datetime(df["Created Date (UTC)"], errors="coerce") >= pd.to_datetime(start_date)]
-        if end_date and str(end_date).strip():
-            df = df[pd.to_datetime(df["Created Date (UTC)"], errors="coerce") <= pd.to_datetime(end_date)]
+        s_date = _clean_str(start_date)
+        e_date = _clean_str(end_date)
+        if s_date:
+            df = df[pd.to_datetime(df["Created Date (UTC)"], errors="coerce") >= pd.to_datetime(s_date)]
+        if e_date:
+            df = df[pd.to_datetime(df["Created Date (UTC)"], errors="coerce") <= pd.to_datetime(e_date)]
 
         donations_df = df[df["row_type"] == "donation"]
         payouts_df = df[df["row_type"] == "payout"]
@@ -327,8 +326,8 @@ def get_payouts_summary(
     except Exception as e:
         print(f"[Error] Payout summary error: {e}")
         return {
-            "currency": currency or "GBP",
-            "batch": batch or "ALL",
+            "currency": curr_selected,
+            "batch": target_batch,
             "total_gross": 0.0,
             "total_fees": 0.0,
             "total_reserves": 0.0,
@@ -347,13 +346,14 @@ def get_payout_ledger_breakdown(
     batch: Optional[str] = Query("ALL", description="Filter by specific Transfer ID / Batch")
 ):
     """Returns complete row-type accounting ledger audit table."""
+    curr_selected = _clean_str(currency, "GBP").upper()
+    target_batch = _clean_str(batch, "ALL")
+
     try:
         df = _get_payout_data_from_db()
-        curr_selected = (currency or "GBP").strip().upper()
         if curr_selected in ["GBP", "USD"]:
             df = df[df["settlement_currency"] == curr_selected]
 
-        target_batch = str(batch or "ALL").strip()
         if target_batch and target_batch.upper() != "ALL":
             target_clean = target_batch.replace(".0", "").replace("#", "").strip().lower()
             df = df[df["transfer_id"].astype(str).str.replace(".0", "").str.strip().str.lower() == target_clean]
@@ -366,7 +366,7 @@ def get_payout_ledger_breakdown(
         }
     except Exception as e:
         print(f"[Error] Ledger breakdown error: {e}")
-        return {"currency": currency or "GBP", "batch": batch or "ALL", "ledger": [], "disbursement_summary": {}}
+        return {"currency": curr_selected, "batch": target_batch, "ledger": [], "disbursement_summary": {}}
 
 
 @router.get("/batches")
@@ -377,13 +377,13 @@ def get_payout_batches(
     search: Optional[str] = ""
 ):
     """Returns paginated list of payout settlement batches grouped by Transfer ID."""
+    curr_selected = _clean_str(currency, "GBP").upper()
+    search_val = _clean_str(search).lower()
+    p_val = int(_clean_str(page, "1")) if _clean_str(page, "1").isdigit() else 1
+    ps_val = int(_clean_str(page_size, "25")) if _clean_str(page_size, "25").isdigit() else 25
+
     try:
         df = _get_payout_data_from_db()
-        p_val = page if isinstance(page, int) else 1
-        ps_val = page_size if isinstance(page_size, int) else 25
-        curr_selected = str(currency).strip().upper() if isinstance(currency, str) else "GBP"
-        search_val = str(search).strip().lower() if isinstance(search, str) else ""
-
         if df.empty:
             return {"total_batches": 0, "page": p_val, "page_size": ps_val, "batches": [], "currency": curr_selected}
 
@@ -442,21 +442,31 @@ def get_campaign_payout_breakdown(
     search: Optional[str] = ""
 ):
     """Returns classification code-level hierarchical breakdown with nested campaigns and individual campaign metrics (Optimized Vectorized Aggregation)."""
+    curr_selected = _clean_str(currency, "GBP").upper()
+    target_batch = _clean_str(batch, "ALL")
+    search_val = _clean_str(search).lower()
     try:
         df = _get_payout_data_from_db()
         if df.empty:
-            return {"code_groups": [], "campaigns": [], "total_codes": 0, "total_campaigns": 0, "currency": currency or "GBP", "batch": batch or "ALL"}
+            return {
+                "code_groups": [], 
+                "heading_groups": [], 
+                "country_groups": [], 
+                "campaigns": [], 
+                "total_codes": 0, 
+                "total_headings": 0, 
+                "total_countries": 0, 
+                "total_campaigns": 0, 
+                "currency": curr_selected, 
+                "batch": target_batch
+            }
 
-        curr_selected = str(currency).strip().upper() if isinstance(currency, str) else "GBP"
         if curr_selected in ["GBP", "USD"]:
             df = df[df["settlement_currency"] == curr_selected]
 
-        target_batch = str(batch or "ALL").strip()
         if target_batch and target_batch.upper() != "ALL":
             target_clean = target_batch.replace(".0", "").replace("#", "").strip().lower()
             df = df[df["transfer_id"].astype(str).str.replace(".0", "").str.strip().str.lower() == target_clean]
-
-        search_val = str(search).strip().lower() if isinstance(search, str) else ""
 
         # 1. Vectorized Aggregation per (Campaign Name, Code) & Row Type
         camp_agg = df.groupby(["campaign_name", "code", "row_type"]).agg(
@@ -517,7 +527,11 @@ def get_campaign_payout_breakdown(
 
         # 2. Build Code Groups from campaign_records
         code_map = {}
+        heading_map = {}
+        country_map = {}
+
         for c in campaign_records:
+            # Code Grouping
             cd = c["code"]
             if cd not in code_map:
                 code_map[cd] = {
@@ -536,21 +550,72 @@ def get_campaign_payout_breakdown(
             code_map[cd]["processing_fees"] = round(code_map[cd]["processing_fees"] + c["processing_fees"], 2)
             code_map[cd]["transfer_amount"] = round(code_map[cd]["transfer_amount"] + c["transfer_amount"], 2)
             code_map[cd]["donations_count"] += c["donations_count"]
-            code_map[cd]["campaigns"].append({
-                "campaign_name": c["campaign_name"],
-                "gross_amount": c["gross_amount"],
-                "processing_fees": c["processing_fees"],
-                "transfer_amount": c["transfer_amount"],
-                "fee_percentage": c["fee_percentage"],
-                "donations_count": c["donations_count"]
-            })
+            code_map[cd]["campaigns"].append(c)
 
+            # Heading Grouping
+            hd = c["heading"] if c["heading"] and c["heading"] != "Unassigned" else "General Fund"
+            if hd not in heading_map:
+                heading_map[hd] = {
+                    "heading": hd,
+                    "gross_amount": 0.0,
+                    "processing_fees": 0.0,
+                    "transfer_amount": 0.0,
+                    "donations_count": 0,
+                    "codes": set(),
+                    "campaigns": []
+                }
+            heading_map[hd]["gross_amount"] = round(heading_map[hd]["gross_amount"] + c["gross_amount"], 2)
+            heading_map[hd]["processing_fees"] = round(heading_map[hd]["processing_fees"] + c["processing_fees"], 2)
+            heading_map[hd]["transfer_amount"] = round(heading_map[hd]["transfer_amount"] + c["transfer_amount"], 2)
+            heading_map[hd]["donations_count"] += c["donations_count"]
+            heading_map[hd]["codes"].add(c["code"])
+            heading_map[hd]["campaigns"].append(c)
+
+            # Country Grouping
+            ctry = c["country"] if c["country"] and c["country"] != "Unassigned" else "Global / Various"
+            if ctry not in country_map:
+                country_map[ctry] = {
+                    "country": ctry,
+                    "gross_amount": 0.0,
+                    "processing_fees": 0.0,
+                    "transfer_amount": 0.0,
+                    "donations_count": 0,
+                    "codes": set(),
+                    "campaigns": []
+                }
+            country_map[ctry]["gross_amount"] = round(country_map[ctry]["gross_amount"] + c["gross_amount"], 2)
+            country_map[ctry]["processing_fees"] = round(country_map[ctry]["processing_fees"] + c["processing_fees"], 2)
+            country_map[ctry]["transfer_amount"] = round(country_map[ctry]["transfer_amount"] + c["transfer_amount"], 2)
+            country_map[ctry]["donations_count"] += c["donations_count"]
+            country_map[ctry]["codes"].add(c["code"])
+            country_map[ctry]["campaigns"].append(c)
+
+        # Finalize Code Groups
         code_groups = list(code_map.values())
         for cg in code_groups:
             cg["campaigns_count"] = len(cg["campaigns"])
             cg["fee_percentage"] = round((cg["processing_fees"] / cg["gross_amount"] * 100.0), 2) if cg["gross_amount"] > 0 else 0.0
-
         code_groups.sort(key=lambda x: x["gross_amount"], reverse=True)
+
+        # Finalize Heading Groups
+        heading_groups = []
+        for h_name, h_dict in heading_map.items():
+            h_dict["codes_count"] = len(h_dict["codes"])
+            h_dict["codes"] = sorted(list(h_dict["codes"]))
+            h_dict["campaigns_count"] = len(h_dict["campaigns"])
+            h_dict["fee_percentage"] = round((h_dict["processing_fees"] / h_dict["gross_amount"] * 100.0), 2) if h_dict["gross_amount"] > 0 else 0.0
+            heading_groups.append(h_dict)
+        heading_groups.sort(key=lambda x: x["gross_amount"], reverse=True)
+
+        # Finalize Country Groups
+        country_groups = []
+        for c_name, c_dict in country_map.items():
+            c_dict["codes_count"] = len(c_dict["codes"])
+            c_dict["codes"] = sorted(list(c_dict["codes"]))
+            c_dict["campaigns_count"] = len(c_dict["campaigns"])
+            c_dict["fee_percentage"] = round((c_dict["processing_fees"] / c_dict["gross_amount"] * 100.0), 2) if c_dict["gross_amount"] > 0 else 0.0
+            country_groups.append(c_dict)
+        country_groups.sort(key=lambda x: x["gross_amount"], reverse=True)
 
         # Apply Search Filter
         if search_val:
@@ -579,10 +644,46 @@ def get_campaign_payout_breakdown(
                     cg_copy["campaigns_count"] = len(matching_subs)
                     filtered_codes.append(cg_copy)
 
+            filtered_headings = []
+            for hg in heading_groups:
+                matching_subs = [
+                    sc for sc in hg["campaigns"]
+                    if search_val in sc["campaign_name"].lower()
+                    or search_val in sc["code"].lower()
+                    or search_val in hg["heading"].lower()
+                    or search_val in sc["sub_heading"].lower()
+                    or search_val in sc["country"].lower()
+                ]
+                if matching_subs:
+                    hg_copy = dict(hg)
+                    hg_copy["campaigns"] = matching_subs
+                    hg_copy["campaigns_count"] = len(matching_subs)
+                    filtered_headings.append(hg_copy)
+
+            filtered_countries = []
+            for ctg in country_groups:
+                matching_subs = [
+                    sc for sc in ctg["campaigns"]
+                    if search_val in sc["campaign_name"].lower()
+                    or search_val in sc["code"].lower()
+                    or search_val in sc["heading"].lower()
+                    or search_val in sc["sub_heading"].lower()
+                    or search_val in ctg["country"].lower()
+                ]
+                if matching_subs:
+                    ctg_copy = dict(ctg)
+                    ctg_copy["campaigns"] = matching_subs
+                    ctg_copy["campaigns_count"] = len(matching_subs)
+                    filtered_countries.append(ctg_copy)
+
             return {
                 "code_groups": filtered_codes,
+                "heading_groups": filtered_headings,
+                "country_groups": filtered_countries,
                 "campaigns": filtered_camps,
                 "total_codes": len(filtered_codes),
+                "total_headings": len(filtered_headings),
+                "total_countries": len(filtered_countries),
                 "total_campaigns": len(filtered_camps),
                 "currency": curr_selected,
                 "batch": target_batch
@@ -590,8 +691,12 @@ def get_campaign_payout_breakdown(
 
         return {
             "code_groups": code_groups,
+            "heading_groups": heading_groups,
+            "country_groups": country_groups,
             "campaigns": campaign_records,
             "total_codes": len(code_groups),
+            "total_headings": len(heading_groups),
+            "total_countries": len(country_groups),
             "total_campaigns": len(campaign_records),
             "currency": curr_selected,
             "batch": target_batch
@@ -599,7 +704,130 @@ def get_campaign_payout_breakdown(
 
     except Exception as e:
         print(f"[Error] Campaign payout breakdown error: {e}")
-        return {"code_groups": [], "campaigns": [], "total_codes": 0, "total_campaigns": 0, "currency": currency or "GBP", "batch": batch or "ALL"}
+        return {
+            "code_groups": [], 
+            "heading_groups": [], 
+            "country_groups": [], 
+            "campaigns": [], 
+            "total_codes": 0, 
+            "total_headings": 0, 
+            "total_countries": 0, 
+            "total_campaigns": 0, 
+            "currency": currency or "GBP", 
+            "batch": batch or "ALL"
+        }
+
+
+class UpdatePayoutClassificationRequest(BaseModel):
+    user_role: str
+    campaign_name: str
+    code: str
+    heading: Optional[str] = "Unassigned"
+    sub_heading: Optional[str] = "Unassigned"
+    country: Optional[str] = "Unassigned"
+    zakat_eligibility: Optional[str] = "Unassigned"
+    can_edit: Optional[bool] = True
+
+
+@router.post("/update-classification")
+def update_payout_classification(payload: UpdatePayoutClassificationRequest):
+    """
+    Updates classification for a campaign from Payouts and synchronizes across all tables and caches in real time.
+    """
+    if payload.user_role not in ["super_admin", "admin"]:
+        raise HTTPException(
+            status_code=403,
+            detail="Classification edits are restricted to authorized accounts."
+        )
+
+    cname = fix_mojibake(payload.campaign_name).strip()
+    code = str(payload.code).strip().upper()
+    heading = fix_mojibake(payload.heading).strip() if payload.heading else "Unassigned"
+    sub_heading = fix_mojibake(payload.sub_heading).strip() if payload.sub_heading else "Unassigned"
+    country = fix_mojibake(payload.country).strip() if payload.country else "Unassigned"
+    zakat = payload.zakat_eligibility if payload.zakat_eligibility else "Unassigned"
+
+    if not cname or not code:
+        raise HTTPException(status_code=400, detail="Campaign Name and Code are required.")
+
+    # Auto-fill from code map if heading/sub_heading/country/zakat are Unassigned
+    code_map = get_code_to_classification_map()
+    if code_map and code.lower() in code_map:
+        cm = code_map[code.lower()]
+        if heading in ["", "Unassigned"] and cm.get("Heading"):
+            heading = cm["Heading"]
+        if sub_heading in ["", "Unassigned"] and cm.get("Sub-Heading"):
+            sub_heading = cm["Sub-Heading"]
+        if country in ["", "Unassigned"] and cm.get("Country"):
+            country = cm["Country"]
+        if zakat in ["", "Unassigned"] and cm.get("Zakat Eligibility"):
+            zakat = cm["Zakat Eligibility"]
+
+    # 1. Update SQLite campaign_classifications
+    with _DB_LOCK:
+        conn = get_db_connection(timeout=60.0)
+        try:
+            with conn:
+                cur = conn.cursor()
+                cur.execute("""
+                    SELECT rowid FROM campaign_classifications 
+                    WHERE LOWER(campaign_name) = ? AND UPPER(code) = ?
+                """, (cname.lower(), code))
+                existing = cur.fetchone()
+                if existing:
+                    conn.execute("""
+                        UPDATE campaign_classifications 
+                        SET heading = ?, sub_heading = ?, country = ?, zakat_eligibility = ?, code = ?
+                        WHERE rowid = ?
+                    """, (heading, sub_heading, country, zakat, code, existing[0]))
+                else:
+                    cur.execute("""
+                        SELECT rowid FROM campaign_classifications 
+                        WHERE LOWER(campaign_name) = ?
+                    """, (cname.lower(),))
+                    c_exist = cur.fetchone()
+                    if c_exist:
+                        conn.execute("""
+                            UPDATE campaign_classifications 
+                            SET code = ?, heading = ?, sub_heading = ?, country = ?, zakat_eligibility = ?, is_primary = 1
+                            WHERE rowid = ?
+                        """, (code, heading, sub_heading, country, zakat, c_exist[0]))
+                    else:
+                        conn.execute("""
+                            INSERT INTO campaign_classifications 
+                            (campaign_name, code, heading, sub_heading, country, zakat_eligibility, is_primary)
+                            VALUES (?, ?, ?, ?, ?, ?, 1)
+                        """, (cname, code, heading, sub_heading, country, zakat))
+        finally:
+            conn.close()
+
+    # 2. Synchronize to donations and payouts in Parquet & SQLite
+    matrix_df = get_classification_matrix()
+    sync_matrix_classifications_to_donors(matrix_df)
+
+    # 3. Invalidate caches & reload map
+    invalidate_payouts_cache()
+    invalidate_data_cache()
+    get_code_to_classification_map(force_reload=True)
+
+    try:
+        from backend.api.events import broadcast_event_sync
+        broadcast_event_sync("MATRIX_UPDATED", {"platform": "launchgood", "campaign": cname})
+    except Exception:
+        pass
+
+    return {
+        "status": "success",
+        "message": f"Successfully updated classification for '{cname}' ({code}) and synchronized across Payouts, Donations, and Classification Matrix!",
+        "updated_rule": {
+            "campaign_name": cname,
+            "code": code,
+            "heading": heading,
+            "sub_heading": sub_heading,
+            "country": country,
+            "zakat_eligibility": zakat
+        }
+    }
 
 
 @router.get("/export")
@@ -765,6 +993,220 @@ def export_payouts_report(
         )
 
     except Exception as e:
+        print(f"[Error] Excel reconciliation export error: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to generate reconciliation report: {str(e)}")
+
+
+@router.get("/donors")
+def get_payout_donors(
+    currency: Optional[str] = Query("GBP", description="Filter by settlement currency"),
+    batch: Optional[str] = Query("ALL", description="Filter by specific Transfer ID / Batch"),
+    search: Optional[str] = "",
+    page: int = Query(1, ge=1),
+    page_size: int = Query(25, ge=1, le=1000),
+    sort_by: Optional[str] = "created_date",
+    sort_order: Optional[str] = "desc",
+    code: Optional[str] = None,
+    heading: Optional[str] = None,
+    country: Optional[str] = None,
+    zakat: Optional[str] = None,
+    campaign: Optional[str] = None
+):
+    """
+    Returns rich, paginated donor-level payout transaction records just like Data Explorer.
+    Only includes settled donation transactions associated with payouts.
+    """
+    curr_selected = _clean_str(currency, "GBP").upper()
+    target_batch = _clean_str(batch, "ALL")
+    search_val = _clean_str(search).lower()
+    sort_col = _clean_str(sort_by, "created_date").lower()
+    sort_dir = _clean_str(sort_order, "desc").lower()
+
+    p_val = int(_clean_str(page, "1")) if _clean_str(page, "1").isdigit() else 1
+    ps_val = int(_clean_str(page_size, "25")) if _clean_str(page_size, "25").isdigit() else 25
+
+    try:
+        df_all = _get_payout_data_from_db()
+        if df_all.empty:
+            return {
+                "total_records": 0,
+                "page": p_val,
+                "page_size": ps_val,
+                "total_pages": 1,
+                "records": [],
+                "summary": {"total_gross": 0.0, "total_fees": 0.0, "total_net": 0.0, "count": 0},
+                "currency": curr_selected,
+                "batch": target_batch
+            }
+
+        # Filter strictly to donation transactions
+        df = df_all[df_all["row_type"] == "donation"].copy()
+
+        # Currency Filter
+        if curr_selected in ["GBP", "USD"]:
+            df = df[df["settlement_currency"] == curr_selected]
+
+        # Batch / Transfer ID Filter
+        if target_batch and target_batch.upper() != "ALL":
+            target_clean = target_batch.replace(".0", "").replace("#", "").strip().lower()
+            df = df[df["transfer_id"].astype(str).str.replace(".0", "").str.strip().str.lower() == target_clean]
+
+        # Code Filter
+        code_filter = _clean_str(code)
+        if code_filter and code_filter.upper() != "ALL":
+            df = df[df["code"].astype(str).str.strip().str.lower() == code_filter.lower()]
+
+        # Heading Filter
+        heading_filter = _clean_str(heading)
+        if heading_filter and heading_filter.upper() != "ALL":
+            df = df[df["heading"].astype(str).str.strip().str.lower() == heading_filter.lower()]
+
+        # Country Filter
+        country_filter = _clean_str(country)
+        if country_filter and country_filter.upper() != "ALL":
+            df = df[df["country"].astype(str).str.strip().str.lower() == country_filter.lower()]
+
+        # Zakat Filter
+        zakat_filter = _clean_str(zakat)
+        if zakat_filter and zakat_filter.upper() != "ALL":
+            df = df[df["zakat"].astype(str).str.strip().str.lower() == zakat_filter.lower()]
+
+        # Campaign Filter
+        camp_filter = _clean_str(campaign)
+        if camp_filter:
+            df = df[df["campaign_name"].astype(str).str.lower().str.contains(camp_filter.lower(), na=False)]
+
+        # Search Filter (Multi-token or text)
+        if search_val:
+            mask = (
+                df["campaign_name"].astype(str).str.lower().str.contains(search_val, na=False) |
+                df["code"].astype(str).str.lower().str.contains(search_val, na=False) |
+                df["heading"].astype(str).str.lower().str.contains(search_val, na=False) |
+                df["sub_heading"].astype(str).str.lower().str.contains(search_val, na=False) |
+                df["country"].astype(str).str.lower().str.contains(search_val, na=False) |
+                df["transfer_id"].astype(str).str.lower().str.contains(search_val, na=False)
+            )
+            # Check donor columns if present
+            for col in ["First Name", "Last Name", "Display Name", "Email", "Donation ID", "Donor ID"]:
+                if col in df.columns:
+                    mask |= df[col].astype(str).str.lower().str.contains(search_val, na=False)
+            df = df[mask]
+
+        total_records = len(df)
+        total_gross = round(float(df["gross_amt"].sum()), 2) if not df.empty else 0.0
+        total_fees = round(float(df["fee_amt"].sum()), 2) if not df.empty else 0.0
+        total_net = round(float(df["net_amt"].sum()), 2) if not df.empty else 0.0
+
+        if total_records == 0:
+            return {
+                "total_records": 0,
+                "page": p_val,
+                "page_size": ps_val,
+                "total_pages": 1,
+                "records": [],
+                "summary": {"total_gross": 0.0, "total_fees": 0.0, "total_net": 0.0, "count": 0},
+                "currency": curr_selected,
+                "batch": target_batch
+            }
+
+        # Sorting
+        sort_map = {
+            "gross_amount": "gross_amt",
+            "gross": "gross_amt",
+            "fees": "fee_amt",
+            "processing_fees": "fee_amt",
+            "net_amount": "net_amt",
+            "net": "net_amt",
+            "created_date": "Created Date (UTC)",
+            "date": "Created Date (UTC)",
+            "campaign_name": "campaign_name",
+            "campaign": "campaign_name",
+            "code": "code",
+            "heading": "heading",
+            "country": "country",
+            "transfer_id": "transfer_id"
+        }
+        target_sort_col = sort_map.get(sort_col, "Created Date (UTC)")
+        if target_sort_col in df.columns:
+            is_asc = (sort_dir == "asc")
+            df = df.sort_values(by=target_sort_col, ascending=is_asc)
+
+        # Pagination
+        total_pages = max(1, math.ceil(total_records / ps_val))
+        p_val = min(p_val, total_pages)
+        start_idx = (p_val - 1) * ps_val
+        end_idx = min(start_idx + ps_val, total_records)
+        paged_df = df.iloc[start_idx:end_idx]
+
+        records = []
+        for idx, r in paged_df.iterrows():
+            gross = round(float(r.get("gross_amt", 0.0) or 0.0), 2)
+            fee = round(float(r.get("fee_amt", 0.0) or 0.0), 2)
+            net = round(float(r.get("net_amt", 0.0) or (gross - fee)), 2)
+            fee_pct = round((fee / gross * 100), 2) if gross > 0 else 0.0
+
+            d_id = str(r.get("Donation ID", "") or "").replace(".0", "").strip()
+            t_id = str(r.get("transfer_id", "") or "").replace(".0", "").strip()
+
+            fn = str(r.get("First Name", "") or "").strip()
+            ln = str(r.get("Last Name", "") or "").strip()
+            dn = str(r.get("Display Name", "") or "").strip()
+            donor_name = dn if dn and dn.lower() != "nan" else (f"{fn} {ln}".strip() or "Anonymous Donor")
+
+            records.append({
+                "row_id": int(idx) if isinstance(idx, (int, float)) else str(idx),
+                "donation_id": d_id or f"D-{idx}",
+                "donor_name": donor_name,
+                "first_name": fn,
+                "last_name": ln,
+                "display_name": dn,
+                "email": str(r.get("Email", "") or "").strip(),
+                "campaign_name": str(r.get("campaign_name", "") or "Unassigned"),
+                "code": str(r.get("code", "") or "Unassigned"),
+                "heading": str(r.get("heading", "") or "Unassigned"),
+                "sub_heading": str(r.get("sub_heading", "") or "Unassigned"),
+                "country": str(r.get("country", "") or "Unassigned"),
+                "zakat": str(r.get("zakat", "") or "Unassigned"),
+                "gross_amount": gross,
+                "processing_fees": fee,
+                "net_amount": net,
+                "fee_percentage": fee_pct,
+                "transfer_id": t_id,
+                "created_date": str(r.get("Created Date (UTC)", "") or r.get("Created Date", "") or "N/A")[:10],
+                "created_time": str(r.get("Created Time (UTC)", "") or r.get("Created Time", "") or ""),
+                "payment_frequency": str(r.get("Payment Frequency", "One-Time Payment") or "One-Time Payment"),
+                "billing_country": str(r.get("Billing Country", "") or ""),
+                "currency": str(r.get("settlement_currency", curr_selected) or curr_selected)
+            })
+
+        return {
+            "total_records": total_records,
+            "page": p_val,
+            "page_size": ps_val,
+            "total_pages": total_pages,
+            "records": records,
+            "summary": {
+                "total_gross": total_gross,
+                "total_fees": total_fees,
+                "total_net": total_net,
+                "count": total_records
+            },
+            "currency": curr_selected,
+            "batch": target_batch
+        }
+
+    except Exception as e:
+        print(f"[Error] get_payout_donors error: {e}")
+        return {
+            "total_records": 0,
+            "page": 1,
+            "page_size": 25,
+            "total_pages": 1,
+            "records": [],
+            "summary": {"total_gross": 0.0, "total_fees": 0.0, "total_net": 0.0, "count": 0},
+            "currency": curr_selected,
+            "batch": target_batch
+        }
         print(f"[Error] Export payouts report error: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to generate Excel export: {str(e)}")
 

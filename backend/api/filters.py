@@ -22,19 +22,11 @@ def get_filter_options(
     start_date: Optional[str] = None,
     end_date: Optional[str] = None
 ):
-    df_donations = load_data()
-    df_payouts = load_payouts_data()
+    df_raw = load_data()
 
-    # Determine primary dataset based on source filter
-    is_payout_only = bool(source and str(source).strip().lower() in ["launchgood payout", "payout", "payouts"])
-    if is_payout_only:
-        df_raw = df_payouts if not df_payouts.empty else df_donations
-    else:
-        df_raw = df_donations
-
-    if df_raw.empty and df_payouts.empty:
+    if df_raw.empty:
         return {
-            "sources": ["GiveBright", "LaunchGood", "LaunchGood Payout", "Paysuite", "Rethink Website"],
+            "sources": ["GiveBright", "LaunchGood", "Paysuite", "Rethink Website"],
             "headings": [],
             "subheadings": [],
             "countries": [],
@@ -50,14 +42,9 @@ def get_filter_options(
     s_df = _apply_filters(df_raw, payment_type, tier, None, heading, subheading, country, code, zakat, donor_country, campaign_search, gift_aid, start_date, end_date)
     sources = []
     if "Platform" in s_df.columns:
-        sources = sorted([str(p).strip() for p in s_df["Platform"].dropna().unique() if str(p).strip() not in ["", "nan", "None"]])
+        sources = sorted([str(p).strip() for p in s_df["Platform"].dropna().unique() if str(p).strip() not in ["", "nan", "None", "LaunchGood Payout", "launchgood payout"]])
     if not sources and "Platform" in df_raw.columns:
-        sources = sorted([str(p).strip() for p in df_raw["Platform"].dropna().unique() if str(p).strip() not in ["", "nan", "None"]])
-
-    # Always ensure LaunchGood Payout is available in sources if payout records exist
-    if not df_payouts.empty and "LaunchGood Payout" not in sources:
-        sources.append("LaunchGood Payout")
-        sources = sorted(sources)
+        sources = sorted([str(p).strip() for p in df_raw["Platform"].dropna().unique() if str(p).strip() not in ["", "nan", "None", "LaunchGood Payout", "launchgood payout"]])
 
     # 2. Headings: filter by all active criteria EXCEPT heading itself
     h_df = _apply_filters(df_raw, payment_type, tier, source, None, subheading, country, code, zakat, donor_country, campaign_search, gift_aid, start_date, end_date)
