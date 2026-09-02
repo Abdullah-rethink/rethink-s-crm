@@ -10,6 +10,7 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 LOCAL_DB_PATH = os.path.join(BASE_DIR, "launchgood_donations.db")
 PARQUET_PATH = os.path.join(BASE_DIR, "donations_cache.parquet")
 PAYOUTS_PARQUET_PATH = os.path.join(BASE_DIR, "payouts_cache.parquet")
+PAYSUITE_PAYOUTS_PARQUET_PATH = os.path.join(BASE_DIR, "paysuite_payouts_cache.parquet")
 CACHE_DIR = os.path.join(BASE_DIR, "data_cache")
 
 # Database Connection URLs

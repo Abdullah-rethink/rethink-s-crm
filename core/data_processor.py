@@ -5,7 +5,7 @@ from typing import Optional
 
 import pandas as pd
 
-from config.settings import LOCAL_DB_PATH, PARQUET_PATH, PAYOUTS_PARQUET_PATH
+from config.settings import LOCAL_DB_PATH, PARQUET_PATH, PAYOUTS_PARQUET_PATH, PAYSUITE_PAYOUTS_PARQUET_PATH
 from core.database import sync_to_cloud_async, get_db_connection, _DB_LOCK
 
 COUNTRY_ISO_MAP = {
@@ -2184,7 +2184,30 @@ def sync_matrix_classifications_to_donors(matrix_df):
             except Exception as e:
                 print(f"Payout matrix sync notice: {e}")
 
+        # 3. Update Paysuite Payout Settlement Records in paysuite_payout_settlements table
+        if os.path.exists(PAYSUITE_PAYOUTS_PARQUET_PATH):
+            try:
+                df_ps_payouts = pd.read_parquet(PAYSUITE_PAYOUTS_PARQUET_PATH)
+                if not df_ps_payouts.empty and "Campaign Name" in df_ps_payouts.columns:
+                    ps_keys = df_ps_payouts["Campaign Name"].astype(str).str.strip().str.lower()
+                    for col in target_fields:
+                        if col in df_ps_payouts.columns:
+                            col_map = {k: v[col] for k, v in camp_rule_map.items()}
+                            mapped_series = ps_keys.map(col_map)
+                            mask = mapped_series.notna()
+                            df_ps_payouts.loc[mask, col] = mapped_series[mask]
+
+                    df_ps_payouts = sanitize_df_dtypes_for_parquet(df_ps_payouts)
+                    df_ps_payouts.to_parquet(PAYSUITE_PAYOUTS_PARQUET_PATH, index=False)
+                    conn = sqlite3.connect(LOCAL_DB_PATH, timeout=30.0)
+                    df_ps_payouts.to_sql("paysuite_payout_settlements", con=conn, if_exists="replace", index=False, chunksize=5000)
+                    conn.close()
+            except Exception as e:
+                print(f"Paysuite payout matrix sync notice: {e}")
+
         load_data(force_reload=True)
+        invalidate_payouts_cache()
+        invalidate_paysuite_payouts_cache()
         return updated_count
     except Exception as e:
         print(f"Matrix to donor/payout sync notice: {e}")
@@ -2422,12 +2445,23 @@ _CACHED_PAYOUTS_DF = None
 _CACHE_PAYOUTS_MTIME = 0.0
 _CACHE_PAYOUTS_LOCK = threading.Lock()
 
+_CACHED_PAYSUITE_PAYOUTS_DF = None
+_CACHE_PAYSUITE_PAYOUTS_MTIME = 0.0
+_CACHE_PAYSUITE_PAYOUTS_LOCK = threading.Lock()
+
 def invalidate_payouts_cache():
     """Forces the in-memory payouts dataset cache to be invalidated."""
     global _CACHED_PAYOUTS_DF, _CACHE_PAYOUTS_MTIME
     with _CACHE_PAYOUTS_LOCK:
         _CACHED_PAYOUTS_DF = None
         _CACHE_PAYOUTS_MTIME = 0.0
+
+def invalidate_paysuite_payouts_cache():
+    """Forces the in-memory paysuite payouts dataset cache to be invalidated."""
+    global _CACHED_PAYSUITE_PAYOUTS_DF, _CACHE_PAYSUITE_PAYOUTS_MTIME
+    with _CACHE_PAYSUITE_PAYOUTS_LOCK:
+        _CACHED_PAYSUITE_PAYOUTS_DF = None
+        _CACHE_PAYSUITE_PAYOUTS_MTIME = 0.0
 
 def load_payouts_data(force_reload: bool = False) -> pd.DataFrame:
     """Thread-safe cached loader for payout settlements dataset."""
@@ -2483,8 +2517,62 @@ def load_payouts_data(force_reload: bool = False) -> pd.DataFrame:
         return pd.DataFrame()
 
 
+def load_paysuite_payouts_data(force_reload: bool = False) -> pd.DataFrame:
+    """Thread-safe cached loader for Paysuite payout settlements dataset."""
+    global _CACHED_PAYSUITE_PAYOUTS_DF, _CACHE_PAYSUITE_PAYOUTS_MTIME
+
+    current_mtime = 0.0
+    if os.path.exists(PAYSUITE_PAYOUTS_PARQUET_PATH):
+        try:
+            current_mtime = os.path.getmtime(PAYSUITE_PAYOUTS_PARQUET_PATH)
+        except Exception:
+            current_mtime = 0.0
+
+    if not force_reload and _CACHED_PAYSUITE_PAYOUTS_DF is not None and len(_CACHED_PAYSUITE_PAYOUTS_DF) > 0:
+        if current_mtime == _CACHE_PAYSUITE_PAYOUTS_MTIME or current_mtime == 0.0:
+            return _CACHED_PAYSUITE_PAYOUTS_DF
+
+    with _CACHE_PAYSUITE_PAYOUTS_LOCK:
+        if not force_reload and _CACHED_PAYSUITE_PAYOUTS_DF is not None and len(_CACHED_PAYSUITE_PAYOUTS_DF) > 0:
+            if current_mtime == _CACHE_PAYSUITE_PAYOUTS_MTIME or current_mtime == 0.0:
+                return _CACHED_PAYSUITE_PAYOUTS_DF
+
+        if os.path.exists(PAYSUITE_PAYOUTS_PARQUET_PATH):
+            try:
+                df = pd.read_parquet(PAYSUITE_PAYOUTS_PARQUET_PATH)
+                if not df.empty:
+                    _CACHED_PAYSUITE_PAYOUTS_DF = df
+                    _CACHE_PAYSUITE_PAYOUTS_MTIME = current_mtime
+                    return _CACHED_PAYSUITE_PAYOUTS_DF
+            except Exception as e:
+                print(f"[CACHE NOTICE] Paysuite payouts parquet read fallback: {e}")
+
+        try:
+            conn = sqlite3.connect(LOCAL_DB_PATH, timeout=15.0)
+            cursor = conn.cursor()
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='paysuite_payout_settlements'")
+            if cursor.fetchone():
+                df = pd.read_sql_query("SELECT * FROM paysuite_payout_settlements", conn)
+                conn.close()
+                if not df.empty:
+                    try:
+                        df.to_parquet(PAYSUITE_PAYOUTS_PARQUET_PATH, index=False)
+                        if os.path.exists(PAYSUITE_PAYOUTS_PARQUET_PATH):
+                            _CACHE_PAYSUITE_PAYOUTS_MTIME = os.path.getmtime(PAYSUITE_PAYOUTS_PARQUET_PATH)
+                    except Exception:
+                        pass
+                    _CACHED_PAYSUITE_PAYOUTS_DF = df
+                    return _CACHED_PAYSUITE_PAYOUTS_DF
+            else:
+                conn.close()
+        except Exception as e:
+            print(f"[CACHE NOTICE] Paysuite Payouts SQLite read fallback: {e}")
+
+        return pd.DataFrame()
+
+
 def ensure_database_indexes():
-    """Ensures database indexes exist on donations and payout_settlements for instant query performance."""
+    """Ensures database indexes exist on donations, payout_settlements, and paysuite_payout_settlements for instant query performance."""
     try:
         conn = sqlite3.connect(LOCAL_DB_PATH, timeout=10.0)
         cursor = conn.cursor()
@@ -2500,6 +2588,14 @@ def ensure_database_indexes():
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_payouts_transfer_id ON payout_settlements(\"Transfer ID\")")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_payouts_donation_id ON payout_settlements(\"Donation ID\")")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_payouts_camp_name ON payout_settlements(\"Campaign Name\")")
+
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='paysuite_payout_settlements'")
+        if cursor.fetchone():
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_ps_payouts_transfer_id ON paysuite_payout_settlements(\"Transfer ID\")")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_ps_payouts_bank_ref ON paysuite_payout_settlements(\"Bank Ref\")")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_ps_payouts_code ON paysuite_payout_settlements(\"Code\")")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_ps_payouts_status ON paysuite_payout_settlements(\"Status\")")
+
         conn.commit()
         conn.close()
     except Exception as e:
