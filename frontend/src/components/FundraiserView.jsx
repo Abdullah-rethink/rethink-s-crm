@@ -4,7 +4,8 @@ import {
   TrendingUp, Users, DollarSign, Edit3, Trash2, Eye, X, Check, 
   RefreshCw, ChevronRight, BarChart3, Clock, AlertCircle, ShieldAlert,
   Layers, CheckCircle2, Award, ArrowUpRight, LayoutGrid, List, Sparkles,
-  Lock, ArrowRight, ExternalLink, Activity
+  Lock, ArrowRight, ExternalLink, Activity, ChevronLeft, ChevronsLeft,
+  ChevronsRight, ArrowUpDown, ArrowDown, ArrowUp, SlidersHorizontal
 } from 'lucide-react';
 import { API_BASE_URL } from '../config';
 
@@ -17,6 +18,27 @@ export default function FundraiserView({ user, accentColor = 'cyan' }) {
   const [availableCampaigns, setAvailableCampaigns] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [syncToast, setSyncToast] = useState(null);
+
+  // Sync & Discover new fundraisers from live transaction data
+  const handleSyncDiscovered = () => {
+    setSyncing(true);
+    fetch(`${API_BASE_URL}/api/fundraisers/sync-discovered`, { method: 'POST' })
+      .then(r => r.json())
+      .then(res => {
+        setSyncing(false);
+        setSyncToast(res.message || 'Fundraisers synced from data successfully.');
+        loadFundraisers(true);
+        loadCampaignsList();
+        setTimeout(() => setSyncToast(null), 4500);
+      })
+      .catch(err => {
+        setSyncing(false);
+        setSyncToast('Sync error: ' + err.message);
+        setTimeout(() => setSyncToast(null), 4500);
+      });
+  };
 
   // Filters & View State
   const [searchQuery, setSearchQuery] = useState('');
@@ -27,6 +49,13 @@ export default function FundraiserView({ user, accentColor = 'cyan' }) {
   const [appliedStartDate, setAppliedStartDate] = useState('');
   const [appliedEndDate, setAppliedEndDate] = useState('');
   const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'table'
+
+  // Pagination & Sorting State
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(24); // 12, 24, 48, 96, 'ALL'
+  const [sortBy, setSortBy] = useState('period_raised'); // 'period_raised', 'all_time_raised', 'target_goal', 'progress', 'donors', 'txns', 'date', 'name'
+  const [sortOrder, setSortOrder] = useState('desc'); // 'desc' or 'asc'
+  const [jumpPageInput, setJumpPageInput] = useState('');
 
   // Modal State (Create / Edit)
   const [showModal, setShowModal] = useState(false);
@@ -61,6 +90,7 @@ export default function FundraiserView({ user, accentColor = 'cyan' }) {
   // Synchronize applied date filters based on preset buttons
   const handleDatePresetChange = (mode) => {
     setDateFilterMode(mode);
+    setCurrentPage(1);
     const today = new Date();
     if (mode === 'all') {
       setAppliedStartDate('');
@@ -105,6 +135,7 @@ export default function FundraiserView({ user, accentColor = 'cyan' }) {
     if (e) e.preventDefault();
     setAppliedStartDate(customStartDate);
     setAppliedEndDate(customEndDate);
+    setCurrentPage(1);
   };
 
   const handleClearDateFilter = () => {
@@ -113,6 +144,7 @@ export default function FundraiserView({ user, accentColor = 'cyan' }) {
     setAppliedEndDate('');
     setCustomStartDate('');
     setCustomEndDate('');
+    setCurrentPage(1);
   };
 
   // Load fundraisers list
@@ -251,13 +283,6 @@ export default function FundraiserView({ user, accentColor = 'cyan' }) {
 
   // Toggle Campaign Assignment in Modal Form
   const handleToggleCampaignAssignment = (camp) => {
-    const isAssignedToOther = camp.is_assigned && camp.assigned_to?.fundraiser_id && (!editingFundraiser || camp.assigned_to.fundraiser_id !== editingFundraiser.id);
-    
-    if (isAssignedToOther) {
-      setFormMsg(`⚠️ Campaign '${camp.campaign_name}' (Code: ${camp.code}) is already assigned to '${camp.assigned_to.fundraiser_name}'. A campaign can only belong to one fundraiser.`);
-      return;
-    }
-
     const exists = modalForm.assigned_campaigns.some(
       c => c.campaign_name.toLowerCase() === camp.campaign_name.toLowerCase() &&
            (c.code || 'ALL').toLowerCase() === (camp.code || 'ALL').toLowerCase()
@@ -410,9 +435,264 @@ export default function FundraiserView({ user, accentColor = 'cyan' }) {
           c.campaign_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
           (c.code && c.code.toLowerCase().includes(searchQuery.toLowerCase()))
         );
-      return matchSearch;
+      
+      const matchStatus = statusFilter === 'ALL' || f.status === statusFilter;
+      return matchSearch && matchStatus;
     });
-  }, [fundraisersData.fundraisers, searchQuery]);
+  }, [fundraisersData.fundraisers, searchQuery, statusFilter]);
+
+  // Sort filtered fundraisers
+  const sortedFundraisers = useMemo(() => {
+    return [...filteredFundraisers].sort((a, b) => {
+      let valA, valB;
+      if (sortBy === 'period_raised') {
+        valA = a.total_raised != null ? a.total_raised : (a.total_raised_period || 0);
+        valB = b.total_raised != null ? b.total_raised : (b.total_raised_period || 0);
+      } else if (sortBy === 'all_time_raised') {
+        valA = a.all_time_raised != null ? a.all_time_raised : (a.total_raised_all_time || a.total_raised || 0);
+        valB = b.all_time_raised != null ? b.all_time_raised : (b.total_raised_all_time || b.total_raised || 0);
+      } else if (sortBy === 'target_goal') {
+        valA = a.target_goal || 0;
+        valB = b.target_goal || 0;
+      } else if (sortBy === 'progress') {
+        valA = a.progress_percentage || 0;
+        valB = b.progress_percentage || 0;
+      } else if (sortBy === 'donors') {
+        valA = a.donor_count != null ? a.donor_count : (a.period_donors || a.total_donors || 0);
+        valB = b.donor_count != null ? b.donor_count : (b.period_donors || b.total_donors || 0);
+      } else if (sortBy === 'txns') {
+        valA = a.donation_count != null ? a.donation_count : (a.period_transactions || a.total_transactions || 0);
+        valB = b.donation_count != null ? b.donation_count : (b.period_transactions || b.total_transactions || 0);
+      } else if (sortBy === 'name') {
+        return sortOrder === 'asc' 
+          ? a.name.localeCompare(b.name) 
+          : b.name.localeCompare(a.name);
+      } else if (sortBy === 'date') {
+        valA = a.first_donation_date && a.first_donation_date !== 'N/A' ? a.first_donation_date : (a.start_date || '');
+        valB = b.first_donation_date && b.first_donation_date !== 'N/A' ? b.first_donation_date : (b.start_date || '');
+        return sortOrder === 'asc' 
+          ? valA.localeCompare(valB) 
+          : valB.localeCompare(valA);
+      } else {
+        valA = a.total_raised || 0;
+        valB = b.total_raised || 0;
+      }
+
+      if (sortOrder === 'asc') {
+        return valA > valB ? 1 : valA < valB ? -1 : 0;
+      } else {
+        return valA < valB ? 1 : valA > valB ? -1 : 0;
+      }
+    });
+  }, [filteredFundraisers, sortBy, sortOrder]);
+
+  // Pagination calculation
+  const totalItems = sortedFundraisers.length;
+  const isAllPages = pageSize === 'ALL';
+  const effectivePageSize = isAllPages ? Math.max(1, totalItems) : Number(pageSize);
+  const totalPages = isAllPages ? 1 : Math.max(1, Math.ceil(totalItems / effectivePageSize));
+
+  // Auto-adjust page if current page exceeds total pages
+  useEffect(() => {
+    if (currentPage > totalPages && totalPages > 0) {
+      setCurrentPage(totalPages);
+    }
+  }, [totalPages, currentPage]);
+
+  const paginatedFundraisers = useMemo(() => {
+    if (isAllPages) return sortedFundraisers;
+    const startIndex = (currentPage - 1) * effectivePageSize;
+    return sortedFundraisers.slice(startIndex, startIndex + effectivePageSize);
+  }, [sortedFundraisers, currentPage, effectivePageSize, isAllPages]);
+
+  const startItemIndex = totalItems === 0 ? 0 : isAllPages ? 1 : (currentPage - 1) * effectivePageSize + 1;
+  const endItemIndex = isAllPages ? totalItems : Math.min(currentPage * effectivePageSize, totalItems);
+
+  // Smart pagination range builder (e.g. 1, 2, 3 ... 10)
+  const paginationRange = useMemo(() => {
+    if (totalPages <= 7) {
+      return Array.from({ length: totalPages }, (_, i) => i + 1);
+    }
+    const delta = 1;
+    const range = [];
+    const rangeWithDots = [];
+    let l;
+
+    for (let i = 1; i <= totalPages; i++) {
+      if (i === 1 || i === totalPages || (i >= currentPage - delta && i <= currentPage + delta)) {
+        range.push(i);
+      }
+    }
+
+    for (let i of range) {
+      if (l) {
+        if (i - l === 2) {
+          rangeWithDots.push(l + 1);
+        } else if (i - l !== 1) {
+          rangeWithDots.push('...');
+        }
+      }
+      rangeWithDots.push(i);
+      l = i;
+    }
+    return rangeWithDots;
+  }, [totalPages, currentPage]);
+
+  // Pagination Controls UI Bar
+  const renderPaginationControls = (isTop = false) => {
+    if (totalItems === 0) return null;
+
+    return (
+      <div 
+        className={`flex flex-col sm:flex-row items-center justify-between gap-3 px-4 py-2.5 rounded-xl border ${
+          isTop ? 'mb-1' : 'mt-2'
+        }`}
+        style={{
+          backgroundColor: 'var(--bg-glass)',
+          borderColor: 'var(--border-glass)',
+          backdropFilter: 'blur(8px)'
+        }}
+      >
+        {/* Left Side: Count & Page Size Selector */}
+        <div className="flex items-center gap-3 flex-wrap justify-center sm:justify-start">
+          <span className="text-xs font-bold" style={{ color: 'var(--text-muted)' }}>
+            Showing <span className="font-extrabold text-cyan-600 dark:text-cyan-400">{startItemIndex}</span> - <span className="font-extrabold text-cyan-600 dark:text-cyan-400">{endItemIndex}</span> of <span className="font-extrabold" style={{ color: 'var(--text-main)' }}>{totalItems}</span> fundraisers
+          </span>
+
+          <div className="flex items-center gap-1.5 pl-3 border-l" style={{ borderColor: 'var(--border-glass)' }}>
+            <span className="text-[11px] font-semibold" style={{ color: 'var(--text-sub)' }}>Show:</span>
+            {[12, 24, 48, 96, 'ALL'].map(size => {
+              const isActive = pageSize === size || (size === 'ALL' && pageSize === 'ALL');
+              return (
+                <button
+                  key={size}
+                  onClick={() => {
+                    setPageSize(size);
+                    setCurrentPage(1);
+                  }}
+                  className={`px-2 py-0.5 rounded text-[11px] font-bold transition-all ${
+                    isActive
+                      ? 'bg-cyan-500 text-white shadow-sm'
+                      : 'hover:bg-slate-200 dark:hover:bg-slate-800'
+                  }`}
+                  style={{
+                    color: isActive ? '#ffffff' : 'var(--text-muted)'
+                  }}
+                >
+                  {size === 'ALL' ? 'All' : size}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Right Side: Page Navigation Buttons & Jump */}
+        {!isAllPages && totalPages > 1 && (
+          <div className="flex items-center gap-1.5 flex-wrap justify-center sm:justify-end">
+            {/* First Page */}
+            <button
+              onClick={() => setCurrentPage(1)}
+              disabled={currentPage === 1}
+              className="p-1.5 rounded-lg border text-xs disabled:opacity-30 disabled:cursor-not-allowed hover:border-cyan-500/50 transition-colors"
+              style={{ backgroundColor: 'var(--input-bg)', color: 'var(--input-text)', borderColor: 'var(--input-border)' }}
+              title="First Page"
+            >
+              <ChevronsLeft className="w-3.5 h-3.5" />
+            </button>
+
+            {/* Previous Page */}
+            <button
+              onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+              disabled={currentPage === 1}
+              className="p-1.5 rounded-lg border text-xs disabled:opacity-30 disabled:cursor-not-allowed hover:border-cyan-500/50 transition-colors"
+              style={{ backgroundColor: 'var(--input-bg)', color: 'var(--input-text)', borderColor: 'var(--input-border)' }}
+              title="Previous Page"
+            >
+              <ChevronLeft className="w-3.5 h-3.5" />
+            </button>
+
+            {/* Numbered Page Buttons */}
+            <div className="flex items-center gap-1">
+              {paginationRange.map((page, idx) => {
+                if (page === '...') {
+                  return (
+                    <span key={`dots-${idx}`} className="px-1.5 py-1 text-xs font-bold text-slate-400">
+                      •••
+                    </span>
+                  );
+                }
+                const isActive = currentPage === page;
+                return (
+                  <button
+                    key={page}
+                    onClick={() => setCurrentPage(page)}
+                    className={`min-w-[28px] h-7 px-2 rounded-lg text-xs font-extrabold transition-all ${
+                      isActive
+                        ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-sm shadow-cyan-500/30'
+                        : 'border hover:border-cyan-500/50'
+                    }`}
+                    style={{
+                      backgroundColor: isActive ? undefined : 'var(--input-bg)',
+                      color: isActive ? '#ffffff' : 'var(--text-main)',
+                      borderColor: isActive ? 'transparent' : 'var(--input-border)'
+                    }}
+                  >
+                    {page}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Next Page */}
+            <button
+              onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+              disabled={currentPage === totalPages}
+              className="p-1.5 rounded-lg border text-xs disabled:opacity-30 disabled:cursor-not-allowed hover:border-cyan-500/50 transition-colors"
+              style={{ backgroundColor: 'var(--input-bg)', color: 'var(--input-text)', borderColor: 'var(--input-border)' }}
+              title="Next Page"
+            >
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+
+            {/* Last Page */}
+            <button
+              onClick={() => setCurrentPage(totalPages)}
+              disabled={currentPage === totalPages}
+              className="p-1.5 rounded-lg border text-xs disabled:opacity-30 disabled:cursor-not-allowed hover:border-cyan-500/50 transition-colors"
+              style={{ backgroundColor: 'var(--input-bg)', color: 'var(--input-text)', borderColor: 'var(--input-border)' }}
+              title="Last Page"
+            >
+              <ChevronsRight className="w-3.5 h-3.5" />
+            </button>
+
+            {/* Page Jump */}
+            {totalPages > 3 && (
+              <div className="flex items-center gap-1 pl-2 border-l" style={{ borderColor: 'var(--border-glass)' }}>
+                <span className="text-[11px] font-semibold" style={{ color: 'var(--text-sub)' }}>Go to:</span>
+                <input
+                  type="number"
+                  min="1"
+                  max={totalPages}
+                  placeholder={currentPage}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') {
+                      const val = parseInt(e.target.value, 10);
+                      if (!isNaN(val) && val >= 1 && val <= totalPages) {
+                        setCurrentPage(val);
+                        e.target.value = '';
+                      }
+                    }
+                  }}
+                  className="w-12 px-1.5 py-1 text-center text-xs rounded-lg border focus:outline-none focus:border-cyan-500"
+                  style={{ backgroundColor: 'var(--input-bg)', color: 'var(--input-text)', borderColor: 'var(--input-border)' }}
+                />
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
 
   const summary = fundraisersData.summary || {};
   const isDateFiltered = !!(appliedStartDate || appliedEndDate);
@@ -442,6 +722,18 @@ export default function FundraiserView({ user, accentColor = 'cyan' }) {
         </div>
 
         <div className="flex items-center gap-2">
+          {isSuperAdmin && (
+            <button
+              onClick={handleSyncDiscovered}
+              disabled={syncing}
+              className="btn-secondary text-xs flex items-center gap-1.5 px-3 py-1.5 border-cyan-500/30 text-cyan-600 dark:text-cyan-400 hover:bg-cyan-500/10"
+              title="Scan donor records to auto-discover and link new fundraisers"
+            >
+              <Sparkles className={`w-3.5 h-3.5 ${syncing ? 'animate-spin' : 'text-cyan-500'}`} />
+              {syncing ? 'Syncing Data...' : 'Sync from Data'}
+            </button>
+          )}
+
           <button
             onClick={() => loadFundraisers(false)}
             disabled={refreshing}
@@ -461,6 +753,19 @@ export default function FundraiserView({ user, accentColor = 'cyan' }) {
           )}
         </div>
       </div>
+
+      {/* ── Sync Notification Toast ───────────────────────────────── */}
+      {syncToast && (
+        <div className="glass-panel p-2.5 px-3.5 bg-gradient-to-r from-cyan-500/10 via-blue-500/10 to-transparent border border-cyan-500/30 flex items-center justify-between text-xs font-semibold text-cyan-700 dark:text-cyan-300">
+          <div className="flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-cyan-500 shrink-0" />
+            <span>{syncToast}</span>
+          </div>
+          <button onClick={() => setSyncToast(null)} className="text-slate-400 hover:text-slate-200">
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
 
       {/* ── KPI Summary Cards ────────────────────────────────────── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
@@ -567,7 +872,10 @@ export default function FundraiserView({ user, accentColor = 'cyan' }) {
             {/* Status Filter */}
             <select
               value={statusFilter}
-              onChange={e => setStatusFilter(e.target.value)}
+              onChange={e => {
+                setStatusFilter(e.target.value);
+                setCurrentPage(1);
+              }}
               className="px-2.5 py-1.5 text-xs rounded-lg focus:outline-none"
               style={{ backgroundColor: 'var(--input-bg)', color: 'var(--input-text)', border: '1px solid var(--input-border)' }}
             >
@@ -576,6 +884,35 @@ export default function FundraiserView({ user, accentColor = 'cyan' }) {
               <option value="PAUSED">Paused</option>
               <option value="COMPLETED">Completed</option>
             </select>
+
+            {/* Sort Filter */}
+            <div className="flex items-center gap-1">
+              <select
+                value={sortBy}
+                onChange={e => setSortBy(e.target.value)}
+                className="px-2.5 py-1.5 text-xs rounded-lg focus:outline-none font-medium"
+                style={{ backgroundColor: 'var(--input-bg)', color: 'var(--input-text)', border: '1px solid var(--input-border)' }}
+              >
+                <option value="period_raised">{isDateFiltered ? 'Sort: Period Raised' : 'Sort: Total Raised'}</option>
+                <option value="all_time_raised">Sort: Lifetime Raised</option>
+                <option value="progress">Sort: Goal Progress %</option>
+                <option value="target_goal">Sort: Target Goal</option>
+                <option value="donors">Sort: Donor Count</option>
+                <option value="txns">Sort: Transactions</option>
+                <option value="name">Sort: Name (A-Z)</option>
+                <option value="date">Sort: First Gift Date</option>
+              </select>
+
+              <button
+                type="button"
+                onClick={() => setSortOrder(prev => prev === 'desc' ? 'asc' : 'desc')}
+                className="p-1.5 rounded-lg border hover:border-cyan-500/50 transition-colors"
+                style={{ backgroundColor: 'var(--input-bg)', color: 'var(--input-text)', borderColor: 'var(--input-border)' }}
+                title={sortOrder === 'desc' ? 'Sort Descending (High to Low)' : 'Sort Ascending (Low to High)'}
+              >
+                {sortOrder === 'desc' ? <ArrowDown className="w-3.5 h-3.5 text-cyan-500" /> : <ArrowUp className="w-3.5 h-3.5 text-cyan-500" />}
+              </button>
+            </div>
           </div>
 
           {/* Preset Buttons */}
@@ -689,6 +1026,9 @@ export default function FundraiserView({ user, accentColor = 'cyan' }) {
         </div>
       </div>
 
+      {/* Top Pagination Controls */}
+      {!loading && filteredFundraisers.length > 0 && renderPaginationControls(true)}
+
       {/* ── Main Content: Grid / Table Views ─────────────────────── */}
       {loading ? (
         <div className="glass-panel p-10 text-center flex flex-col items-center justify-center gap-2.5">
@@ -718,7 +1058,7 @@ export default function FundraiserView({ user, accentColor = 'cyan' }) {
       ) : viewMode === 'grid' ? (
         /* ── Grid Cards View (Responsive 3/4 Column Layout) ───────── */
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
-          {filteredFundraisers.map(f => {
+          {paginatedFundraisers.map(f => {
             const hasGoal = f.target_goal > 0;
             const progress = f.progress_percentage || 0;
             const isCompleted = progress >= 100;
@@ -774,97 +1114,104 @@ export default function FundraiserView({ user, accentColor = 'cyan' }) {
                       {isDateFiltered ? (
                         <span className="truncate">Period window:</span>
                       ) : (
-                        <span className="truncate">Since first gift (<strong style={{ color: 'var(--text-main)' }}>{firstDate}</strong>):</span>
+                        <span className="truncate">First gift date:</span>
                       )}
                     </div>
-                    <span className="font-black text-emerald-600 dark:text-emerald-400 text-xs shrink-0 ml-2">
-                      £{f.total_raised_period.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    <span className="font-extrabold text-[11px] text-cyan-600 dark:text-cyan-400 shrink-0 ml-1">
+                      {isDateFiltered ? `${appliedStartDate || 'Start'} → ${appliedEndDate || 'Now'}` : firstDate}
                     </span>
                   </div>
 
-                  {/* Target Goal Progress */}
-                  {hasGoal && (
+                  {/* ── Raised Amounts ───────────────────────────────── */}
+                  <div className="mt-3 flex items-baseline justify-between">
+                    <div>
+                      <div className="text-[10px] uppercase font-bold" style={{ color: 'var(--text-sub)' }}>
+                        {isDateFiltered ? 'Raised (In Period)' : 'Total Raised (All-Time)'}
+                      </div>
+                      <div className="text-xl font-black text-emerald-600 dark:text-emerald-400 tracking-tight">
+                        £{f.total_raised_period.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </div>
+                    </div>
+                    {isDateFiltered && (
+                      <div className="text-right">
+                        <div className="text-[10px] uppercase font-bold" style={{ color: 'var(--text-sub)' }}>Lifetime</div>
+                        <div className="text-xs font-bold" style={{ color: 'var(--text-main)' }}>
+                          £{f.total_raised_all_time.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* ── Target & Progress Bar ────────────────────────── */}
+                  {hasGoal ? (
                     <div className="mt-2.5">
                       <div className="flex items-center justify-between text-[11px] mb-1">
                         <span className="font-semibold" style={{ color: 'var(--text-muted)' }}>
-                          Target Goal: £{f.target_goal.toLocaleString()}
+                          Goal: £{f.target_goal.toLocaleString()}
                         </span>
-                        <span className={`font-black ${isCompleted ? 'text-emerald-500' : 'text-cyan-500'}`}>
-                          {progress}%
+                        <span className="font-black text-cyan-600 dark:text-cyan-400">
+                          {progress}% {isCompleted ? '🎉' : ''}
                         </span>
                       </div>
-                      <div className="w-full rounded-full h-1.5 overflow-hidden border" style={{ backgroundColor: 'var(--bg-card-inner)', borderColor: 'var(--border-glass)' }}>
+                      <div className="w-full rounded-full h-2 overflow-hidden" style={{ backgroundColor: 'var(--bg-card-inner)' }}>
                         <div 
                           className={`h-full rounded-full transition-all duration-500 ${
                             isCompleted 
-                              ? 'bg-gradient-to-r from-emerald-500 to-teal-400' 
+                              ? 'bg-gradient-to-r from-emerald-500 to-cyan-400' 
                               : 'bg-gradient-to-r from-cyan-500 to-blue-500'
                           }`}
                           style={{ width: `${Math.min(progress, 100)}%` }}
                         />
                       </div>
                     </div>
+                  ) : (
+                    <div className="mt-2 text-[11px] italic" style={{ color: 'var(--text-sub)' }}>
+                      No fundraising target set
+                    </div>
                   )}
 
-                  {/* Metrics Grid */}
-                  <div className="grid grid-cols-3 gap-1.5 mt-3 pt-2.5 border-t" style={{ borderColor: 'var(--border-glass)' }}>
-                    <div className="text-center p-1 rounded-md" style={{ backgroundColor: 'var(--bg-card-inner)' }}>
-                      <div className="text-[9px] uppercase font-bold" style={{ color: 'var(--text-muted)' }}>Lifetime</div>
-                      <div className="text-[11px] font-black mt-0.5 text-purple-600 dark:text-purple-400 truncate">
-                        £{f.total_raised_all_time.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                  {/* ── Donors & Avg Donation Metrics ────────────────── */}
+                  <div className="mt-3 grid grid-cols-2 gap-2 pt-2 border-t" style={{ borderColor: 'var(--border-glass)' }}>
+                    <div className="p-1.5 rounded-md" style={{ backgroundColor: 'var(--bg-card-inner)' }}>
+                      <div className="text-[10px]" style={{ color: 'var(--text-sub)' }}>Donors</div>
+                      <div className="text-xs font-extrabold" style={{ color: 'var(--text-main)' }}>
+                        {isDateFiltered ? `${f.period_donors} (in period)` : f.total_donors}
                       </div>
                     </div>
-                    <div className="text-center p-1 rounded-md" style={{ backgroundColor: 'var(--bg-card-inner)' }}>
-                      <div className="text-[9px] uppercase font-bold" style={{ color: 'var(--text-muted)' }}>
-                        {isDateFiltered ? 'Period Donors' : 'Donors'}
-                      </div>
-                      <div className="text-[11px] font-black mt-0.5 truncate" style={{ color: 'var(--text-main)' }}>
-                        {isDateFiltered ? f.period_donors : f.total_donors}
-                      </div>
-                    </div>
-                    <div className="text-center p-1 rounded-md" style={{ backgroundColor: 'var(--bg-card-inner)' }}>
-                      <div className="text-[9px] uppercase font-bold" style={{ color: 'var(--text-muted)' }}>Avg Gift</div>
-                      <div className="text-[11px] font-black mt-0.5 text-cyan-600 dark:text-cyan-400 truncate">
-                        £{f.avg_donation}
+                    <div className="p-1.5 rounded-md" style={{ backgroundColor: 'var(--bg-card-inner)' }}>
+                      <div className="text-[10px]" style={{ color: 'var(--text-sub)' }}>Avg Donation</div>
+                      <div className="text-xs font-extrabold" style={{ color: 'var(--text-main)' }}>
+                        £{(f.average_donation || 0).toFixed(2)}
                       </div>
                     </div>
                   </div>
 
-                  {/* Assigned Campaigns Badges */}
-                  <div className="mt-2.5">
-                    <div className="text-[9px] font-extrabold uppercase tracking-wider mb-1 flex items-center justify-between" style={{ color: 'var(--text-muted)' }}>
-                      <span>Assigned ({f.assigned_campaigns?.length || 0})</span>
-                      {f.latest_donation_date && f.latest_donation_date !== 'N/A' && (
-                        <span className="font-normal" style={{ color: 'var(--text-sub)' }}>
-                          Latest: {f.latest_donation_date}
-                        </span>
-                      )}
+                  {/* ── Assigned Campaigns Pills ─────────────────────── */}
+                  <div className="mt-3">
+                    <div className="text-[10px] uppercase font-bold mb-1.5 flex items-center justify-between" style={{ color: 'var(--text-sub)' }}>
+                      <span>Linked Campaigns ({f.assigned_campaigns ? f.assigned_campaigns.length : 0})</span>
                     </div>
-                    <div className="flex flex-wrap gap-1 max-h-16 overflow-y-auto custom-scrollbar">
-                      {(f.assigned_campaigns || []).length === 0 ? (
-                        <span className="text-[10px] italic" style={{ color: 'var(--text-sub)' }}>No campaigns assigned yet.</span>
-                      ) : (
-                        (f.assigned_campaigns || []).map((c, idx) => (
-                          <span 
-                            key={idx}
-                            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-cyan-500/10 text-cyan-700 dark:text-cyan-300 border border-cyan-500/20 truncate max-w-[170px]"
-                            title={`${c.campaign_name} [Code: ${c.code || 'ALL'}]`}
-                          >
-                            <span className="truncate">{c.campaign_name}</span>
-                            {c.code && c.code !== 'ALL' && (
-                              <span className="px-1 rounded bg-cyan-500/20 text-cyan-800 dark:text-cyan-200 text-[8px] font-black shrink-0">
-                                {c.code}
-                              </span>
-                            )}
-                          </span>
-                        ))
+                    <div className="flex flex-wrap gap-1 max-h-16 overflow-y-auto pr-1">
+                      {(f.assigned_campaigns || []).map((c, i) => (
+                        <span 
+                          key={i} 
+                          className="px-2 py-0.5 rounded text-[10px] font-bold bg-cyan-500/10 text-cyan-700 dark:text-cyan-300 border border-cyan-500/20 truncate max-w-full"
+                          title={`${c.campaign_name} (${c.code || 'No Code'})`}
+                        >
+                          {c.campaign_name}
+                        </span>
+                      ))}
+                      {(!f.assigned_campaigns || f.assigned_campaigns.length === 0) && (
+                        <span className="text-[10px] italic" style={{ color: 'var(--text-sub)' }}>
+                          No campaigns assigned yet
+                        </span>
                       )}
                     </div>
                   </div>
                 </div>
 
-                {/* Card Footer Actions */}
-                <div className="flex items-center justify-between pt-2 border-t mt-1" style={{ borderColor: 'var(--border-glass)' }}>
+                {/* Card Bottom: Drilldown & Admin Actions */}
+                <div className="pt-2 border-t flex items-center justify-between gap-2 mt-1" style={{ borderColor: 'var(--border-glass)' }}>
                   <button
                     onClick={() => {
                       setSelectedFundraiserId(f.id);
@@ -872,26 +1219,26 @@ export default function FundraiserView({ user, accentColor = 'cyan' }) {
                       setDrilldownEndDate(appliedEndDate);
                       loadDrilldown(f.id, appliedStartDate, appliedEndDate);
                     }}
-                    className="text-xs font-bold text-cyan-600 dark:text-cyan-400 hover:text-cyan-500 flex items-center gap-1 transition-colors"
+                    className="flex-1 py-1.5 px-2.5 rounded-lg bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-600 dark:text-cyan-400 text-xs font-bold flex items-center justify-center gap-1.5 transition-colors"
                   >
-                    <BarChart3 className="w-3 h-3" /> Breakdown <ArrowUpRight className="w-3 h-3" />
+                    <Eye className="w-3.5 h-3.5" /> View Drilldown
                   </button>
 
                   {isSuperAdmin && (
                     <div className="flex items-center gap-1">
                       <button
                         onClick={() => handleOpenEditModal(f)}
-                        className="p-1 rounded-md hover:bg-slate-200 dark:hover:bg-slate-700/40 text-slate-400 hover:text-cyan-500 transition-colors"
-                        title="Edit Fundraiser &amp; Campaigns"
+                        className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700/60 text-slate-400 hover:text-cyan-500 transition-colors"
+                        title="Edit Fundraiser"
                       >
-                        <Edit3 className="w-3 h-3" />
+                        <Edit3 className="w-3.5 h-3.5" />
                       </button>
                       <button
                         onClick={() => setDeleteConfirm(f)}
-                        className="p-1 rounded-md hover:bg-rose-500/10 text-slate-400 hover:text-rose-500 transition-colors"
+                        className="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 transition-colors"
                         title="Delete Fundraiser"
                       >
-                        <Trash2 className="w-3 h-3" />
+                        <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </div>
                   )}
@@ -907,21 +1254,103 @@ export default function FundraiserView({ user, accentColor = 'cyan' }) {
             <table className="w-full text-left text-xs border-collapse">
               <thead>
                 <tr className="border-b" style={{ borderColor: 'var(--border-glass)', backgroundColor: 'var(--table-header-bg)' }}>
-                  <th className="py-2.5 px-3.5 font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Fundraiser</th>
-                  <th className="py-2.5 px-3.5 font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>First Gift Date</th>
-                  <th className="py-2.5 px-3.5 font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
-                    {isDateFiltered ? 'Period Raised' : 'Total Raised'}
+                  <th 
+                    onClick={() => {
+                      if (sortBy === 'name') setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
+                      else { setSortBy('name'); setSortOrder('asc'); }
+                    }}
+                    className="py-2.5 px-3.5 font-bold uppercase tracking-wider cursor-pointer hover:text-cyan-500 select-none transition-colors" 
+                    style={{ color: sortBy === 'name' ? 'var(--color-primary, #06b6d4)' : 'var(--text-muted)' }}
+                  >
+                    <div className="flex items-center gap-1">
+                      <span>Fundraiser</span>
+                      {sortBy === 'name' && (sortOrder === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />)}
+                    </div>
                   </th>
-                  <th className="py-2.5 px-3.5 font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Lifetime Raised</th>
-                  <th className="py-2.5 px-3.5 font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Target Goal</th>
-                  <th className="py-2.5 px-3.5 font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Progress</th>
-                  <th className="py-2.5 px-3.5 font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Donors</th>
+                  <th 
+                    onClick={() => {
+                      if (sortBy === 'date') setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
+                      else { setSortBy('date'); setSortOrder('desc'); }
+                    }}
+                    className="py-2.5 px-3.5 font-bold uppercase tracking-wider cursor-pointer hover:text-cyan-500 select-none transition-colors" 
+                    style={{ color: sortBy === 'date' ? 'var(--color-primary, #06b6d4)' : 'var(--text-muted)' }}
+                  >
+                    <div className="flex items-center gap-1">
+                      <span>First Gift Date</span>
+                      {sortBy === 'date' && (sortOrder === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />)}
+                    </div>
+                  </th>
+                  <th 
+                    onClick={() => {
+                      if (sortBy === 'period_raised') setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
+                      else { setSortBy('period_raised'); setSortOrder('desc'); }
+                    }}
+                    className="py-2.5 px-3.5 font-bold uppercase tracking-wider cursor-pointer hover:text-cyan-500 select-none transition-colors" 
+                    style={{ color: sortBy === 'period_raised' ? 'var(--color-primary, #06b6d4)' : 'var(--text-muted)' }}
+                  >
+                    <div className="flex items-center gap-1">
+                      <span>{isDateFiltered ? 'Period Raised' : 'Total Raised'}</span>
+                      {sortBy === 'period_raised' && (sortOrder === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />)}
+                    </div>
+                  </th>
+                  <th 
+                    onClick={() => {
+                      if (sortBy === 'all_time_raised') setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
+                      else { setSortBy('all_time_raised'); setSortOrder('desc'); }
+                    }}
+                    className="py-2.5 px-3.5 font-bold uppercase tracking-wider cursor-pointer hover:text-cyan-500 select-none transition-colors" 
+                    style={{ color: sortBy === 'all_time_raised' ? 'var(--color-primary, #06b6d4)' : 'var(--text-muted)' }}
+                  >
+                    <div className="flex items-center gap-1">
+                      <span>Lifetime Raised</span>
+                      {sortBy === 'all_time_raised' && (sortOrder === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />)}
+                    </div>
+                  </th>
+                  <th 
+                    onClick={() => {
+                      if (sortBy === 'target_goal') setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
+                      else { setSortBy('target_goal'); setSortOrder('desc'); }
+                    }}
+                    className="py-2.5 px-3.5 font-bold uppercase tracking-wider cursor-pointer hover:text-cyan-500 select-none transition-colors" 
+                    style={{ color: sortBy === 'target_goal' ? 'var(--color-primary, #06b6d4)' : 'var(--text-muted)' }}
+                  >
+                    <div className="flex items-center gap-1">
+                      <span>Target Goal</span>
+                      {sortBy === 'target_goal' && (sortOrder === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />)}
+                    </div>
+                  </th>
+                  <th 
+                    onClick={() => {
+                      if (sortBy === 'progress') setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
+                      else { setSortBy('progress'); setSortOrder('desc'); }
+                    }}
+                    className="py-2.5 px-3.5 font-bold uppercase tracking-wider cursor-pointer hover:text-cyan-500 select-none transition-colors" 
+                    style={{ color: sortBy === 'progress' ? 'var(--color-primary, #06b6d4)' : 'var(--text-muted)' }}
+                  >
+                    <div className="flex items-center gap-1">
+                      <span>Progress</span>
+                      {sortBy === 'progress' && (sortOrder === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />)}
+                    </div>
+                  </th>
+                  <th 
+                    onClick={() => {
+                      if (sortBy === 'donors') setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
+                      else { setSortBy('donors'); setSortOrder('desc'); }
+                    }}
+                    className="py-2.5 px-3.5 font-bold uppercase tracking-wider cursor-pointer hover:text-cyan-500 select-none transition-colors" 
+                    style={{ color: sortBy === 'donors' ? 'var(--color-primary, #06b6d4)' : 'var(--text-muted)' }}
+                  >
+                    <div className="flex items-center gap-1">
+                      <span>Donors</span>
+                      {sortBy === 'donors' && (sortOrder === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />)}
+                    </div>
+                  </th>
                   <th className="py-2.5 px-3.5 font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Assigned Campaigns</th>
                   <th className="py-2.5 px-3.5 font-bold uppercase tracking-wider text-right" style={{ color: 'var(--text-muted)' }}>Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y" style={{ borderColor: 'var(--border-glass)' }}>
-                {filteredFundraisers.map(f => (
+                {paginatedFundraisers.map(f => (
                   <tr key={f.id} className="hover:bg-slate-200/40 dark:hover:bg-slate-800/40 transition-colors">
                     <td className="py-2.5 px-3.5 font-bold" style={{ color: 'var(--text-main)' }}>
                       <div className="flex items-center gap-2">
@@ -1019,6 +1448,9 @@ export default function FundraiserView({ user, accentColor = 'cyan' }) {
           </div>
         </div>
       )}
+
+      {/* Bottom Pagination Controls */}
+      {!loading && filteredFundraisers.length > 0 && renderPaginationControls(false)}
 
       {/* ── Super Admin: Create / Edit Modal ─────────────────────── */}
       {showModal && isSuperAdmin && (
