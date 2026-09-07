@@ -6,7 +6,7 @@ import {
   Layers, CheckCircle2, Award, ArrowUpRight, LayoutGrid, List, Sparkles,
   ArrowRight, ExternalLink, Activity, ChevronLeft, ChevronsLeft,
   ChevronsRight, ArrowUpDown, ArrowDown, ArrowUp, SlidersHorizontal,
-  ChevronDown
+  ChevronDown, ChevronUp
 } from 'lucide-react';
 import { API_BASE_URL } from '../config';
 import FundraiserFormModal from './FundraiserFormModal';
@@ -79,7 +79,7 @@ export default function FundraiserView({ user, accentColor = 'cyan' }) {
   const [loadingDrilldown, setLoadingDrilldown] = useState(false);
   const [drilldownStartDate, setDrilldownStartDate] = useState('');
   const [drilldownEndDate, setDrilldownEndDate] = useState('');
-  const [campaignBreakdownExpanded, setCampaignBreakdownExpanded] = useState(true);
+  const [showAllCampaigns, setShowAllCampaigns] = useState(false);
   const [campaignBreakdownSearch, setCampaignBreakdownSearch] = useState('');
   const drawerBodyRef = useRef(null);
 
@@ -187,10 +187,7 @@ export default function FundraiserView({ user, accentColor = 'cyan' }) {
       .then(res => res.json())
       .then(data => {
         setDrilldownData(data);
-        // Auto-expand for normal fundraisers (<= 5 campaigns) so breakdown table is immediately visible,
-        // collapse only for heavy fundraisers (> 5 campaigns) so view is clean
-        const count = (data?.campaign_breakdown || []).length;
-        setCampaignBreakdownExpanded(count <= 5);
+        setShowAllCampaigns(false);
         setLoadingDrilldown(false);
         setTimeout(() => {
           if (drawerBodyRef.current) {
@@ -432,6 +429,13 @@ export default function FundraiserView({ user, accentColor = 'cyan' }) {
       (cb.heading && cb.heading.toLowerCase().includes(q))
     );
   }, [drilldownData?.campaign_breakdown, campaignBreakdownSearch]);
+
+  const displayedCampaigns = useMemo(() => {
+    if (campaignBreakdownSearch.trim() || showAllCampaigns) {
+      return filteredCampaignBreakdown;
+    }
+    return filteredCampaignBreakdown.slice(0, 5);
+  }, [filteredCampaignBreakdown, campaignBreakdownSearch, showAllCampaigns]);
 
   const totalCampaignsGross = useMemo(() => {
     return (drilldownData?.campaign_breakdown || []).reduce((acc, c) => acc + (c.gross_raised || 0), 0);
@@ -1116,7 +1120,7 @@ export default function FundraiserView({ user, accentColor = 'cyan' }) {
                   <button
                     onClick={() => {
                       setSelectedFundraiserId(f.id);
-                      setCampaignBreakdownExpanded((f.assigned_campaigns || []).length <= 5);
+                      setShowAllCampaigns(false);
                       setCampaignBreakdownSearch('');
                       setDrilldownStartDate(appliedStartDate);
                       setDrilldownEndDate(appliedEndDate);
@@ -1315,7 +1319,7 @@ export default function FundraiserView({ user, accentColor = 'cyan' }) {
                         <button
                           onClick={() => {
                             setSelectedFundraiserId(f.id);
-                            setCampaignBreakdownExpanded((f.assigned_campaigns || []).length <= 5);
+                            setShowAllCampaigns(false);
                             setCampaignBreakdownSearch('');
                             setDrilldownStartDate(appliedStartDate);
                             setDrilldownEndDate(appliedEndDate);
@@ -1438,7 +1442,7 @@ export default function FundraiserView({ user, accentColor = 'cyan' }) {
                 onClick={() => {
                   setSelectedFundraiserId(null);
                   setDrilldownData(null);
-                  setCampaignBreakdownExpanded(false);
+                  setShowAllCampaigns(false);
                   setCampaignBreakdownSearch('');
                 }}
                 className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors"
@@ -1506,124 +1510,115 @@ export default function FundraiserView({ user, accentColor = 'cyan' }) {
                 </div>
               ) : (
                 <>
-                  {/* Collapsible Campaign Breakdown Table */}
-                  <div className="border rounded-xl overflow-hidden transition-all shadow-sm" style={{ borderColor: 'var(--border-glass)', backgroundColor: 'var(--bg-card-inner)' }}>
-                    {/* Collapsible Accordion Header */}
-                    <button
-                      type="button"
-                      onClick={() => setCampaignBreakdownExpanded(prev => !prev)}
-                      className="w-full flex items-center justify-between p-3.5 text-left hover:bg-slate-200/40 dark:hover:bg-slate-800/40 transition-colors group cursor-pointer"
-                    >
-                      <div className="flex items-center gap-2.5">
-                        <div className="p-1.5 rounded-lg bg-cyan-500/10 text-cyan-600 dark:text-cyan-400">
+                  {/* Assigned Campaign Performance Section */}
+                  <div className="flex flex-col gap-2.5">
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <div className="flex items-center gap-2">
+                        <div className="p-1 rounded-lg bg-cyan-500/10 text-cyan-600 dark:text-cyan-400">
                           <BarChart3 className="w-4 h-4" />
                         </div>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs font-extrabold uppercase tracking-wider" style={{ color: 'var(--text-main)' }}>
-                              Assigned Campaign Performance
-                            </span>
-                            <span className="text-[11px] font-extrabold px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-500/20">
-                              {(drilldownData?.campaign_breakdown || []).length} campaigns
-                            </span>
-                          </div>
-                          {!campaignBreakdownExpanded && (
-                            <p className="text-[11px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                              {(drilldownData?.campaign_breakdown || []).length > 0
-                                ? `Total: £${totalCampaignsGross.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} • Click to expand`
-                                : 'No assigned campaigns • Click to view'}
-                            </p>
-                          )}
-                        </div>
+                        <h4 className="text-xs font-extrabold uppercase tracking-wider flex items-center gap-2" style={{ color: 'var(--text-main)' }}>
+                          Assigned Campaign Performance
+                          <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-500/20">
+                            {(drilldownData?.campaign_breakdown || []).length} campaigns
+                          </span>
+                        </h4>
                       </div>
 
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-semibold px-2.5 py-1 rounded-md border text-slate-500 dark:text-slate-400 group-hover:border-cyan-500/40 group-hover:text-cyan-500 transition-colors" style={{ borderColor: 'var(--border-glass)' }}>
-                          {campaignBreakdownExpanded ? 'Hide Breakdown' : 'Show Breakdown'}
-                        </span>
-                        <div className={`p-1 rounded-full text-slate-400 group-hover:text-cyan-500 transition-transform duration-200 ${campaignBreakdownExpanded ? 'rotate-180 text-cyan-500' : ''}`}>
-                          <ChevronDown className="w-4 h-4" />
-                        </div>
+                      <div className="text-xs font-black text-emerald-600 dark:text-emerald-400">
+                        Total: £{totalCampaignsGross.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </div>
-                    </button>
+                    </div>
 
-                    {/* Expandable Table Content */}
-                    {campaignBreakdownExpanded && (
-                      <div className="border-t p-3 flex flex-col gap-2.5" style={{ borderColor: 'var(--border-glass)' }}>
-                        {/* Quick search if multiple campaigns */}
-                        {(drilldownData?.campaign_breakdown || []).length > 5 && (
-                          <div className="relative">
-                            <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-400" />
-                            <input
-                              type="text"
-                              placeholder="Search campaigns by name, code, or category..."
-                              value={campaignBreakdownSearch}
-                              onChange={e => setCampaignBreakdownSearch(e.target.value)}
-                              className="w-full pl-8 pr-7 py-1.5 text-xs rounded-lg border focus:outline-none focus:border-cyan-500 transition-colors"
-                              style={{
-                                backgroundColor: 'var(--input-bg)',
-                                color: 'var(--input-text)',
-                                borderColor: 'var(--input-border)'
-                              }}
-                            />
-                            {campaignBreakdownSearch && (
-                              <button
-                                onClick={() => setCampaignBreakdownSearch('')}
-                                className="absolute right-2.5 top-2 text-slate-400 hover:text-slate-600 dark:hover:text-white text-xs"
-                              >
-                                &times;
-                              </button>
-                            )}
-                          </div>
+                    {/* Quick search if multiple campaigns (> 5) */}
+                    {(drilldownData?.campaign_breakdown || []).length > 5 && (
+                      <div className="relative">
+                        <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-400" />
+                        <input
+                          type="text"
+                          placeholder="Search campaigns by name, code, or category..."
+                          value={campaignBreakdownSearch}
+                          onChange={e => setCampaignBreakdownSearch(e.target.value)}
+                          className="w-full pl-8 pr-7 py-1.5 text-xs rounded-lg border focus:outline-none focus:border-cyan-500 transition-colors"
+                          style={{
+                            backgroundColor: 'var(--input-bg)',
+                            color: 'var(--input-text)',
+                            borderColor: 'var(--input-border)'
+                          }}
+                        />
+                        {campaignBreakdownSearch && (
+                          <button
+                            onClick={() => setCampaignBreakdownSearch('')}
+                            className="absolute right-2.5 top-2 text-slate-400 hover:text-slate-600 dark:hover:text-white text-xs"
+                          >
+                            &times;
+                          </button>
                         )}
-
-                        <div className="border rounded-lg overflow-hidden max-h-80 overflow-y-auto custom-scrollbar" style={{ borderColor: 'var(--border-glass)' }}>
-                          <table className="w-full text-left text-xs border-collapse">
-                            <thead className="sticky top-0 z-10" style={{ backgroundColor: 'var(--table-header-bg)', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}>
-                              <tr className="border-b" style={{ borderColor: 'var(--border-glass)' }}>
-                                <th className="py-2 px-3 font-bold" style={{ color: 'var(--text-muted)' }}>Campaign</th>
-                                <th className="py-2 px-3 font-bold" style={{ color: 'var(--text-muted)' }}>Code</th>
-                                <th className="py-2 px-3 font-bold" style={{ color: 'var(--text-muted)' }}>Category</th>
-                                <th className="py-2 px-3 font-bold text-right" style={{ color: 'var(--text-muted)' }}>
-                                  {(drilldownStartDate || drilldownEndDate) ? 'Period Raised' : 'Gross Raised'}
-                                </th>
-                                <th className="py-2 px-3 font-bold text-right" style={{ color: 'var(--text-muted)' }}>Donors</th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y" style={{ borderColor: 'var(--border-glass)' }}>
-                              {filteredCampaignBreakdown.length === 0 ? (
-                                <tr>
-                                  <td colSpan={5} className="py-4 text-center" style={{ color: 'var(--text-sub)' }}>
-                                    {campaignBreakdownSearch
-                                      ? `No campaigns match "${campaignBreakdownSearch}"`
-                                      : 'No donation activity recorded for assigned campaigns yet.'}
-                                  </td>
-                                </tr>
-                              ) : (
-                                filteredCampaignBreakdown.map((cb, i) => (
-                                  <tr key={i} className="hover:bg-slate-200/40 dark:hover:bg-slate-800/40 transition-colors">
-                                    <td className="py-2 px-3 font-bold max-w-[200px] truncate" style={{ color: 'var(--text-main)' }} title={cb.campaign_name}>
-                                      {cb.campaign_name}
-                                    </td>
-                                    <td className="py-2 px-3 font-mono text-cyan-600 dark:text-cyan-400 font-bold text-[10px]">
-                                      {cb.code}
-                                    </td>
-                                    <td className="py-2 px-3 text-[10px]" style={{ color: 'var(--text-muted)' }}>
-                                      {cb.heading}
-                                    </td>
-                                    <td className="py-2 px-3 font-black text-emerald-600 dark:text-emerald-400 text-right">
-                                      £{cb.gross_raised.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                    </td>
-                                    <td className="py-2 px-3 text-right font-semibold" style={{ color: 'var(--text-main)' }}>
-                                      {cb.total_donors}
-                                    </td>
-                                  </tr>
-                                ))
-                              )}
-                            </tbody>
-                          </table>
-                        </div>
                       </div>
+                    )}
+
+                    {/* Permanent Breakdown Table */}
+                    <div className="border rounded-xl overflow-hidden max-h-72 overflow-y-auto custom-scrollbar shadow-sm" style={{ borderColor: 'var(--border-glass)', backgroundColor: 'var(--bg-card-inner)' }}>
+                      <table className="w-full text-left text-xs border-collapse">
+                        <thead className="sticky top-0 z-10" style={{ backgroundColor: 'var(--table-header-bg)', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}>
+                          <tr className="border-b" style={{ borderColor: 'var(--border-glass)' }}>
+                            <th className="py-2.5 px-3 font-bold" style={{ color: 'var(--text-muted)' }}>Campaign</th>
+                            <th className="py-2.5 px-3 font-bold" style={{ color: 'var(--text-muted)' }}>Code</th>
+                            <th className="py-2.5 px-3 font-bold" style={{ color: 'var(--text-muted)' }}>Category</th>
+                            <th className="py-2.5 px-3 font-bold text-right" style={{ color: 'var(--text-muted)' }}>
+                              {(drilldownStartDate || drilldownEndDate) ? 'Period Raised' : 'Gross Raised'}
+                            </th>
+                            <th className="py-2.5 px-3 font-bold text-right" style={{ color: 'var(--text-muted)' }}>Donors</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y" style={{ borderColor: 'var(--border-glass)' }}>
+                          {displayedCampaigns.length === 0 ? (
+                            <tr>
+                              <td colSpan={5} className="py-4 text-center" style={{ color: 'var(--text-sub)' }}>
+                                {campaignBreakdownSearch
+                                  ? `No campaigns match "${campaignBreakdownSearch}"`
+                                  : 'No donation activity recorded for assigned campaigns yet.'}
+                              </td>
+                            </tr>
+                          ) : (
+                            displayedCampaigns.map((cb, i) => (
+                              <tr key={i} className="hover:bg-slate-200/40 dark:hover:bg-slate-800/40 transition-colors">
+                                <td className="py-2.5 px-3 font-bold max-w-[200px] truncate" style={{ color: 'var(--text-main)' }} title={cb.campaign_name}>
+                                  {cb.campaign_name}
+                                </td>
+                                <td className="py-2.5 px-3 font-mono text-cyan-600 dark:text-cyan-400 font-bold text-[10px]">
+                                  {cb.code}
+                                </td>
+                                <td className="py-2.5 px-3 text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                                  {cb.heading}
+                                </td>
+                                <td className="py-2.5 px-3 font-black text-emerald-600 dark:text-emerald-400 text-right">
+                                  £{cb.gross_raised.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </td>
+                                <td className="py-2.5 px-3 text-right font-semibold" style={{ color: 'var(--text-main)' }}>
+                                  {cb.total_donors}
+                                </td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Expand/Collapse toggle button when > 5 campaigns and not searching */}
+                    {!campaignBreakdownSearch && (drilldownData?.campaign_breakdown || []).length > 5 && (
+                      <button
+                        type="button"
+                        onClick={() => setShowAllCampaigns(prev => !prev)}
+                        className="w-full py-2 px-3 rounded-lg border text-center text-xs font-bold transition-all flex items-center justify-center gap-1.5 hover:bg-slate-200/40 dark:hover:bg-slate-800/40 cursor-pointer"
+                        style={{ borderColor: 'var(--border-glass)', color: 'var(--accent-cyan)' }}
+                      >
+                        {showAllCampaigns ? (
+                          <>Show Less (Top 5 Only) <ChevronUp className="w-3.5 h-3.5" /></>
+                        ) : (
+                          <>Show All {(drilldownData?.campaign_breakdown || []).length} Campaigns ({(drilldownData?.campaign_breakdown || []).length - 5} more) <ChevronDown className="w-3.5 h-3.5" /></>
+                        )}
+                      </button>
                     )}
                   </div>
 
