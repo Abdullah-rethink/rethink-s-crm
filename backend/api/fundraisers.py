@@ -260,7 +260,7 @@ def get_available_campaigns_list():
                             "heading": head,
                             "sub_heading": subhead,
                             "country": country,
-                            "is_assigned": bool(assigned_info),
+                            "is_assigned": False,
                             "assigned_to": assigned_info
                         })
         except Exception as e:
@@ -294,7 +294,7 @@ def get_available_campaigns_list():
                         "heading": str(head or "Unassigned"),
                         "sub_heading": str(subhead or "Unassigned"),
                         "country": str(country or "Unassigned"),
-                        "is_assigned": bool(assigned_info),
+                        "is_assigned": False,
                         "assigned_to": assigned_info
                     })
         except Exception:
@@ -334,7 +334,7 @@ def get_available_campaigns_list():
                             "heading": str(head or "Unassigned"),
                             "sub_heading": str(subhead or "Unassigned"),
                             "country": str(country or "Unassigned"),
-                            "is_assigned": bool(assigned_info),
+                            "is_assigned": False,
                             "assigned_to": assigned_info
                         })
             except Exception:
@@ -537,38 +537,53 @@ def get_fundraisers_list(
     global_donor_emails = set()
     total_txns_sum = 0
 
-    for f in fundraiser_rows:
-        fid = f["id"]
-        fname = f.get("name", "Unnamed")
-        fname_clean = str(fname or "").strip().lower()
-        c_list = f_campaign_map.get(fid, [])
-        if not c_list:
-            c_list = all_time_campaigns_map.get(fname_clean, [])
-        target_goal = float(f.get("target_goal") or 0.0)
-        f_start_date = str(f.get("start_date") or "").strip()
+    # Map DB fundraisers by lowercase name to preserve custom settings (goal, notes, status, email, phone)
+    db_fundraisers_by_name = {str(r.get("name") or "").strip().lower(): r for r in fundraiser_rows if r.get("name")}
 
-        all_time_raised = 0.0
-        period_raised = 0.0
-        txn_count = 0
-        period_txns = 0
-        donor_count = 0
-        period_donors = 0
-        first_donation_date = None
-        latest_donation_date = None
+    # Fundraisers exist strictly in real-time based on having active campaigns containing them in live donations
+    for fn_k, c_list in all_time_campaigns_map.items():
+        if not fn_k or not c_list:
+            continue
 
-        if fname_clean in known_donation_fundraisers:
-            all_time_raised = float(all_time_raised_map.get(fname_clean, 0.0))
-            txn_count = int(all_time_txns_map.get(fname_clean, 0))
-            donor_count = int(all_time_donors_map.get(fname_clean, 0))
-            first_donation_date = str(all_time_min_date_map.get(fname_clean) or "")
-            latest_donation_date = str(all_time_max_date_map.get(fname_clean) or "")
-            
-            period_raised = float(period_raised_map.get(fname_clean, 0.0))
-            period_txns = int(period_txns_map.get(fname_clean, 0))
-            period_donors = int(period_donors_map.get(fname_clean, 0))
+        f_meta = db_fundraisers_by_name.get(fn_k)
+        if f_meta:
+            fid = f_meta["id"]
+            fname = f_meta.get("name") or fn_k.title()
+            target_goal = float(f_meta.get("target_goal") or 0.0)
+            status = f_meta.get("status", "ACTIVE")
+            notes = f_meta.get("notes", "")
+            email = f_meta.get("email", "")
+            phone = f_meta.get("phone", "")
+            f_start_date = str(f_meta.get("start_date") or "").strip()
+            created_at = f_meta.get("created_at", "")
+        else:
+            fid = f"fund_{uuid.uuid5(uuid.NAMESPACE_DNS, fn_k).hex[:16]}"
+            sample_name = df_named[df_named["fn_lower"] == fn_k]["fundraiser_name"].dropna() if not df_named.empty else pd.Series()
+            fname = str(sample_name.iloc[0]).strip() if not sample_name.empty else fn_k.title()
+            raised_val = float(all_time_raised_map.get(fn_k, 0.0))
+            target_goal = calculate_benchmark_goal(raised_val)
+            status = "ACTIVE"
+            notes = "Auto-discovered in real-time from donor data"
+            email = ""
+            phone = ""
+            f_start_date = ""
+            created_at = ""
 
-            if fname_clean in all_time_emails_set_map:
-                global_donor_emails.update(all_time_emails_set_map[fname_clean])
+        if status_clean != "ALL" and status.upper() != status_clean:
+            continue
+
+        all_time_raised = float(all_time_raised_map.get(fn_k, 0.0))
+        txn_count = int(all_time_txns_map.get(fn_k, 0))
+        donor_count = int(all_time_donors_map.get(fn_k, 0))
+        first_donation_date = str(all_time_min_date_map.get(fn_k) or "")
+        latest_donation_date = str(all_time_max_date_map.get(fn_k) or "")
+        
+        period_raised = float(period_raised_map.get(fn_k, 0.0))
+        period_txns = int(period_txns_map.get(fn_k, 0))
+        period_donors = int(period_donors_map.get(fn_k, 0))
+
+        if fn_k in all_time_emails_set_map:
+            global_donor_emails.update(all_time_emails_set_map[fn_k])
 
         inception_date = first_donation_date or f_start_date or "N/A"
         progress_pct = round((all_time_raised / target_goal * 100.0), 1) if target_goal > 0 else (100.0 if all_time_raised > 0 else 0.0)
@@ -578,16 +593,16 @@ def get_fundraisers_list(
         fundraiser_obj = {
             "id": fid,
             "name": fname,
-            "email": f.get("email", ""),
-            "phone": f.get("phone", ""),
+            "email": email,
+            "phone": phone,
             "target_goal": round(target_goal, 2),
             "first_donation_date": first_donation_date or "N/A",
             "latest_donation_date": latest_donation_date or "N/A",
             "inception_date": inception_date,
             "start_date": inception_date,
-            "status": f.get("status", "ACTIVE"),
-            "notes": f.get("notes", ""),
-            "created_at": f.get("created_at", ""),
+            "status": status,
+            "notes": notes,
+            "created_at": created_at,
             "assigned_campaigns": c_list,
             "total_raised_all_time": round(all_time_raised, 2),
             "total_raised_period": round(period_raised, 2),
@@ -610,11 +625,12 @@ def get_fundraisers_list(
         total_target_goal_sum += target_goal
         total_txns_sum += txn_count
 
+    fundraisers_result.sort(key=lambda x: x["total_raised_all_time"], reverse=True)
     overall_progress = round((total_raised_all_time_sum / total_target_goal_sum * 100.0), 1) if total_target_goal_sum > 0 else 0.0
 
     return {
         "summary": {
-            "total_fundraisers": len(fundraiser_rows),
+            "total_fundraisers": len(fundraisers_result),
             "total_raised_all_time": round(total_raised_all_time_sum, 2),
             "total_raised_period": round(total_raised_period_sum, 2),
             "total_target_goal": round(total_target_goal_sum, 2),
@@ -645,15 +661,12 @@ def get_fundraiser_detail(
     conn.row_factory = sqlite3.Row
     cur = conn.cursor()
 
+    fundraiser = None
     try:
         cur.execute("SELECT * FROM fundraisers WHERE id = ?", (fundraiser_id,))
         f_row = cur.fetchone()
-        if not f_row:
-            raise HTTPException(status_code=404, detail="Fundraiser not found.")
-        fundraiser = dict(f_row)
-
-        cur.execute("SELECT campaign_name, code, platform FROM fundraiser_campaigns WHERE fundraiser_id = ?", (fundraiser_id,))
-        assigned_campaigns = [dict(r) for r in cur.fetchall()]
+        if f_row:
+            fundraiser = dict(f_row)
     finally:
         conn.close()
 
@@ -667,6 +680,7 @@ def get_fundraiser_detail(
     latest_donation_date = None
     total_raised_all_time = 0.0
     total_raised_period = 0.0
+    assigned_campaigns = []
 
     if df_donations is not None and not df_donations.empty:
         df_work = df_donations.copy()
@@ -680,30 +694,49 @@ def get_fundraiser_detail(
         else:
             df_work["_parsed_date"] = ""
 
+        # If not found in SQLite by ID, resolve real-time fundraiser profile from live donor data
+        if not fundraiser:
+            for fn_k in df_work[df_work["fn_lower"] != ""]["fn_lower"].unique():
+                synth_id = f"fund_{uuid.uuid5(uuid.NAMESPACE_DNS, fn_k).hex[:16]}"
+                if synth_id == fundraiser_id or fn_k == fundraiser_id.lower():
+                    sample_name = df_work[df_work["fn_lower"] == fn_k]["fundraiser_name"].dropna()
+                    display_name = str(sample_name.iloc[0]).strip() if not sample_name.empty else fn_k.title()
+                    fundraiser = {
+                        "id": fundraiser_id,
+                        "name": display_name,
+                        "email": "",
+                        "phone": "",
+                        "target_goal": 0.0,
+                        "status": "ACTIVE",
+                        "notes": "Auto-discovered in real-time from donor data",
+                        "created_at": ""
+                    }
+                    break
+
+        if not fundraiser:
+            raise HTTPException(status_code=404, detail="Fundraiser not found.")
+
         fname_clean = str(fundraiser.get("name") or "").strip().lower()
-        known_donation_fundraisers = set(df_work[df_work["fn_lower"] != ""]["fn_lower"].unique())
+        sub_df = df_work[df_work["fn_lower"] == fname_clean]
+        if sub_df.empty:
+            raise HTTPException(status_code=404, detail="Fundraiser has no active campaigns or donations.")
 
-        if fname_clean in known_donation_fundraisers:
-            sub_df = df_work[df_work["fn_lower"] == fname_clean]
-        else:
-            sub_df = pd.DataFrame()
-
-        if not assigned_campaigns and not sub_df.empty and "Campaign Name" in sub_df.columns:
-            cols_c = [c for c in ["Campaign Name", "Code", "Platform"] if c in sub_df.columns]
-            seen_c = set()
-            c_list_items = []
-            for _, r in sub_df[cols_c].drop_duplicates().iterrows():
-                c_name_val = str(r.get("Campaign Name") or "").strip()
-                c_code_val = str(r.get("Code") or "ALL").strip() if "Code" in r else "ALL"
-                c_plat_val = str(r.get("Platform") or "GiveBright").strip() if "Platform" in r else "GiveBright"
-                if c_name_val and (c_name_val.lower(), c_code_val.lower()) not in seen_c:
-                    seen_c.add((c_name_val.lower(), c_code_val.lower()))
-                    c_list_items.append({
-                        "campaign_name": c_name_val,
-                        "code": c_code_val,
-                        "platform": c_plat_val
-                    })
-            assigned_campaigns = c_list_items
+        # Real-time campaign list strictly derived from active campaigns containing this fundraiser
+        cols_c = [c for c in ["Campaign Name", "Code", "Platform"] if c in sub_df.columns]
+        seen_c = set()
+        c_list_items = []
+        for _, r in sub_df[cols_c].drop_duplicates().iterrows():
+            c_name_val = str(r.get("Campaign Name") or "").strip()
+            c_code_val = str(r.get("Code") or "ALL").strip() if "Code" in r else "ALL"
+            c_plat_val = str(r.get("Platform") or "GiveBright").strip() if "Platform" in r else "GiveBright"
+            if c_name_val and (c_name_val.lower(), c_code_val.lower()) not in seen_c:
+                seen_c.add((c_name_val.lower(), c_code_val.lower()))
+                c_list_items.append({
+                    "campaign_name": c_name_val,
+                    "code": c_code_val,
+                    "platform": c_plat_val
+                })
+        assigned_campaigns = c_list_items
 
         if not sub_df.empty:
             total_raised_all_time = float(sub_df["net_num"].sum())

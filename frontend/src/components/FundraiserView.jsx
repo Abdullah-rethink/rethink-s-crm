@@ -4,7 +4,7 @@ import {
   TrendingUp, Users, DollarSign, Edit3, Trash2, Eye, X, Check, 
   RefreshCw, ChevronRight, BarChart3, Clock, AlertCircle, ShieldAlert,
   Layers, CheckCircle2, Award, ArrowUpRight, LayoutGrid, List, Sparkles,
-  Lock, ArrowRight, ExternalLink, Activity, ChevronLeft, ChevronsLeft,
+  ArrowRight, ExternalLink, Activity, ChevronLeft, ChevronsLeft,
   ChevronsRight, ArrowUpDown, ArrowDown, ArrowUp, SlidersHorizontal
 } from 'lucide-react';
 import { API_BASE_URL } from '../config';
@@ -407,7 +407,6 @@ export default function FundraiserView({ user, accentColor = 'cyan' }) {
       
       const matchPlatform = platformFilter === 'ALL' || c.platform.toLowerCase() === platformFilter.toLowerCase();
 
-      const isAssignedToOther = c.is_assigned && c.assigned_to?.fundraiser_id && (!editingFundraiser || c.assigned_to.fundraiser_id !== editingFundraiser.id);
       const isAssignedToThis = modalForm.assigned_campaigns.some(
         ac => ac.campaign_name.toLowerCase() === c.campaign_name.toLowerCase() &&
               (ac.code || 'ALL').toLowerCase() === (c.code || 'ALL').toLowerCase()
@@ -415,19 +414,24 @@ export default function FundraiserView({ user, accentColor = 'cyan' }) {
 
       let matchAssignment = true;
       if (assignmentFilter === 'UNASSIGNED') {
-        matchAssignment = !c.is_assigned || (editingFundraiser && c.assigned_to?.fundraiser_id === editingFundraiser.id);
+        matchAssignment = !isAssignedToThis;
       } else if (assignmentFilter === 'ASSIGNED_THIS') {
         matchAssignment = isAssignedToThis;
       }
 
       return matchSearch && matchPlatform && matchAssignment;
     });
-  }, [availableCampaigns, campaignSearch, platformFilter, assignmentFilter, editingFundraiser, modalForm.assigned_campaigns]);
+  }, [availableCampaigns, campaignSearch, platformFilter, assignmentFilter, modalForm.assigned_campaigns]);
 
-  // Filter fundraisers list for display
+  // Filter fundraisers list for display (strictly exclude stale/unassigned fundraisers with 0 campaigns)
   const filteredFundraisers = useMemo(() => {
     const list = fundraisersData.fundraisers || [];
     return list.filter(f => {
+      // Make sure no stale/unassigned fundraiser without campaigns is displayed
+      if (!f.assigned_campaigns || f.assigned_campaigns.length === 0) {
+        return false;
+      }
+
       const matchSearch = !searchQuery || 
         f.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         (f.email && f.email.toLowerCase().includes(searchQuery.toLowerCase())) ||
@@ -1687,31 +1691,25 @@ export default function FundraiserView({ user, accentColor = 'cyan' }) {
                           c => c.campaign_name.toLowerCase() === camp.campaign_name.toLowerCase() &&
                                (c.code || 'ALL').toLowerCase() === (camp.code || 'ALL').toLowerCase()
                         );
-                        const isAssignedToOther = camp.is_assigned && camp.assigned_to?.fundraiser_id && (!editingFundraiser || camp.assigned_to.fundraiser_id !== editingFundraiser.id);
 
                         return (
                           <div
                             key={idx}
-                            onClick={() => !isAssignedToOther && handleToggleCampaignAssignment(camp)}
-                            className={`p-1.5 rounded-md text-xs flex items-center justify-between gap-2 transition-colors ${
-                              isAssignedToOther 
-                                ? 'opacity-60 cursor-not-allowed bg-slate-500/5' 
-                                : isAssignedToThis
-                                ? 'bg-cyan-500/20 text-cyan-800 dark:text-cyan-200 border border-cyan-500/40 font-bold cursor-pointer'
-                                : 'hover:bg-slate-200/60 dark:hover:bg-slate-800/60 border border-transparent cursor-pointer'
+                            onClick={() => handleToggleCampaignAssignment(camp)}
+                            className={`p-1.5 rounded-md text-xs flex items-center justify-between gap-2 transition-colors cursor-pointer ${
+                              isAssignedToThis
+                                ? 'bg-cyan-500/20 text-cyan-800 dark:text-cyan-200 border border-cyan-500/40 font-bold'
+                                : 'hover:bg-slate-200/60 dark:hover:bg-slate-800/60 border border-transparent'
                             }`}
                             style={{ color: isAssignedToThis ? undefined : 'var(--text-main)' }}
-                            title={isAssignedToOther ? `Already assigned to ${camp.assigned_to?.fundraiser_name}` : undefined}
                           >
                             <div className="flex items-center gap-2 min-w-0">
                               <div className={`w-3.5 h-3.5 rounded flex items-center justify-center text-[9px] font-bold shrink-0 ${
-                                isAssignedToOther 
-                                  ? 'bg-amber-500/20 text-amber-600 border border-amber-500/30'
-                                  : isAssignedToThis 
+                                isAssignedToThis 
                                   ? 'bg-cyan-500 text-white' 
                                   : 'border border-slate-400'
                               }`}>
-                                {isAssignedToOther ? <Lock className="w-2.5 h-2.5" /> : isAssignedToThis ? <Check className="w-2.5 h-2.5 stroke-[3]" /> : null}
+                                {isAssignedToThis ? <Check className="w-2.5 h-2.5 stroke-[3]" /> : null}
                               </div>
                               <div className="truncate">
                                 <span className="font-semibold text-xs">{camp.campaign_name}</span>
@@ -1725,11 +1723,6 @@ export default function FundraiserView({ user, accentColor = 'cyan' }) {
                             </div>
 
                             <div className="flex items-center gap-2 shrink-0">
-                              {isAssignedToOther && (
-                                <span className="px-1.5 py-0.2 rounded text-[8px] font-bold bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30 flex items-center gap-1">
-                                  <Lock className="w-2 h-2" /> {camp.assigned_to?.fundraiser_name}
-                                </span>
-                              )}
                               <span className="text-[10px]" style={{ color: 'var(--text-sub)' }}>
                                 {camp.platform} • {camp.heading}
                               </span>

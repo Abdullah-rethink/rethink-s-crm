@@ -142,6 +142,7 @@ def update_single_donor_record(payload: UpdateSingleDonorRequest):
         clear_expenses_cache()
         from backend.api.events import broadcast_event_sync
         broadcast_event_sync("DONORS_UPDATED", {"source": "single_edit", "column": payload.column_name})
+        broadcast_event_sync("FUNDRAISER_UPDATED", {"source": "single_edit", "column": payload.column_name})
     except Exception:
         pass
 
@@ -221,6 +222,7 @@ def bulk_edit_donors(payload: BulkEditDonorsRequest):
         clear_expenses_cache()
         from backend.api.events import broadcast_event_sync
         broadcast_event_sync("DONORS_UPDATED", {"source": "bulk_edit", "columns": payload.target_columns})
+        broadcast_event_sync("FUNDRAISER_UPDATED", {"source": "bulk_edit", "columns": payload.target_columns})
     except Exception:
         pass
 

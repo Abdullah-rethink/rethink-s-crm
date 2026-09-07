@@ -2,17 +2,84 @@ import React, { useEffect, useState } from 'react';
 import { Table, Search, Download, ChevronLeft, ChevronRight, Edit3, UserCheck, Eye, Columns, CheckSquare, Square, Save, ArrowUpDown, ArrowUp, ArrowDown, X, Check, AlertCircle } from 'lucide-react';
 import { API_BASE_URL } from '../config';
 
+const DEFAULT_EXPLORER_COLUMNS = [
+  'First Name',
+  'Last Name',
+  'Total Online Donations Net Amount in Settled Currency',
+  'Transaction Donor Classification',
+  'Lifetime Donor Classification',
+  'Total LTV',
+  'Payment Frequency',
+  'Heading',
+  'Sub-Heading',
+  'Country',
+  'Code',
+  'Zakat Eligibility'
+];
+
+const COLUMN_ALIASES = {
+  'Display Name': 'Donor Name',
+  'Total Online Donations Net Amount in Settled Currency': 'Settled Net Amount',
+  'Lifetime Donor Classification': 'Lifetime Classification',
+  'Transaction Donor Classification': 'Transaction Classification',
+  'Campaign Name': 'Campaign',
+  'Community Name': 'Community',
+  'Created Date (UTC)': 'Date',
+  'Donation Amount in Project Currency (May be approx.)': 'Project Amount',
+  'Donation Currency (DC)': 'Currency',
+  'Payment Frequency': 'Frequency',
+  'fundraiser_name': 'Fundraiser',
+  'Fundraiser Name': 'Fundraiser',
+  'fundraiser_url': 'Fundraiser URL',
+  'Fundraiser URL': 'Fundraiser URL',
+  'Campaign URL': 'Campaign URL',
+  'campaign_url': 'Campaign URL'
+};
+
+const getFundraiserColumn = (cols = []) => {
+  return cols.find(c => ['fundraiser_name', 'Fundraiser Name', 'fundraiser'].includes(c)) || 'fundraiser_name';
+};
+const getCampaignColumn = (cols = []) => {
+  return cols.find(c => ['Campaign Name', 'campaign_name', 'Campaign'].includes(c)) || 'Campaign Name';
+};
+
+const getStoredColumns = () => {
+  try {
+    const saved = localStorage.getItem('explorer_selected_columns');
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed;
+      }
+    }
+  } catch (e) {
+    console.error('Error reading explorer_selected_columns from localStorage:', e);
+  }
+  return null;
+};
+
+const getStoredPreset = () => {
+  try {
+    return localStorage.getItem('explorer_column_preset') || 'default';
+  } catch (e) {
+    return 'default';
+  }
+};
+
 export default function ExplorerView({ user, filters, onSelectDonor }) {
   const [data, setData] = useState({ total_records: 0, page: 1, page_size: 100, total_pages: 1, available_columns: [], records: [] });
   const [loading, setLoading] = useState(true);
   
   // Controls state
   const [search, setSearch] = useState('');
-  const [preset, setPreset] = useState('default');
+  const [preset, setPreset] = useState(() => getStoredPreset());
   const [pageSize, setPageSize] = useState(100);
   const [currentPage, setCurrentPage] = useState(1);
   const [showColumnChooser, setShowColumnChooser] = useState(false);
-  const [selectedColumns, setSelectedColumns] = useState([]);
+  const [columnFilterText, setColumnFilterText] = useState('');
+  const [selectedColumns, setSelectedColumns] = useState(() => {
+    return getStoredColumns() || DEFAULT_EXPLORER_COLUMNS;
+  });
   const [sortBy, setSortBy] = useState(null);
   const [sortOrder, setSortOrder] = useState('asc');
 
@@ -92,25 +159,32 @@ export default function ExplorerView({ user, filters, onSelectDonor }) {
         setData(resData);
         if (resData.available_columns?.length > 0) {
           setSelectedColumns(prev => {
-            if (prev && prev.length > 0) {
-              const validPrev = prev.filter(c => resData.available_columns.includes(c));
-              if (validPrev.length > 0) return validPrev;
+            let candidate = (prev && prev.length > 0) ? prev : (getStoredColumns() || DEFAULT_EXPLORER_COLUMNS);
+            const valid = candidate.filter(c => resData.available_columns.includes(c));
+            if (valid.length > 0) {
+              const currentPreset = getStoredPreset();
+              if (currentPreset === 'fundraisers') {
+                const fundCol = getFundraiserColumn(resData.available_columns);
+                if (fundCol && resData.available_columns.includes(fundCol) && !valid.includes(fundCol)) {
+                  const campIdx = valid.indexOf('Campaign Name');
+                  if (campIdx !== -1) {
+                    valid.splice(campIdx, 0, fundCol);
+                  } else {
+                    valid.push(fundCol);
+                  }
+                }
+              }
+              try {
+                localStorage.setItem('explorer_selected_columns', JSON.stringify(valid));
+              } catch (e) {}
+              return valid;
             }
-            const defaultCols = [
-              'First Name',
-              'Last Name',
-              'Total Online Donations Net Amount in Settled Currency',
-              'Transaction Donor Classification',
-              'Lifetime Donor Classification',
-              'Total LTV',
-              'Payment Frequency',
-              'Heading',
-              'Sub-Heading',
-              'Country',
-              'Code',
-              'Zakat Eligibility'
-            ].filter(c => resData.available_columns.includes(c));
-            return defaultCols.length > 0 ? defaultCols : resData.available_columns.slice(0, 12);
+            const defaultCols = DEFAULT_EXPLORER_COLUMNS.filter(c => resData.available_columns.includes(c));
+            const fallback = defaultCols.length > 0 ? defaultCols : resData.available_columns.slice(0, 12);
+            try {
+              localStorage.setItem('explorer_selected_columns', JSON.stringify(fallback));
+            } catch (e) {}
+            return fallback;
           });
         }
         setLoading(false);
@@ -126,10 +200,91 @@ export default function ExplorerView({ user, filters, onSelectDonor }) {
   }, [currentPage, pageSize, search, filters, sortBy, sortOrder]);
 
   const handleToggleColumn = (col) => {
-    if (selectedColumns.includes(col)) {
-      setSelectedColumns(selectedColumns.filter(c => c !== col));
-    } else {
-      setSelectedColumns([...selectedColumns, col]);
+    setSelectedColumns(prev => {
+      const updated = prev.includes(col)
+        ? prev.filter(c => c !== col)
+        : [...prev, col];
+      try {
+        localStorage.setItem('explorer_selected_columns', JSON.stringify(updated));
+      } catch (e) {}
+      return updated;
+    });
+    setPreset('custom');
+    try {
+      localStorage.setItem('explorer_column_preset', 'custom');
+    } catch (e) {}
+  };
+
+  const handleSelectAllColumns = () => {
+    if (!data.available_columns || data.available_columns.length === 0) return;
+    const allCols = [...data.available_columns];
+    setSelectedColumns(allCols);
+    setPreset('all');
+    try {
+      localStorage.setItem('explorer_selected_columns', JSON.stringify(allCols));
+      localStorage.setItem('explorer_column_preset', 'all');
+    } catch (e) {}
+  };
+
+  const handleDeselectAllColumns = () => {
+    setSelectedColumns([]);
+    setPreset('custom');
+    try {
+      localStorage.setItem('explorer_selected_columns', JSON.stringify([]));
+      localStorage.setItem('explorer_column_preset', 'custom');
+    } catch (e) {}
+  };
+
+  const handleResetDefaultColumns = () => {
+    const available = data.available_columns || [];
+    const defaultCols = DEFAULT_EXPLORER_COLUMNS.filter(c => available.includes(c));
+    const fallback = defaultCols.length > 0 ? defaultCols : available.slice(0, 12);
+    setSelectedColumns(fallback);
+    setPreset('default');
+    try {
+      localStorage.setItem('explorer_selected_columns', JSON.stringify(fallback));
+      localStorage.setItem('explorer_column_preset', 'default');
+    } catch (e) {}
+  };
+
+  const handlePresetChange = (val) => {
+    setPreset(val);
+    try {
+      localStorage.setItem('explorer_column_preset', val);
+    } catch (e) {}
+
+    let newCols = [];
+    const available = data.available_columns || [];
+    if (val === 'default') {
+      newCols = DEFAULT_EXPLORER_COLUMNS.filter(c => available.includes(c));
+    } else if (val === 'all') {
+      newCols = [...available];
+    } else if (val === 'minimal') {
+      newCols = [
+        'First Name',
+        'Last Name',
+        'Total Online Donations Net Amount in Settled Currency',
+        'Payment Frequency'
+      ].filter(c => available.includes(c));
+    } else if (val === 'fundraisers') {
+      const fundCol = getFundraiserColumn(available);
+      const campCol = getCampaignColumn(available);
+      newCols = [
+        'First Name',
+        'Last Name',
+        fundCol,
+        campCol,
+        'Total Online Donations Net Amount in Settled Currency',
+        'Payment Frequency',
+        'Created Date (UTC)'
+      ].filter(c => available.includes(c));
+    }
+
+    if (newCols.length > 0) {
+      setSelectedColumns(newCols);
+      try {
+        localStorage.setItem('explorer_selected_columns', JSON.stringify(newCols));
+      } catch (e) {}
     }
   };
 
@@ -288,18 +443,6 @@ export default function ExplorerView({ user, filters, onSelectDonor }) {
       });
   };
 
-  const COLUMN_ALIASES = {
-    'Display Name': 'Donor Name',
-    'Total Online Donations Net Amount in Settled Currency': 'Settled Net Amount',
-    'Lifetime Donor Classification': 'Lifetime Classification',
-    'Transaction Donor Classification': 'Transaction Classification',
-    'Campaign Name': 'Campaign',
-    'Community Name': 'Community',
-    'Created Date (UTC)': 'Date',
-    'Donation Amount in Project Currency (May be approx.)': 'Project Amount',
-    'Donation Currency (DC)': 'Currency',
-    'Payment Frequency': 'Frequency'
-  };
 
   const getTierBadgeClass = (tier) => {
     switch (tier) {
@@ -375,40 +518,14 @@ export default function ExplorerView({ user, filters, onSelectDonor }) {
 
           <select
             value={preset}
-            onChange={e => {
-              const val = e.target.value;
-              setPreset(val);
-              if (val === 'default') {
-                setSelectedColumns([
-                  'First Name',
-                  'Last Name',
-                  'Total Online Donations Net Amount in Settled Currency',
-                  'Lifetime Donor Classification',
-                  'Total LTV',
-                  'Transaction Donor Classification',
-                  'Payment Frequency',
-                  'Heading',
-                  'Sub-Heading',
-                  'Country',
-                  'Code',
-                  'Zakat Eligibility'
-                ].filter(c => data.available_columns.includes(c)));
-              } else if (val === 'all') {
-                setSelectedColumns(data.available_columns);
-              } else if (val === 'minimal') {
-                setSelectedColumns([
-                  'First Name',
-                  'Last Name',
-                  'Total Online Donations Net Amount in Settled Currency',
-                  'Payment Frequency'
-                ].filter(c => data.available_columns.includes(c)));
-              }
-            }}
+            onChange={e => handlePresetChange(e.target.value)}
             className="bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500 cursor-pointer"
           >
             <option value="default">📋 Default Preset</option>
             <option value="minimal">🔍 Minimal View</option>
+            <option value="fundraisers">🤝 Fundraisers & Campaigns</option>
             <option value="all">🌐 All Columns</option>
+            {preset === 'custom' && <option value="custom">⚙️ Custom Selection ({selectedColumns.length})</option>}
           </select>
 
           <button 
@@ -434,29 +551,81 @@ export default function ExplorerView({ user, filters, onSelectDonor }) {
       {/* Column Chooser Modal UI */}
       {showColumnChooser && (
         <div className="glass-panel p-5 border-l-4 border-cyan-400 flex flex-col gap-4 animate-fadeIn">
-          <div className="flex items-center justify-between border-b border-white/10 pb-3">
-            <h3 className="text-xs font-extrabold text-white uppercase tracking-wider flex items-center gap-2">
-              <Columns className="w-4 h-4 text-cyan-400" /> Select & Customize Visible Columns
-            </h3>
-            <button onClick={() => setShowColumnChooser(false)} className="text-xs text-slate-400 hover:text-white">Close</button>
+          <div className="flex items-center justify-between border-b border-white/10 pb-3 flex-wrap gap-2">
+            <div className="flex items-center gap-2">
+              <h3 className="text-xs font-extrabold text-white uppercase tracking-wider flex items-center gap-2">
+                <Columns className="w-4 h-4 text-cyan-400" /> Select & Customize Visible Columns
+              </h3>
+              <span className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
+                {selectedColumns.length} of {data.available_columns?.length || 0} active
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button 
+                type="button"
+                onClick={handleSelectAllColumns} 
+                className="text-xs px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10 transition-colors"
+              >
+                Select All
+              </button>
+              <button 
+                type="button"
+                onClick={handleResetDefaultColumns} 
+                className="text-xs px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-cyan-400 hover:text-cyan-300 border border-cyan-500/20 transition-colors"
+              >
+                Reset Defaults
+              </button>
+              <button 
+                type="button"
+                onClick={handleDeselectAllColumns} 
+                className="text-xs px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-rose-400/80 hover:text-rose-300 border border-rose-500/20 transition-colors"
+              >
+                Clear
+              </button>
+              <button 
+                type="button"
+                onClick={() => setShowColumnChooser(false)} 
+                className="text-xs px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-white transition-colors ml-1"
+              >
+                Done
+              </button>
+            </div>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 max-h-[220px] overflow-y-auto pr-1">
-            {data.available_columns?.map(col => {
-              const isChecked = selectedColumns.includes(col);
-              return (
-                <div 
-                  key={col} 
-                  onClick={() => handleToggleColumn(col)}
-                  className={`p-2 rounded-lg border text-xs cursor-pointer flex items-center gap-2 transition-all ${
-                    isChecked ? 'border-cyan-400/50 bg-cyan-500/10 text-cyan-300 font-bold' : 'border-white/5 bg-slate-900/60 text-slate-400 hover:text-white'
-                  }`}
-                >
-                  {isChecked ? <CheckSquare className="w-4 h-4 text-cyan-400 shrink-0" /> : <Square className="w-4 h-4 text-slate-500 shrink-0" />}
-                  <span className="truncate">{COLUMN_ALIASES[col] || col}</span>
-                </div>
-              );
-            })}
+          <div className="relative">
+            <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Search / filter columns..."
+              value={columnFilterText}
+              onChange={e => setColumnFilterText(e.target.value)}
+              className="w-full bg-slate-900/80 border border-white/10 rounded-lg pl-8 pr-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 max-h-[240px] overflow-y-auto pr-1 custom-scrollbar">
+            {data.available_columns
+              ?.filter(col => {
+                if (!columnFilterText.trim()) return true;
+                const query = columnFilterText.toLowerCase();
+                const alias = (COLUMN_ALIASES[col] || '').toLowerCase();
+                return col.toLowerCase().includes(query) || alias.includes(query);
+              })
+              .map(col => {
+                const isChecked = selectedColumns.includes(col);
+                return (
+                  <div 
+                    key={col} 
+                    onClick={() => handleToggleColumn(col)}
+                    className={`p-2 rounded-lg border text-xs cursor-pointer flex items-center gap-2 transition-all ${
+                      isChecked ? 'border-cyan-400/50 bg-cyan-500/10 text-cyan-300 font-bold' : 'border-white/5 bg-slate-900/60 text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    {isChecked ? <CheckSquare className="w-4 h-4 text-cyan-400 shrink-0" /> : <Square className="w-4 h-4 text-slate-500 shrink-0" />}
+                    <span className="truncate" title={col}>{COLUMN_ALIASES[col] || col}</span>
+                  </div>
+                );
+              })}
           </div>
         </div>
       )}
@@ -882,6 +1051,7 @@ export default function ExplorerView({ user, filters, onSelectDonor }) {
                                   'First Name': row['First Name'] || '',
                                   'Last Name': row['Last Name'] || '',
                                   'Email': row['Email'] || '',
+                                  'fundraiser_name': row['fundraiser_name'] || row['Fundraiser Name'] || '',
                                   'Campaign Name': row['Campaign Name'] || '',
                                   'Heading': row['Heading'] || '',
                                   'Sub-Heading': row['Sub-Heading'] || '',
@@ -948,6 +1118,19 @@ export default function ExplorerView({ user, filters, onSelectDonor }) {
                               className="whitespace-nowrap"
                             >
                               <span className={`badge ${getTierBadgeClass(val)}`}>{val || 'Unassigned'}</span>
+                            </td>
+                          );
+                        }
+                        if (c === 'fundraiser_name' || c === 'Fundraiser Name') {
+                          return (
+                            <td key={c} className="whitespace-nowrap">
+                              {val ? (
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20 shadow-sm">
+                                  🤝 {val}
+                                </span>
+                              ) : (
+                                <span className="text-slate-500 italic text-xs">Unassigned</span>
+                              )}
                             </td>
                           );
                         }
