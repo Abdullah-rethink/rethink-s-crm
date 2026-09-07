@@ -9,6 +9,7 @@ import {
   ChevronDown
 } from 'lucide-react';
 import { API_BASE_URL } from '../config';
+import FundraiserFormModal from './FundraiserFormModal';
 
 export default function FundraiserView({ user, accentColor = 'cyan' }) {
   // Strictly enforce that only Super Admin accounts can manage fundraisers
@@ -67,21 +68,6 @@ export default function FundraiserView({ user, accentColor = 'cyan' }) {
   // Modal State (Create / Edit)
   const [showModal, setShowModal] = useState(false);
   const [editingFundraiser, setEditingFundraiser] = useState(null);
-  const [modalForm, setModalForm] = useState({
-    name: '',
-    email: '',
-    phone: '',
-    target_goal: '',
-    start_date: '',
-    status: 'ACTIVE',
-    notes: '',
-    assigned_campaigns: []
-  });
-  const [campaignSearch, setCampaignSearch] = useState('');
-  const [platformFilter, setPlatformFilter] = useState('ALL');
-  const [assignmentFilter, setAssignmentFilter] = useState('ALL'); // 'ALL', 'UNASSIGNED', 'ASSIGNED_THIS'
-  const [submitting, setSubmitting] = useState(false);
-  const [formMsg, setFormMsg] = useState('');
 
   // Delete State
   const [deleteConfirm, setDeleteConfirm] = useState(null);
@@ -246,20 +232,6 @@ export default function FundraiserView({ user, accentColor = 'cyan' }) {
   const handleOpenCreateModal = () => {
     if (!isSuperAdmin) return;
     setEditingFundraiser(null);
-    setModalForm({
-      name: '',
-      email: '',
-      phone: '',
-      target_goal: '',
-      start_date: '',
-      status: 'ACTIVE',
-      notes: '',
-      assigned_campaigns: []
-    });
-    setFormMsg('');
-    setCampaignSearch('');
-    setPlatformFilter('ALL');
-    setAssignmentFilter('ALL');
     setShowModal(true);
     loadCampaignsList();
   };
@@ -268,114 +240,8 @@ export default function FundraiserView({ user, accentColor = 'cyan' }) {
   const handleOpenEditModal = (f) => {
     if (!isSuperAdmin) return;
     setEditingFundraiser(f);
-    setModalForm({
-      name: f.name || '',
-      email: f.email || '',
-      phone: f.phone || '',
-      target_goal: f.target_goal || '',
-      start_date: f.start_date !== 'N/A' ? f.start_date : '',
-      status: f.status || 'ACTIVE',
-      notes: f.notes || '',
-      assigned_campaigns: (f.assigned_campaigns || []).map(c => ({
-        campaign_name: c.campaign_name,
-        code: c.code || 'ALL',
-        platform: c.platform || 'ALL'
-      }))
-    });
-    setFormMsg('');
-    setCampaignSearch('');
-    setPlatformFilter('ALL');
-    setAssignmentFilter('ALL');
     setShowModal(true);
     loadCampaignsList();
-  };
-
-  // Toggle Campaign Assignment in Modal Form
-  const handleToggleCampaignAssignment = (camp) => {
-    const exists = modalForm.assigned_campaigns.some(
-      c => c.campaign_name.toLowerCase() === camp.campaign_name.toLowerCase() &&
-           (c.code || 'ALL').toLowerCase() === (camp.code || 'ALL').toLowerCase()
-    );
-
-    if (exists) {
-      setModalForm(prev => ({
-        ...prev,
-        assigned_campaigns: prev.assigned_campaigns.filter(
-          c => !(c.campaign_name.toLowerCase() === camp.campaign_name.toLowerCase() &&
-                 (c.code || 'ALL').toLowerCase() === (camp.code || 'ALL').toLowerCase())
-        )
-      }));
-    } else {
-      setModalForm(prev => ({
-        ...prev,
-        assigned_campaigns: [
-          ...prev.assigned_campaigns,
-          {
-            campaign_name: camp.campaign_name,
-            code: camp.code || 'ALL',
-            platform: camp.platform || 'ALL'
-          }
-        ]
-      }));
-    }
-  };
-
-  // Submit Modal Form (Create / Update)
-  const handleSubmitModal = (e) => {
-    e.preventDefault();
-    if (!isSuperAdmin) {
-      setFormMsg('❌ Managing fundraisers is strictly restricted to Super Admin accounts.');
-      return;
-    }
-
-    if (!modalForm.name.trim()) {
-      setFormMsg('❌ Fundraiser name is required.');
-      return;
-    }
-
-    setSubmitting(true);
-    setFormMsg('');
-
-    const payload = {
-      user_role: user?.role,
-      name: modalForm.name.trim(),
-      email: modalForm.email.trim(),
-      phone: modalForm.phone.trim(),
-      target_goal: parseFloat(modalForm.target_goal || 0),
-      start_date: modalForm.start_date || '',
-      status: modalForm.status,
-      notes: modalForm.notes,
-      assigned_campaigns: modalForm.assigned_campaigns
-    };
-
-    const isEdit = !!editingFundraiser;
-    const url = isEdit ? `${API_BASE_URL}/api/fundraisers/${editingFundraiser.id}` : `${API_BASE_URL}/api/fundraisers`;
-    const method = isEdit ? 'PUT' : 'POST';
-
-    fetch(url, {
-      method: method,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    })
-      .then(r => r.json())
-      .then(res => {
-        setSubmitting(false);
-        if (res.status === 'success') {
-          setFormMsg(`✅ ${res.message}`);
-          loadFundraisers(true);
-          loadCampaignsList();
-          setTimeout(() => {
-            setShowModal(false);
-            setFormMsg('');
-          }, 1200);
-        } else {
-          setFormMsg(`❌ ${res.detail || 'Failed to save fundraiser.'}`);
-        }
-      })
-      .catch(err => {
-        setSubmitting(false);
-        setFormMsg(`❌ Error: ${err.message}`);
-      });
   };
 
   // Delete Fundraiser
@@ -404,33 +270,6 @@ export default function FundraiserView({ user, accentColor = 'cyan' }) {
         console.error('Error deleting fundraiser:', err);
       });
   };
-
-  // Filter available campaigns in modal
-  const filteredAvailableCampaigns = useMemo(() => {
-    return availableCampaigns.filter(c => {
-      const matchSearch = !campaignSearch || 
-        c.campaign_name.toLowerCase().includes(campaignSearch.toLowerCase()) ||
-        c.code.toLowerCase().includes(campaignSearch.toLowerCase()) ||
-        c.heading.toLowerCase().includes(campaignSearch.toLowerCase()) ||
-        c.country.toLowerCase().includes(campaignSearch.toLowerCase());
-      
-      const matchPlatform = platformFilter === 'ALL' || c.platform.toLowerCase() === platformFilter.toLowerCase();
-
-      const isAssignedToThis = modalForm.assigned_campaigns.some(
-        ac => ac.campaign_name.toLowerCase() === c.campaign_name.toLowerCase() &&
-              (ac.code || 'ALL').toLowerCase() === (c.code || 'ALL').toLowerCase()
-      );
-
-      let matchAssignment = true;
-      if (assignmentFilter === 'UNASSIGNED') {
-        matchAssignment = !isAssignedToThis;
-      } else if (assignmentFilter === 'ASSIGNED_THIS') {
-        matchAssignment = isAssignedToThis;
-      }
-
-      return matchSearch && matchPlatform && matchAssignment;
-    });
-  }, [availableCampaigns, campaignSearch, platformFilter, assignmentFilter, modalForm.assigned_campaigns]);
 
   // Filter fundraisers list for display (strictly exclude stale/unassigned fundraisers with 0 campaigns)
   const filteredFundraisers = useMemo(() => {
@@ -1509,307 +1348,17 @@ export default function FundraiserView({ user, accentColor = 'cyan' }) {
       {!loading && filteredFundraisers.length > 0 && renderPaginationControls(false)}
 
       {/* ── Super Admin: Create / Edit Modal ─────────────────────── */}
-      {showModal && isSuperAdmin && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div 
-            className="glass-panel w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl rounded-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200 border"
-            style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-glass)', color: 'var(--text-main)' }}
-          >
-            {/* Modal Header */}
-            <div className="flex items-center justify-between p-4 border-b" style={{ borderColor: 'var(--border-glass)' }}>
-              <div className="flex items-center gap-2.5">
-                <div className="p-2 rounded-xl bg-cyan-500/15 text-cyan-500">
-                  <HeartHandshake className="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-black" style={{ color: 'var(--text-main)' }}>
-                    {editingFundraiser ? `Edit Fundraiser: ${editingFundraiser.name}` : 'Create New Fundraiser'}
-                  </h3>
-                  <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
-                    Assign campaigns &amp; multi-codes. A campaign can only be assigned to one fundraiser.
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => setShowModal(false)}
-                className="p-1 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* Modal Body */}
-            <div className="flex-1 overflow-y-auto p-4 custom-scrollbar flex flex-col gap-3.5">
-              {formMsg && (
-                <div className={`p-2.5 rounded-lg text-xs font-bold border ${
-                  formMsg.startsWith('✅') ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30' : 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/30'
-                }`}>
-                  {formMsg}
-                </div>
-              )}
-
-              <form onSubmit={handleSubmitModal} id="fundraiser-form" className="flex flex-col gap-3.5">
-                {/* Row 1: Name & Target Goal */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-bold mb-1" style={{ color: 'var(--text-main)' }}>
-                      Fundraiser Name *
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="e.g. Kamrul, Team Alpha, Fatima"
-                      value={modalForm.name}
-                      onChange={e => setModalForm(prev => ({ ...prev, name: e.target.value }))}
-                      className="w-full rounded-lg px-3 py-1.5 text-xs focus:outline-none"
-                      style={{ backgroundColor: 'var(--input-bg)', color: 'var(--input-text)', border: '1px solid var(--input-border)' }}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold mb-1" style={{ color: 'var(--text-main)' }}>
-                      Target Fundraising Goal (£)
-                    </label>
-                    <input
-                      type="number"
-                      min="0"
-                      step="100"
-                      placeholder="e.g. 50000"
-                      value={modalForm.target_goal}
-                      onChange={e => setModalForm(prev => ({ ...prev, target_goal: e.target.value }))}
-                      className="w-full rounded-lg px-3 py-1.5 text-xs focus:outline-none"
-                      style={{ backgroundColor: 'var(--input-bg)', color: 'var(--input-text)', border: '1px solid var(--input-border)' }}
-                    />
-                  </div>
-                </div>
-
-                {/* Row 2: Status & Optional Manual Start Date */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-bold mb-1" style={{ color: 'var(--text-main)' }}>
-                      Status
-                    </label>
-                    <select
-                      value={modalForm.status}
-                      onChange={e => setModalForm(prev => ({ ...prev, status: e.target.value }))}
-                      className="w-full rounded-lg px-3 py-1.5 text-xs focus:outline-none"
-                      style={{ backgroundColor: 'var(--input-bg)', color: 'var(--input-text)', border: '1px solid var(--input-border)' }}
-                    >
-                      <option value="ACTIVE">ACTIVE</option>
-                      <option value="PAUSED">PAUSED</option>
-                      <option value="COMPLETED">COMPLETED</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold mb-1" style={{ color: 'var(--text-main)' }}>
-                      <Calendar className="w-3 h-3 inline mr-1 text-cyan-500" /> Manual Start Date (Optional)
-                    </label>
-                    <input
-                      type="date"
-                      value={modalForm.start_date}
-                      onChange={e => setModalForm(prev => ({ ...prev, start_date: e.target.value }))}
-                      className="w-full rounded-lg px-3 py-1.5 text-xs focus:outline-none"
-                      style={{ backgroundColor: 'var(--input-bg)', color: 'var(--input-text)', border: '1px solid var(--input-border)' }}
-                    />
-                    <span className="text-[10px] block mt-0.5" style={{ color: 'var(--text-sub)' }}>
-                      Defaults automatically to the earliest donation date in dataset.
-                    </span>
-                  </div>
-                </div>
-
-                {/* Row 3: Email & Phone (Optional) */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-bold mb-1" style={{ color: 'var(--text-main)' }}>
-                      Contact Email (Optional)
-                    </label>
-                    <input
-                      type="email"
-                      placeholder="fundraiser@example.com"
-                      value={modalForm.email}
-                      onChange={e => setModalForm(prev => ({ ...prev, email: e.target.value }))}
-                      className="w-full rounded-lg px-3 py-1.5 text-xs focus:outline-none"
-                      style={{ backgroundColor: 'var(--input-bg)', color: 'var(--input-text)', border: '1px solid var(--input-border)' }}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold mb-1" style={{ color: 'var(--text-main)' }}>
-                      Contact Phone (Optional)
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="+44 7123 456789"
-                      value={modalForm.phone}
-                      onChange={e => setModalForm(prev => ({ ...prev, phone: e.target.value }))}
-                      className="w-full rounded-lg px-3 py-1.5 text-xs focus:outline-none"
-                      style={{ backgroundColor: 'var(--input-bg)', color: 'var(--input-text)', border: '1px solid var(--input-border)' }}
-                    />
-                  </div>
-                </div>
-
-                {/* ── Campaign & Code Assignment Section ──────────────── */}
-                <div className="mt-1 border-t pt-3" style={{ borderColor: 'var(--border-glass)' }}>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <div>
-                      <label className="block text-xs font-black flex items-center gap-1.5" style={{ color: 'var(--text-main)' }}>
-                        <Layers className="w-3.5 h-3.5 text-cyan-500" /> Assign Campaigns &amp; Multi-Codes *
-                      </label>
-                      <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
-                        Select the campaigns belonging to this fundraiser ({modalForm.assigned_campaigns.length} assigned)
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Selected Badges */}
-                  {modalForm.assigned_campaigns.length > 0 && (
-                    <div 
-                      className="p-2.5 rounded-lg border mb-2.5 flex flex-wrap gap-1 max-h-24 overflow-y-auto custom-scrollbar"
-                      style={{ backgroundColor: 'var(--bg-card-inner)', borderColor: 'var(--border-glass)' }}
-                    >
-                      {modalForm.assigned_campaigns.map((c, i) => (
-                        <span 
-                          key={i}
-                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold bg-cyan-500/15 text-cyan-700 dark:text-cyan-300 border border-cyan-500/30"
-                        >
-                          <span className="truncate max-w-[180px]">{c.campaign_name}</span>
-                          <span className="px-1 rounded bg-cyan-500/25 text-cyan-900 dark:text-white text-[9px] font-black">
-                            {c.code || 'ALL'}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => handleToggleCampaignAssignment(c)}
-                            className="hover:text-rose-500 ml-0.5"
-                          >
-                            <X className="w-3 h-3" />
-                          </button>
-                        </span>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Search, Platform Filter, and Assignment Filter Toolbar */}
-                  <div className="flex items-center gap-2 mb-2 flex-wrap">
-                    <div className="relative flex-1 min-w-[160px]">
-                      <Search className="w-3 h-3 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                      <input
-                        type="text"
-                        placeholder="Search available campaigns..."
-                        value={campaignSearch}
-                        onChange={e => setCampaignSearch(e.target.value)}
-                        className="w-full pl-7 pr-3 py-1.5 text-xs rounded-lg focus:outline-none"
-                        style={{ backgroundColor: 'var(--input-bg)', color: 'var(--input-text)', border: '1px solid var(--input-border)' }}
-                      />
-                    </div>
-
-                    <select
-                      value={platformFilter}
-                      onChange={e => setPlatformFilter(e.target.value)}
-                      className="px-2 py-1.5 text-xs rounded-lg focus:outline-none"
-                      style={{ backgroundColor: 'var(--input-bg)', color: 'var(--input-text)', border: '1px solid var(--input-border)' }}
-                    >
-                      <option value="ALL">All Platforms</option>
-                      <option value="LaunchGood">LaunchGood</option>
-                      <option value="GiveBright">GiveBright</option>
-                      <option value="Paysuite">Paysuite</option>
-                      <option value="Rethink Website">Rethink Website</option>
-                    </select>
-
-                    <select
-                      value={assignmentFilter}
-                      onChange={e => setAssignmentFilter(e.target.value)}
-                      className="px-2 py-1.5 text-xs rounded-lg focus:outline-none"
-                      style={{ backgroundColor: 'var(--input-bg)', color: 'var(--input-text)', border: '1px solid var(--input-border)' }}
-                    >
-                      <option value="ALL">All Campaigns</option>
-                      <option value="UNASSIGNED">Unassigned Only</option>
-                      <option value="ASSIGNED_THIS">Assigned to this Fundraiser</option>
-                    </select>
-                  </div>
-
-                  {/* Available Campaigns Multi-Select List */}
-                  <div 
-                    className="border rounded-lg p-1.5 max-h-44 overflow-y-auto custom-scrollbar flex flex-col gap-1"
-                    style={{ borderColor: 'var(--border-glass)', backgroundColor: 'var(--bg-card-inner)' }}
-                  >
-                    {filteredAvailableCampaigns.length === 0 ? (
-                      <div className="text-center py-4 text-xs" style={{ color: 'var(--text-sub)' }}>
-                        No matching campaigns found.
-                      </div>
-                    ) : (
-                      filteredAvailableCampaigns.map((camp, idx) => {
-                        const isAssignedToThis = modalForm.assigned_campaigns.some(
-                          c => c.campaign_name.toLowerCase() === camp.campaign_name.toLowerCase() &&
-                               (c.code || 'ALL').toLowerCase() === (camp.code || 'ALL').toLowerCase()
-                        );
-
-                        return (
-                          <div
-                            key={idx}
-                            onClick={() => handleToggleCampaignAssignment(camp)}
-                            className={`p-1.5 rounded-md text-xs flex items-center justify-between gap-2 transition-colors cursor-pointer ${
-                              isAssignedToThis
-                                ? 'bg-cyan-500/20 text-cyan-800 dark:text-cyan-200 border border-cyan-500/40 font-bold'
-                                : 'hover:bg-slate-200/60 dark:hover:bg-slate-800/60 border border-transparent'
-                            }`}
-                            style={{ color: isAssignedToThis ? undefined : 'var(--text-main)' }}
-                          >
-                            <div className="flex items-center gap-2 min-w-0">
-                              <div className={`w-3.5 h-3.5 rounded flex items-center justify-center text-[9px] font-bold shrink-0 ${
-                                isAssignedToThis 
-                                  ? 'bg-cyan-500 text-white' 
-                                  : 'border border-slate-400'
-                              }`}>
-                                {isAssignedToThis ? <Check className="w-2.5 h-2.5 stroke-[3]" /> : null}
-                              </div>
-                              <div className="truncate">
-                                <span className="font-semibold text-xs">{camp.campaign_name}</span>
-                                <span 
-                                  className="ml-1.5 px-1 py-0.5 rounded text-[9px] font-mono border"
-                                  style={{ backgroundColor: 'var(--bg-card)', color: 'var(--accent-cyan)', borderColor: 'var(--border-glass)' }}
-                                >
-                                  {camp.code}
-                                </span>
-                              </div>
-                            </div>
-
-                            <div className="flex items-center gap-2 shrink-0">
-                              <span className="text-[10px]" style={{ color: 'var(--text-sub)' }}>
-                                {camp.platform} • {camp.heading}
-                              </span>
-                            </div>
-                          </div>
-                        );
-                      })
-                    )}
-                  </div>
-                </div>
-              </form>
-            </div>
-
-            {/* Modal Footer */}
-            <div className="p-3.5 border-t flex items-center justify-end gap-2.5" style={{ borderColor: 'var(--border-glass)' }}>
-              <button
-                type="button"
-                onClick={() => setShowModal(false)}
-                className="btn-secondary text-xs px-3.5 py-1.5"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                form="fundraiser-form"
-                disabled={submitting}
-                className="btn-primary text-xs flex items-center gap-1.5 px-4 py-1.5 shadow-md shadow-cyan-500/20 font-bold"
-              >
-                {submitting ? <RefreshCw className="w-3 h-3 animate-spin" /> : <CheckCircle2 className="w-3 h-3" />}
-                {editingFundraiser ? 'Save Changes' : 'Create Fundraiser'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <FundraiserFormModal
+        isOpen={showModal}
+        onClose={() => setShowModal(false)}
+        editingFundraiser={editingFundraiser}
+        availableCampaigns={availableCampaigns}
+        onSuccess={() => {
+          loadFundraisers(true);
+          loadCampaignsList();
+        }}
+        isSuperAdmin={isSuperAdmin}
+      />
 
       {/* ── Super Admin: Delete Confirmation Modal ──────────────── */}
       {deleteConfirm && isSuperAdmin && (
