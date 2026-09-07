@@ -5,7 +5,8 @@ import {
   RefreshCw, ChevronRight, BarChart3, Clock, AlertCircle, ShieldAlert,
   Layers, CheckCircle2, Award, ArrowUpRight, LayoutGrid, List, Sparkles,
   ArrowRight, ExternalLink, Activity, ChevronLeft, ChevronsLeft,
-  ChevronsRight, ArrowUpDown, ArrowDown, ArrowUp, SlidersHorizontal
+  ChevronsRight, ArrowUpDown, ArrowDown, ArrowUp, SlidersHorizontal,
+  ChevronDown
 } from 'lucide-react';
 import { API_BASE_URL } from '../config';
 
@@ -52,7 +53,13 @@ export default function FundraiserView({ user, accentColor = 'cyan' }) {
 
   // Pagination & Sorting State
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(24); // 12, 24, 48, 96, 'ALL'
+  const [pageSize, setPageSize] = useState(() => {
+    try {
+      const saved = localStorage.getItem('fundraiser_page_size');
+      if (saved) return saved === 'ALL' ? 'ALL' : Number(saved);
+    } catch (e) {}
+    return 'ALL';
+  });
   const [sortBy, setSortBy] = useState('period_raised'); // 'period_raised', 'all_time_raised', 'target_goal', 'progress', 'donors', 'txns', 'date', 'name'
   const [sortOrder, setSortOrder] = useState('desc'); // 'desc' or 'asc'
   const [jumpPageInput, setJumpPageInput] = useState('');
@@ -86,6 +93,8 @@ export default function FundraiserView({ user, accentColor = 'cyan' }) {
   const [loadingDrilldown, setLoadingDrilldown] = useState(false);
   const [drilldownStartDate, setDrilldownStartDate] = useState('');
   const [drilldownEndDate, setDrilldownEndDate] = useState('');
+  const [campaignBreakdownExpanded, setCampaignBreakdownExpanded] = useState(false);
+  const [campaignBreakdownSearch, setCampaignBreakdownSearch] = useState('');
 
   // Synchronize applied date filters based on preset buttons
   const handleDatePresetChange = (mode) => {
@@ -512,6 +521,27 @@ export default function FundraiserView({ user, accentColor = 'cyan' }) {
   const startItemIndex = totalItems === 0 ? 0 : isAllPages ? 1 : (currentPage - 1) * effectivePageSize + 1;
   const endItemIndex = isAllPages ? totalItems : Math.min(currentPage * effectivePageSize, totalItems);
 
+  // Persist page size preference
+  useEffect(() => {
+    try {
+      localStorage.setItem('fundraiser_page_size', String(pageSize));
+    } catch (e) {}
+  }, [pageSize]);
+
+  // Dynamically compute available page sizes so sizes >= totalItems (e.g. 48 or 96 when total is 36) are never shown
+  const availablePageSizes = useMemo(() => {
+    const baseSizes = [12, 24, 48, 96];
+    const filtered = baseSizes.filter(size => size < totalItems);
+    return [...filtered, 'ALL'];
+  }, [totalItems]);
+
+  // If currently selected pageSize is numeric and >= totalItems, reset to 'ALL'
+  useEffect(() => {
+    if (pageSize !== 'ALL' && typeof pageSize === 'number' && totalItems > 0 && pageSize >= totalItems) {
+      setPageSize('ALL');
+    }
+  }, [totalItems, pageSize]);
+
   // Smart pagination range builder (e.g. 1, 2, 3 ... 10)
   const paginationRange = useMemo(() => {
     if (totalPages <= 7) {
@@ -542,6 +572,22 @@ export default function FundraiserView({ user, accentColor = 'cyan' }) {
     return rangeWithDots;
   }, [totalPages, currentPage]);
 
+  // Drilldown campaign breakdown filtering & summary
+  const filteredCampaignBreakdown = useMemo(() => {
+    const list = drilldownData?.campaign_breakdown || [];
+    if (!campaignBreakdownSearch.trim()) return list;
+    const q = campaignBreakdownSearch.toLowerCase().trim();
+    return list.filter(cb => 
+      (cb.campaign_name && cb.campaign_name.toLowerCase().includes(q)) ||
+      (cb.code && cb.code.toLowerCase().includes(q)) ||
+      (cb.heading && cb.heading.toLowerCase().includes(q))
+    );
+  }, [drilldownData?.campaign_breakdown, campaignBreakdownSearch]);
+
+  const totalCampaignsGross = useMemo(() => {
+    return (drilldownData?.campaign_breakdown || []).reduce((acc, c) => acc + (c.gross_raised || 0), 0);
+  }, [drilldownData?.campaign_breakdown]);
+
   // Pagination Controls UI Bar
   const renderPaginationControls = (isTop = false) => {
     if (totalItems === 0) return null;
@@ -563,31 +609,33 @@ export default function FundraiserView({ user, accentColor = 'cyan' }) {
             Showing <span className="font-extrabold text-cyan-600 dark:text-cyan-400">{startItemIndex}</span> - <span className="font-extrabold text-cyan-600 dark:text-cyan-400">{endItemIndex}</span> of <span className="font-extrabold" style={{ color: 'var(--text-main)' }}>{totalItems}</span> fundraisers
           </span>
 
-          <div className="flex items-center gap-1.5 pl-3 border-l" style={{ borderColor: 'var(--border-glass)' }}>
-            <span className="text-[11px] font-semibold" style={{ color: 'var(--text-sub)' }}>Show:</span>
-            {[12, 24, 48, 96, 'ALL'].map(size => {
-              const isActive = pageSize === size || (size === 'ALL' && pageSize === 'ALL');
-              return (
-                <button
-                  key={size}
-                  onClick={() => {
-                    setPageSize(size);
-                    setCurrentPage(1);
-                  }}
-                  className={`px-2 py-0.5 rounded text-[11px] font-bold transition-all ${
-                    isActive
-                      ? 'bg-cyan-500 text-white shadow-sm'
-                      : 'hover:bg-slate-200 dark:hover:bg-slate-800'
-                  }`}
-                  style={{
-                    color: isActive ? '#ffffff' : 'var(--text-muted)'
-                  }}
-                >
-                  {size === 'ALL' ? 'All' : size}
-                </button>
-              );
-            })}
-          </div>
+          {availablePageSizes.length > 1 && (
+            <div className="flex items-center gap-1.5 pl-3 border-l" style={{ borderColor: 'var(--border-glass)' }}>
+              <span className="text-[11px] font-semibold" style={{ color: 'var(--text-sub)' }}>Show:</span>
+              {availablePageSizes.map(size => {
+                const isActive = pageSize === size || (size === 'ALL' && pageSize === 'ALL');
+                return (
+                  <button
+                    key={size}
+                    onClick={() => {
+                      setPageSize(size);
+                      setCurrentPage(1);
+                    }}
+                    className={`px-2 py-0.5 rounded text-[11px] font-bold transition-all ${
+                      isActive
+                        ? 'bg-cyan-500 text-white shadow-sm'
+                        : 'hover:bg-slate-200 dark:hover:bg-slate-800'
+                    }`}
+                    style={{
+                      color: isActive ? '#ffffff' : 'var(--text-muted)'
+                    }}
+                  >
+                    {size === 'ALL' ? 'All' : size}
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         {/* Right Side: Page Navigation Buttons & Jump */}
@@ -1219,6 +1267,8 @@ export default function FundraiserView({ user, accentColor = 'cyan' }) {
                   <button
                     onClick={() => {
                       setSelectedFundraiserId(f.id);
+                      setCampaignBreakdownExpanded(false);
+                      setCampaignBreakdownSearch('');
                       setDrilldownStartDate(appliedStartDate);
                       setDrilldownEndDate(appliedEndDate);
                       loadDrilldown(f.id, appliedStartDate, appliedEndDate);
@@ -1416,6 +1466,8 @@ export default function FundraiserView({ user, accentColor = 'cyan' }) {
                         <button
                           onClick={() => {
                             setSelectedFundraiserId(f.id);
+                            setCampaignBreakdownExpanded(false);
+                            setCampaignBreakdownSearch('');
                             setDrilldownStartDate(appliedStartDate);
                             setDrilldownEndDate(appliedEndDate);
                             loadDrilldown(f.id, appliedStartDate, appliedEndDate);
@@ -1827,6 +1879,8 @@ export default function FundraiserView({ user, accentColor = 'cyan' }) {
                 onClick={() => {
                   setSelectedFundraiserId(null);
                   setDrilldownData(null);
+                  setCampaignBreakdownExpanded(false);
+                  setCampaignBreakdownSearch('');
                 }}
                 className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors"
               >
@@ -1893,55 +1947,125 @@ export default function FundraiserView({ user, accentColor = 'cyan' }) {
                 </div>
               ) : (
                 <>
-                  {/* Campaign Breakdown Table */}
-                  <div>
-                    <h4 className="text-xs font-extrabold uppercase tracking-wider mb-2 flex items-center gap-1.5" style={{ color: 'var(--text-muted)' }}>
-                      <BarChart3 className="w-3.5 h-3.5 text-cyan-500" /> Assigned Campaign Performance
-                    </h4>
-                    <div className="border rounded-lg overflow-hidden" style={{ borderColor: 'var(--border-glass)' }}>
-                      <table className="w-full text-left text-xs border-collapse">
-                        <thead>
-                          <tr className="border-b" style={{ backgroundColor: 'var(--table-header-bg)', borderColor: 'var(--border-glass)' }}>
-                            <th className="py-2 px-3 font-bold" style={{ color: 'var(--text-muted)' }}>Campaign</th>
-                            <th className="py-2 px-3 font-bold" style={{ color: 'var(--text-muted)' }}>Code</th>
-                            <th className="py-2 px-3 font-bold" style={{ color: 'var(--text-muted)' }}>Category</th>
-                            <th className="py-2 px-3 font-bold text-right" style={{ color: 'var(--text-muted)' }}>
-                              {(drilldownStartDate || drilldownEndDate) ? 'Period Raised' : 'Gross Raised'}
-                            </th>
-                            <th className="py-2 px-3 font-bold text-right" style={{ color: 'var(--text-muted)' }}>Donors</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y" style={{ borderColor: 'var(--border-glass)' }}>
-                          {(drilldownData?.campaign_breakdown || []).length === 0 ? (
-                            <tr>
-                              <td colSpan={5} className="py-3 text-center" style={{ color: 'var(--text-sub)' }}>
-                                No donation activity recorded for assigned campaigns yet.
-                              </td>
-                            </tr>
-                          ) : (
-                            drilldownData.campaign_breakdown.map((cb, i) => (
-                              <tr key={i} className="hover:bg-slate-200/40 dark:hover:bg-slate-800/40 transition-colors">
-                                <td className="py-2 px-3 font-bold max-w-[180px] truncate" style={{ color: 'var(--text-main)' }} title={cb.campaign_name}>
-                                  {cb.campaign_name}
-                                </td>
-                                <td className="py-2 px-3 font-mono text-cyan-600 dark:text-cyan-400 font-bold text-[10px]">
-                                  {cb.code}
-                                </td>
-                                <td className="py-2 px-3 text-[10px]" style={{ color: 'var(--text-muted)' }}>
-                                  {cb.heading}
-                                </td>
-                                <td className="py-2 px-3 font-black text-emerald-600 dark:text-emerald-400 text-right">
-                                  £{cb.gross_raised.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                </td>
-                                <td className="py-2 px-3 text-right font-semibold" style={{ color: 'var(--text-main)' }}>
-                                  {cb.total_donors}
-                                </td>
-                              </tr>
-                            ))
+                  {/* Collapsible Campaign Breakdown Table */}
+                  <div className="border rounded-xl overflow-hidden transition-all shadow-sm" style={{ borderColor: 'var(--border-glass)', backgroundColor: 'var(--bg-card-inner)' }}>
+                    {/* Collapsible Accordion Header */}
+                    <button
+                      type="button"
+                      onClick={() => setCampaignBreakdownExpanded(prev => !prev)}
+                      className="w-full flex items-center justify-between p-3.5 text-left hover:bg-slate-200/40 dark:hover:bg-slate-800/40 transition-colors group cursor-pointer"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <div className="p-1.5 rounded-lg bg-cyan-500/10 text-cyan-600 dark:text-cyan-400">
+                          <BarChart3 className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-extrabold uppercase tracking-wider" style={{ color: 'var(--text-main)' }}>
+                              Assigned Campaign Performance
+                            </span>
+                            <span className="text-[11px] font-extrabold px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-500/20">
+                              {(drilldownData?.campaign_breakdown || []).length} campaigns
+                            </span>
+                          </div>
+                          {!campaignBreakdownExpanded && (
+                            <p className="text-[11px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                              {(drilldownData?.campaign_breakdown || []).length > 0
+                                ? `Total: £${totalCampaignsGross.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} • Click to expand`
+                                : 'No assigned campaigns • Click to view'}
+                            </p>
                           )}
-                        </tbody>
-                      </table>
-                    </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-semibold px-2.5 py-1 rounded-md border text-slate-500 dark:text-slate-400 group-hover:border-cyan-500/40 group-hover:text-cyan-500 transition-colors" style={{ borderColor: 'var(--border-glass)' }}>
+                          {campaignBreakdownExpanded ? 'Collapse' : 'Expand'}
+                        </span>
+                        <div className={`p-1 rounded-full text-slate-400 group-hover:text-cyan-500 transition-transform duration-200 ${campaignBreakdownExpanded ? 'rotate-180 text-cyan-500' : ''}`}>
+                          <ChevronDown className="w-4 h-4" />
+                        </div>
+                      </div>
+                    </button>
+
+                    {/* Expandable Table Content */}
+                    {campaignBreakdownExpanded && (
+                      <div className="border-t p-3 flex flex-col gap-2.5" style={{ borderColor: 'var(--border-glass)' }}>
+                        {/* Quick search if multiple campaigns */}
+                        {(drilldownData?.campaign_breakdown || []).length > 5 && (
+                          <div className="relative">
+                            <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-400" />
+                            <input
+                              type="text"
+                              placeholder="Search campaigns by name, code, or category..."
+                              value={campaignBreakdownSearch}
+                              onChange={e => setCampaignBreakdownSearch(e.target.value)}
+                              className="w-full pl-8 pr-7 py-1.5 text-xs rounded-lg border focus:outline-none focus:border-cyan-500 transition-colors"
+                              style={{
+                                backgroundColor: 'var(--input-bg)',
+                                color: 'var(--input-text)',
+                                borderColor: 'var(--input-border)'
+                              }}
+                            />
+                            {campaignBreakdownSearch && (
+                              <button
+                                onClick={() => setCampaignBreakdownSearch('')}
+                                className="absolute right-2.5 top-2 text-slate-400 hover:text-slate-600 dark:hover:text-white text-xs"
+                              >
+                                &times;
+                              </button>
+                            )}
+                          </div>
+                        )}
+
+                        <div className="border rounded-lg overflow-hidden max-h-80 overflow-y-auto custom-scrollbar" style={{ borderColor: 'var(--border-glass)' }}>
+                          <table className="w-full text-left text-xs border-collapse">
+                            <thead className="sticky top-0 z-10" style={{ backgroundColor: 'var(--table-header-bg)', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}>
+                              <tr className="border-b" style={{ borderColor: 'var(--border-glass)' }}>
+                                <th className="py-2 px-3 font-bold" style={{ color: 'var(--text-muted)' }}>Campaign</th>
+                                <th className="py-2 px-3 font-bold" style={{ color: 'var(--text-muted)' }}>Code</th>
+                                <th className="py-2 px-3 font-bold" style={{ color: 'var(--text-muted)' }}>Category</th>
+                                <th className="py-2 px-3 font-bold text-right" style={{ color: 'var(--text-muted)' }}>
+                                  {(drilldownStartDate || drilldownEndDate) ? 'Period Raised' : 'Gross Raised'}
+                                </th>
+                                <th className="py-2 px-3 font-bold text-right" style={{ color: 'var(--text-muted)' }}>Donors</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y" style={{ borderColor: 'var(--border-glass)' }}>
+                              {filteredCampaignBreakdown.length === 0 ? (
+                                <tr>
+                                  <td colSpan={5} className="py-4 text-center" style={{ color: 'var(--text-sub)' }}>
+                                    {campaignBreakdownSearch
+                                      ? `No campaigns match "${campaignBreakdownSearch}"`
+                                      : 'No donation activity recorded for assigned campaigns yet.'}
+                                  </td>
+                                </tr>
+                              ) : (
+                                filteredCampaignBreakdown.map((cb, i) => (
+                                  <tr key={i} className="hover:bg-slate-200/40 dark:hover:bg-slate-800/40 transition-colors">
+                                    <td className="py-2 px-3 font-bold max-w-[200px] truncate" style={{ color: 'var(--text-main)' }} title={cb.campaign_name}>
+                                      {cb.campaign_name}
+                                    </td>
+                                    <td className="py-2 px-3 font-mono text-cyan-600 dark:text-cyan-400 font-bold text-[10px]">
+                                      {cb.code}
+                                    </td>
+                                    <td className="py-2 px-3 text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                                      {cb.heading}
+                                    </td>
+                                    <td className="py-2 px-3 font-black text-emerald-600 dark:text-emerald-400 text-right">
+                                      £{cb.gross_raised.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    </td>
+                                    <td className="py-2 px-3 text-right font-semibold" style={{ color: 'var(--text-main)' }}>
+                                      {cb.total_donors}
+                                    </td>
+                                  </tr>
+                                ))
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* Monthly Timeline */}
