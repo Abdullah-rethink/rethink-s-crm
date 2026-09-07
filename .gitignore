@@ -1,5 +1,9 @@
 .env
-launchgood_donations.db
+launchgood_donations.db*
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
 __pycache__/
 
 scratch/

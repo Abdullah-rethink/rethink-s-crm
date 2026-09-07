@@ -2225,7 +2225,7 @@
   {
     "Campaign Name": "Ammarah & Hiba \u2013 STAND WITH GAZA & SYRIA",
     "Campaign URL": "https://www.launchgood.com/v4/campaign/ammarah_hiba",
-    "Community Name": "Unassigned",
+    "Community Name": "TEAM SISTERS PROJECT",
     "Donor Name": "",
     "Donor Email": "",
     "Heading": "General Fund",
@@ -2932,19 +2932,6 @@
     "Donor Email": "",
     "Heading": "Sponsorships",
     "Sub-Heading": "Orphan Sponsorship",
-    "Country": "Gaza",
-    "Code": "GAZ-SPN-ORP",
-    "Zakat Eligibility": "Zakat",
-    "is_primary": 1
-  },
-  {
-    "Campaign Name": "Ashb\u0101l Orphan \u2013 Orphan Sponsorship (Syria)",
-    "Campaign URL": "https://www.launchgood.com/v4/campaign/ashbalorphan_1",
-    "Community Name": "Ashb\u0101l Al-Ummah",
-    "Donor Name": "",
-    "Donor Email": "",
-    "Heading": "Sponsorships",
-    "Sub-Heading": "Orphan Sponsorship",
     "Country": "Syria,Afghanistan",
     "Code": "SYR-SPN-ORP",
     "Zakat Eligibility": "Zakat",
@@ -3108,8 +3095,8 @@
   },
   {
     "Campaign Name": "Asia \u2013 STAND WITH GAZA & SYRIA",
-    "Campaign URL": "",
-    "Community Name": "Unassigned",
+    "Campaign URL": "https://www.launchgood.com/v4/campaign/sp_asia_liaquat",
+    "Community Name": "TEAM SISTERS PROJECT",
     "Donor Name": "",
     "Donor Email": "",
     "Heading": "One-Off Projects",
@@ -12547,7 +12534,7 @@
   {
     "Campaign Name": "Orphan Qur'\u0101n Student",
     "Campaign URL": "https://www.launchgood.com/v4/campaign/orphan_qurn_student",
-    "Community Name": "Unassigned",
+    "Community Name": "313 Orphans",
     "Donor Name": "",
     "Donor Email": "",
     "Heading": "Sponsorships",
@@ -15342,7 +15329,7 @@
   {
     "Campaign Name": "SAMRA \u2013 STAND WITH GAZA & SYRIA",
     "Campaign URL": "https://www.launchgood.com/v4/campaign/sp_1_1",
-    "Community Name": "Unassigned",
+    "Community Name": "TEAM SISTERS PROJECT",
     "Donor Name": "",
     "Donor Email": "",
     "Heading": "Sponsorships",
@@ -16531,7 +16518,7 @@
     "Heading": "Water",
     "Sub-Heading": "Wells and Boreholes",
     "Country": "Gaza",
-    "Code": "GAZ-WAT-WEL",
+    "Code": "GAZ-W",
     "Zakat Eligibility": "Non-Zakat",
     "is_primary": 0
   },
@@ -16876,7 +16863,7 @@
   {
     "Campaign Name": "Sponsor Qur'\u0101n Teacher",
     "Campaign URL": "https://www.launchgood.com/v4/campaign/qurn_teacher",
-    "Community Name": "Unassigned",
+    "Community Name": "Ashb\u0101l Al-Ummah",
     "Donor Name": "",
     "Donor Email": "",
     "Heading": "General Fund",
@@ -20048,7 +20035,7 @@
   {
     "Campaign Name": "Yahya \u2013 Carriers of the Qur'\u0101n",
     "Campaign URL": "https://www.launchgood.com/v4/campaign/yahya_3",
-    "Community Name": "Unassigned",
+    "Community Name": "Ashb\u0101l Al-Ummah",
     "Donor Name": "",
     "Donor Email": "",
     "Heading": "Sponsorships",
@@ -21201,5 +21188,44 @@
     "Code": "SYR-SPN-ORP",
     "Zakat Eligibility": "Zakat",
     "is_primary": 1
+  },
+  {
+    "Campaign Name": "Ashb\u0101l Orphan \u2013 Orphan Sponsorship (Syria)",
+    "Campaign URL": "https://www.launchgood.com/v4/campaign/ashbalorphan_1",
+    "Community Name": "Ashb\u0101l Al-Ummah",
+    "Donor Name": "",
+    "Donor Email": "",
+    "Heading": "Sponsorships",
+    "Sub-Heading": "Orphan Sponsorship",
+    "Country": "Gaza",
+    "Code": "GAZ-SPN-ORP",
+    "Zakat Eligibility": "Zakat",
+    "is_primary": 1
+  },
+  {
+    "Campaign Name": "Emergency Food Packages for Displaced Families in Gaza",
+    "Campaign URL": "",
+    "Community Name": "N/A",
+    "Donor Name": "",
+    "Donor Email": "",
+    "Heading": "Food",
+    "Sub-Heading": "Emergency Food",
+    "Country": "Gaza",
+    "Code": "GAZ-FOD",
+    "Zakat Eligibility": "Zakat",
+    "is_primary": 1
+  },
+  {
+    "Campaign Name": "School in Shaam",
+    "Campaign URL": "https://www.launchgood.com/v4/campaign/school_in_shaam_1",
+    "Community Name": "Educate & Empower",
+    "Donor Name": "",
+    "Donor Email": "",
+    "Heading": "Village Project",
+    "Sub-Heading": "Village School",
+    "Country": "Syria",
+    "Code": "SYR-VIL-SCH",
+    "Zakat Eligibility": "Zakat",
+    "is_primary": 0
   }
 ]
