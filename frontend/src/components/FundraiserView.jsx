@@ -1181,7 +1181,7 @@ export default function FundraiserView({ user, accentColor = 'cyan' }) {
                     <div className="p-1.5 rounded-md" style={{ backgroundColor: 'var(--bg-card-inner)' }}>
                       <div className="text-[10px]" style={{ color: 'var(--text-sub)' }}>Avg Donation</div>
                       <div className="text-xs font-extrabold" style={{ color: 'var(--text-main)' }}>
-                        £{(f.average_donation || 0).toFixed(2)}
+                        £{(f.avg_donation !== undefined ? f.avg_donation : (f.average_donation || 0)).toFixed(2)}
                       </div>
                     </div>
                   </div>
@@ -1189,7 +1189,7 @@ export default function FundraiserView({ user, accentColor = 'cyan' }) {
                   {/* ── Assigned Campaigns Pills ─────────────────────── */}
                   <div className="mt-3">
                     <div className="text-[10px] uppercase font-bold mb-1.5 flex items-center justify-between" style={{ color: 'var(--text-sub)' }}>
-                      <span>Linked Campaigns ({f.assigned_campaigns ? f.assigned_campaigns.length : 0})</span>
+                      <span>Campaigns ({f.assigned_campaigns ? f.assigned_campaigns.length : 0})</span>
                     </div>
                     <div className="flex flex-wrap gap-1 max-h-16 overflow-y-auto pr-1">
                       {(f.assigned_campaigns || []).map((c, i) => (

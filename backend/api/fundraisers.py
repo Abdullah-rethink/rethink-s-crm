@@ -15,8 +15,26 @@ from backend.api.events import broadcast_event_sync
 router = APIRouter(prefix="/api/fundraisers", tags=["Fundraiser Tracking"])
 
 
+def _sync_parquet_and_cache_from_sqlite():
+    """
+    Reads the updated donations table from SQLite, applies standard type sanitization,
+    writes to PARQUET_PATH, and invalidates the in-memory cache so all endpoints stay synchronized.
+    """
+    try:
+        conn = sqlite3.connect(LOCAL_DB_PATH, timeout=30.0)
+        df_donations = pd.read_sql("SELECT * FROM donations", conn)
+        conn.close()
+
+        from core.data_processor import sanitize_df_dtypes_for_parquet, invalidate_data_cache
+        df_donations = sanitize_df_dtypes_for_parquet(df_donations)
+        df_donations.to_parquet(PARQUET_PATH, index=False)
+        invalidate_data_cache()
+    except Exception as e:
+        print(f"[Fundraiser Sync Parquet Notice]: {e}")
+
+
 def init_fundraiser_db():
-    """Initializes fundraisers and fundraiser_campaigns SQLite tables."""
+    """Initializes fundraisers and fundraiser_campaigns SQLite tables, and purges legacy auto-sync locks."""
     try:
         conn = sqlite3.connect(LOCAL_DB_PATH, timeout=30.0)
         cursor = conn.cursor()
@@ -48,6 +66,9 @@ def init_fundraiser_db():
             );
         """)
         
+        # Purge legacy auto-sync campaign locks (id starting with fc_) so campaigns are not falsely locked
+        cursor.execute("DELETE FROM fundraiser_campaigns WHERE id LIKE 'fc_%'")
+
         conn.commit()
         conn.close()
     except Exception as e:
@@ -78,7 +99,7 @@ def calculate_benchmark_goal(raised_amount: float) -> float:
 def sync_discovered_fundraisers_internal() -> int:
     """
     Scans the live donations dataset for unique fundraiser_name values not yet present
-    in the fundraisers table and auto-registers them without overwriting admin customizations.
+    in the fundraisers table and auto-registers them without creating false campaign locks.
     """
     init_fundraiser_db()
     conn = sqlite3.connect(LOCAL_DB_PATH, timeout=30.0)
@@ -107,7 +128,6 @@ def sync_discovered_fundraisers_internal() -> int:
         return 0
         
     new_fundraisers = []
-    new_campaign_mappings = []
     
     for fname, lname, total_raised, total_dons, earliest_gift, latest_gift in don_fundraisers:
         if lname not in existing_lower_names and fname:
@@ -123,31 +143,12 @@ def sync_discovered_fundraisers_internal() -> int:
                 now_str, now_str
             ))
             existing_lower_names.add(lname)
-            
-            cur.execute("""
-                SELECT DISTINCT TRIM([Campaign Name]), COALESCE(TRIM(Code), 'ALL'), COALESCE(TRIM(Platform), 'LaunchGood')
-                FROM donations
-                WHERE LOWER(TRIM(fundraiser_name)) = ?
-                  AND [Campaign Name] IS NOT NULL AND TRIM([Campaign Name]) != ''
-            """, (lname,))
-            for cname, code, plat in cur.fetchall():
-                map_id = f"fc_{uuid.uuid5(uuid.NAMESPACE_DNS, f'{fid}_{cname}_{code}').hex[:16]}"
-                new_campaign_mappings.append((
-                    map_id, fid, cname, code or "ALL", plat or "LaunchGood", now_str
-                ))
     
     if new_fundraisers:
         cur.executemany("""
             INSERT INTO fundraisers (id, name, email, phone, target_goal, start_date, status, notes, created_at, updated_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, new_fundraisers)
-        
-        if new_campaign_mappings:
-            cur.executemany("""
-                INSERT OR IGNORE INTO fundraiser_campaigns (id, fundraiser_id, campaign_name, code, platform, created_at)
-                VALUES (?, ?, ?, ?, ?, ?)
-            """, new_campaign_mappings)
-            
         conn.commit()
         
     conn.close()
@@ -381,9 +382,7 @@ def get_fundraisers_list(
 ):
     """
     Returns list of all fundraisers with live aggregated metrics.
-    Uses ultra-fast vectorized hybrid attribution:
-    - Peer-to-peer fundraisers matching exact fundraiser_name.
-    - Custom admin fundraisers matching assigned campaigns for unassigned donations.
+    Attribution is strictly derived from the fundraiser_name column in the donor dataset.
     """
     status_clean = str(status_filter or "ALL").strip().upper()
     if status_clean in ["NONE", "", "NAN", "UNDEFINED"]:
@@ -438,7 +437,6 @@ def get_fundraisers_list(
     amount_col = "Total Online Donations Net Amount in Settled Currency"
 
     if df_donations is not None and not df_donations.empty:
-        # Pre-normalize columns ONCE for instant 15ms vectorized execution
         df_work = df_donations.copy()
         df_work["fn_lower"] = df_work["fundraiser_name"].fillna("").astype(str).str.strip().str.lower() if "fundraiser_name" in df_work.columns else ""
         df_work["cname_lower"] = df_work["Campaign Name"].fillna("").astype(str).str.strip().str.lower() if "Campaign Name" in df_work.columns else ""
@@ -450,7 +448,7 @@ def get_fundraisers_list(
         else:
             df_work["_parsed_date"] = ""
 
-        # Vectorized pre-aggregation for named peer-to-peer fundraisers
+        # Vectorized pre-aggregation for named fundraisers
         df_named = df_work[df_work["fn_lower"] != ""].copy()
         known_donation_fundraisers = set(df_named["fn_lower"].unique())
         
@@ -470,6 +468,26 @@ def get_fundraisers_list(
         else:
             all_time_donors_map = {}
             all_time_emails_set_map = {}
+
+        # Build live campaign mappings from actual donor data for fundraisers without manual overrides
+        all_time_campaigns_map = {}
+        if not df_named.empty and "Campaign Name" in df_named.columns:
+            cols_c = [c for c in ["Campaign Name", "Code", "Platform"] if c in df_named.columns]
+            for fn_k, grp in df_named.groupby("fn_lower"):
+                seen_c = set()
+                c_list_items = []
+                for _, r in grp[cols_c].drop_duplicates().iterrows():
+                    c_name_val = str(r.get("Campaign Name") or "").strip()
+                    c_code_val = str(r.get("Code") or "ALL").strip() if "Code" in r else "ALL"
+                    c_plat_val = str(r.get("Platform") or "GiveBright").strip() if "Platform" in r else "GiveBright"
+                    if c_name_val and (c_name_val.lower(), c_code_val.lower()) not in seen_c:
+                        seen_c.add((c_name_val.lower(), c_code_val.lower()))
+                        c_list_items.append({
+                            "campaign_name": c_name_val,
+                            "code": c_code_val,
+                            "platform": c_plat_val
+                        })
+                all_time_campaigns_map[fn_k] = c_list_items
 
         # Period group aggregations if date filtered
         is_custom_filtered = bool(start_date or end_date)
@@ -497,7 +515,6 @@ def get_fundraisers_list(
             period_raised_map = all_time_raised_map
             period_txns_map = all_time_txns_map
             period_donors_map = all_time_donors_map
-
     else:
         df_work = pd.DataFrame()
         known_donation_fundraisers = set()
@@ -507,6 +524,7 @@ def get_fundraisers_list(
         all_time_max_date_map = {}
         all_time_donors_map = {}
         all_time_emails_set_map = {}
+        all_time_campaigns_map = {}
         period_raised_map = {}
         period_txns_map = {}
         period_donors_map = {}
@@ -524,6 +542,8 @@ def get_fundraisers_list(
         fname = f.get("name", "Unnamed")
         fname_clean = str(fname or "").strip().lower()
         c_list = f_campaign_map.get(fid, [])
+        if not c_list:
+            c_list = all_time_campaigns_map.get(fname_clean, [])
         target_goal = float(f.get("target_goal") or 0.0)
         f_start_date = str(f.get("start_date") or "").strip()
 
@@ -537,7 +557,6 @@ def get_fundraisers_list(
         latest_donation_date = None
 
         if fname_clean in known_donation_fundraisers:
-            # 1. Named peer-to-peer fundraiser: instant dict lookup
             all_time_raised = float(all_time_raised_map.get(fname_clean, 0.0))
             txn_count = int(all_time_txns_map.get(fname_clean, 0))
             donor_count = int(all_time_donors_map.get(fname_clean, 0))
@@ -550,59 +569,6 @@ def get_fundraisers_list(
 
             if fname_clean in all_time_emails_set_map:
                 global_donor_emails.update(all_time_emails_set_map[fname_clean])
-
-        elif c_list and not df_work.empty:
-            # 2. Custom manual fundraiser: matches assigned campaigns for unassigned gifts
-            masks = []
-            for c_item in c_list:
-                c_clean = str(c_item.get("campaign_name") or "").strip().lower()
-                cd_clean = str(c_item.get("code") or "ALL").strip().lower()
-                if not c_clean:
-                    continue
-                if cd_clean in ["all", "", "unassigned"]:
-                    m = (df_work["cname_lower"] == c_clean) & (df_work["fn_lower"].isin(["", "nan", "none", "n/a", "unassigned"]))
-                else:
-                    m = (df_work["cname_lower"] == c_clean) & (df_work["code_lower"] == cd_clean) & (df_work["fn_lower"].isin(["", "nan", "none", "n/a", "unassigned"]))
-                masks.append(m)
-            if masks:
-                comb = masks[0]
-                for m in masks[1:]:
-                    comb = comb | m
-                sub_df = df_work[comb]
-                if not sub_df.empty:
-                    all_time_raised = float(sub_df["net_num"].sum())
-                    txn_count = len(sub_df)
-                    if "Email" in sub_df.columns:
-                        valid_emails = sub_df["Email"].dropna().astype(str).str.strip().str.lower()
-                        valid_emails = valid_emails[~valid_emails.isin(["", "nan", "none", "n/a"])]
-                        donor_count = len(set(valid_emails))
-                        global_donor_emails.update(valid_emails)
-                    if "_parsed_date" in sub_df.columns:
-                        valid_dates = sub_df["_parsed_date"].dropna()
-                        valid_dates = valid_dates[valid_dates != ""]
-                        if not valid_dates.empty:
-                            first_donation_date = str(valid_dates.min())
-                            latest_donation_date = str(valid_dates.max())
-
-                    if is_custom_filtered:
-                        date_m = pd.Series(True, index=sub_df.index)
-                        if start_date:
-                            date_m = date_m & (sub_df["_parsed_date"] >= start_date)
-                        if end_date:
-                            date_m = date_m & (sub_df["_parsed_date"] <= end_date)
-                        p_sub = sub_df[date_m]
-                        period_raised = float(p_sub["net_num"].sum()) if not p_sub.empty else 0.0
-                        period_txns = len(p_sub)
-                        if "Email" in p_sub.columns and not p_sub.empty:
-                            p_emails = p_sub["Email"].dropna().astype(str).str.strip().str.lower()
-                            p_emails = p_emails[~p_emails.isin(["", "nan", "none", "n/a"])]
-                            period_donors = len(set(p_emails))
-                        else:
-                            period_donors = 0
-                    else:
-                        period_raised = all_time_raised
-                        period_txns = txn_count
-                        period_donors = donor_count
 
         inception_date = first_donation_date or f_start_date or "N/A"
         progress_pct = round((all_time_raised / target_goal * 100.0), 1) if target_goal > 0 else (100.0 if all_time_raised > 0 else 0.0)
@@ -634,7 +600,8 @@ def get_fundraisers_list(
             "period_donors": period_donors,
             "total_donations_count": txn_count,
             "period_donations_count": period_txns,
-            "avg_donation": avg_donation
+            "avg_donation": avg_donation,
+            "average_donation": avg_donation
         }
 
         fundraisers_result.append(fundraiser_obj)
@@ -671,6 +638,7 @@ def get_fundraiser_detail(
     """
     Returns deep drilldown for a single fundraiser:
     individual campaign breakdown, monthly timeline, and recent transactions log.
+    Attribution is strictly derived from the fundraiser_name column in the donor dataset.
     """
     init_fundraiser_db()
     conn = sqlite3.connect(LOCAL_DB_PATH, timeout=10.0)
@@ -717,27 +685,25 @@ def get_fundraiser_detail(
 
         if fname_clean in known_donation_fundraisers:
             sub_df = df_work[df_work["fn_lower"] == fname_clean]
-        elif assigned_campaigns:
-            masks = []
-            for c_item in assigned_campaigns:
-                c_clean = str(c_item.get("campaign_name") or "").strip().lower()
-                cd_clean = str(c_item.get("code") or "ALL").strip().lower()
-                if not c_clean:
-                    continue
-                if cd_clean in ["all", "", "unassigned"]:
-                    m = (df_work["cname_lower"] == c_clean) & (df_work["fn_lower"].isin(["", "nan", "none", "n/a", "unassigned"]))
-                else:
-                    m = (df_work["cname_lower"] == c_clean) & (df_work["code_lower"] == cd_clean) & (df_work["fn_lower"].isin(["", "nan", "none", "n/a", "unassigned"]))
-                masks.append(m)
-            if masks:
-                comb = masks[0]
-                for m in masks[1:]:
-                    comb = comb | m
-                sub_df = df_work[comb]
-            else:
-                sub_df = pd.DataFrame()
         else:
             sub_df = pd.DataFrame()
+
+        if not assigned_campaigns and not sub_df.empty and "Campaign Name" in sub_df.columns:
+            cols_c = [c for c in ["Campaign Name", "Code", "Platform"] if c in sub_df.columns]
+            seen_c = set()
+            c_list_items = []
+            for _, r in sub_df[cols_c].drop_duplicates().iterrows():
+                c_name_val = str(r.get("Campaign Name") or "").strip()
+                c_code_val = str(r.get("Code") or "ALL").strip() if "Code" in r else "ALL"
+                c_plat_val = str(r.get("Platform") or "GiveBright").strip() if "Platform" in r else "GiveBright"
+                if c_name_val and (c_name_val.lower(), c_code_val.lower()) not in seen_c:
+                    seen_c.add((c_name_val.lower(), c_code_val.lower()))
+                    c_list_items.append({
+                        "campaign_name": c_name_val,
+                        "code": c_code_val,
+                        "platform": c_plat_val
+                    })
+            assigned_campaigns = c_list_items
 
         if not sub_df.empty:
             total_raised_all_time = float(sub_df["net_num"].sum())
@@ -844,10 +810,11 @@ def get_fundraiser_detail(
 
 @router.post("", status_code=status.HTTP_201_CREATED)
 def create_fundraiser(payload: CreateFundraiserRequest):
-    """Creates a new fundraiser and assigns campaigns (Super Admin only)."""
+    """Creates a new fundraiser, assigns campaigns, and updates donor records permanently (Super Admin only)."""
     _check_super_admin(payload.user_role, payload.can_edit_donors or False)
 
-    if not payload.name or not payload.name.strip():
+    f_name = payload.name.strip()
+    if not f_name:
         raise HTTPException(status_code=400, detail="Fundraiser name is required.")
 
     fundraiser_id = f"FR-{uuid.uuid4().hex[:8].upper()}"
@@ -861,7 +828,7 @@ def create_fundraiser(payload: CreateFundraiserRequest):
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         """, (
             fundraiser_id,
-            payload.name.strip(),
+            f_name,
             payload.email.strip() if payload.email else "",
             payload.phone.strip() if payload.phone else "",
             float(payload.target_goal or 0.0),
@@ -870,7 +837,7 @@ def create_fundraiser(payload: CreateFundraiserRequest):
             payload.notes.strip() if payload.notes else ""
         ))
 
-        # Insert campaign assignments
+        # Insert campaign assignments and update donor records permanently
         if payload.assigned_campaigns:
             for c in payload.assigned_campaigns:
                 cname = c.campaign_name.strip()
@@ -882,42 +849,127 @@ def create_fundraiser(payload: CreateFundraiserRequest):
                         VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
                     """, (str(uuid.uuid4()), fundraiser_id, cname, code, plat))
 
+                    if code.upper() in ["ALL", "UNASSIGNED", ""] or not code:
+                        cur.execute("""
+                            UPDATE donations 
+                            SET fundraiser_name = ? 
+                            WHERE [Campaign Name] = ? 
+                              AND (fundraiser_name IS NULL OR TRIM(fundraiser_name) = '')
+                        """, (f_name, cname))
+                    else:
+                        cur.execute("""
+                            UPDATE donations 
+                            SET fundraiser_name = ? 
+                            WHERE [Campaign Name] = ? AND Code = ?
+                              AND (fundraiser_name IS NULL OR TRIM(fundraiser_name) = '')
+                        """, (f_name, cname, code))
+
         conn.commit()
     finally:
         conn.close()
 
+    _sync_parquet_and_cache_from_sqlite()
+
     try:
-        broadcast_event_sync("FUNDRAISER_UPDATED", {"action": "create", "id": fundraiser_id, "name": payload.name})
+        broadcast_event_sync("DONORS_UPDATED", {"source": "fundraiser_create", "fundraiser_name": f_name})
+        broadcast_event_sync("FUNDRAISER_UPDATED", {"action": "create", "id": fundraiser_id, "name": f_name})
     except Exception:
         pass
 
     return {
         "status": "success",
-        "message": f"Successfully created fundraiser '{payload.name}'.",
+        "message": f"Successfully created fundraiser '{f_name}'.",
         "fundraiser_id": fundraiser_id
     }
 
 
 @router.put("/{fundraiser_id}")
 def update_fundraiser(fundraiser_id: str, payload: UpdateFundraiserRequest):
-    """Updates an existing fundraiser and re-assigns campaigns (Super Admin only)."""
+    """Updates an existing fundraiser, synchronizes donor records, and re-assigns campaigns (Super Admin only)."""
     _check_super_admin(payload.user_role, payload.can_edit_donors or False)
+
+    new_name = payload.name.strip()
+    if not new_name:
+        raise HTTPException(status_code=400, detail="Fundraiser name is required.")
 
     init_fundraiser_db()
     conn = sqlite3.connect(LOCAL_DB_PATH, timeout=30.0)
     cur = conn.cursor()
 
     try:
-        cur.execute("SELECT id FROM fundraisers WHERE id = ?", (fundraiser_id,))
-        if not cur.fetchone():
+        cur.execute("SELECT name FROM fundraisers WHERE id = ?", (fundraiser_id,))
+        row = cur.fetchone()
+        if not row:
             raise HTTPException(status_code=404, detail="Fundraiser not found.")
+        old_name = row[0]
 
+        # Get existing assigned campaigns for diffing
+        cur.execute("SELECT campaign_name, code FROM fundraiser_campaigns WHERE fundraiser_id = ?", (fundraiser_id,))
+        old_campaigns = set((r[0].strip().lower(), (r[1] or "ALL").strip().lower()) for r in cur.fetchall())
+
+        new_campaigns_set = set()
+        new_campaigns_list = []
+        if payload.assigned_campaigns:
+            for c in payload.assigned_campaigns:
+                cn = c.campaign_name.strip()
+                cd = (c.code or "ALL").strip()
+                pl = (c.platform or "ALL").strip()
+                if cn:
+                    new_campaigns_set.add((cn.lower(), cd.lower()))
+                    new_campaigns_list.append((cn, cd, pl))
+
+        # 1. If name changed, update all existing donations that had the old fundraiser name
+        if old_name.strip().lower() != new_name.lower():
+            cur.execute("""
+                UPDATE donations 
+                SET fundraiser_name = ? 
+                WHERE LOWER(TRIM(fundraiser_name)) = LOWER(TRIM(?))
+            """, (new_name, old_name))
+
+        # 2. Handle unlinked campaigns (in old_campaigns but not in new_campaigns):
+        # Clear fundraiser_name on donations that were assigned to this fundraiser
+        unlinked = old_campaigns - new_campaigns_set
+        for u_cname_lower, u_code_lower in unlinked:
+            if u_code_lower in ["all", "unassigned", ""]:
+                cur.execute("""
+                    UPDATE donations
+                    SET fundraiser_name = NULL
+                    WHERE LOWER(TRIM([Campaign Name])) = ?
+                      AND (LOWER(TRIM(fundraiser_name)) = LOWER(TRIM(?)) OR LOWER(TRIM(fundraiser_name)) = LOWER(TRIM(?)))
+                """, (u_cname_lower, old_name, new_name))
+            else:
+                cur.execute("""
+                    UPDATE donations
+                    SET fundraiser_name = NULL
+                    WHERE LOWER(TRIM([Campaign Name])) = ? AND LOWER(TRIM(Code)) = ?
+                      AND (LOWER(TRIM(fundraiser_name)) = LOWER(TRIM(?)) OR LOWER(TRIM(fundraiser_name)) = LOWER(TRIM(?)))
+                """, (u_cname_lower, u_code_lower, old_name, new_name))
+
+        # 3. Handle newly assigned campaigns:
+        # Assign matching unassigned donations (or existing donations of this fundraiser) to new_name
+        for cn, cd, pl in new_campaigns_list:
+            if cd.upper() in ["ALL", "UNASSIGNED", ""] or not cd:
+                cur.execute("""
+                    UPDATE donations
+                    SET fundraiser_name = ?
+                    WHERE [Campaign Name] = ?
+                      AND (fundraiser_name IS NULL OR TRIM(fundraiser_name) = '' OR LOWER(TRIM(fundraiser_name)) = LOWER(TRIM(?)))
+                """, (new_name, cn, old_name))
+            else:
+                cur.execute("""
+                    UPDATE donations
+                    SET fundraiser_name = ?
+                    WHERE [Campaign Name] = ? AND Code = ?
+                      AND (fundraiser_name IS NULL OR TRIM(fundraiser_name) = '' OR LOWER(TRIM(fundraiser_name)) = LOWER(TRIM(?)))
+                """, (new_name, cn, cd, old_name))
+
+        # Update fundraisers table
         cur.execute("""
             UPDATE fundraisers 
             SET name = ?, email = ?, phone = ?, target_goal = ?, start_date = ?, status = ?, notes = ?, updated_at = CURRENT_TIMESTAMP
             WHERE id = ?
         """, (
-            payload.name.strip(),
+            new_name,
             payload.email.strip() if payload.email else "",
             payload.phone.strip() if payload.phone else "",
             float(payload.target_goal or 0.0),
@@ -927,31 +979,29 @@ def update_fundraiser(fundraiser_id: str, payload: UpdateFundraiserRequest):
             fundraiser_id
         ))
 
-        # Re-assign campaigns
+        # Re-assign campaigns in fundraiser_campaigns
         cur.execute("DELETE FROM fundraiser_campaigns WHERE fundraiser_id = ?", (fundraiser_id,))
-        if payload.assigned_campaigns:
-            for c in payload.assigned_campaigns:
-                cname = c.campaign_name.strip()
-                code = (c.code or "ALL").strip()
-                plat = (c.platform or "ALL").strip()
-                if cname:
-                    cur.execute("""
-                        INSERT INTO fundraiser_campaigns (id, fundraiser_id, campaign_name, code, platform, created_at)
-                        VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-                    """, (str(uuid.uuid4()), fundraiser_id, cname, code, plat))
+        for cn, cd, pl in new_campaigns_list:
+            cur.execute("""
+                INSERT INTO fundraiser_campaigns (id, fundraiser_id, campaign_name, code, platform, created_at)
+                VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            """, (str(uuid.uuid4()), fundraiser_id, cn, cd, pl))
 
         conn.commit()
     finally:
         conn.close()
 
+    _sync_parquet_and_cache_from_sqlite()
+
     try:
-        broadcast_event_sync("FUNDRAISER_UPDATED", {"action": "update", "id": fundraiser_id, "name": payload.name})
+        broadcast_event_sync("DONORS_UPDATED", {"source": "fundraiser_update", "fundraiser_name": new_name})
+        broadcast_event_sync("FUNDRAISER_UPDATED", {"action": "update", "id": fundraiser_id, "name": new_name})
     except Exception:
         pass
 
     return {
         "status": "success",
-        "message": f"Successfully updated fundraiser '{payload.name}' and campaign assignments."
+        "message": f"Successfully updated fundraiser '{new_name}' and synchronized donor records."
     }
 
 
@@ -985,7 +1035,7 @@ def assign_unassigned_donations(payload: AssignDonationsRequest):
         elif payload.campaign_name:
             cname = payload.campaign_name.strip()
             code = (payload.code or "ALL").strip()
-            if code.upper() == "ALL" or not code:
+            if code.upper() in ["ALL", "UNASSIGNED", ""] or not code:
                 cur.execute("""
                     UPDATE donations 
                     SET fundraiser_name = ? 
@@ -1005,6 +1055,14 @@ def assign_unassigned_donations(payload: AssignDonationsRequest):
     finally:
         conn.close()
 
+    if updated_rows > 0:
+        _sync_parquet_and_cache_from_sqlite()
+        try:
+            broadcast_event_sync("DONORS_UPDATED", {"source": "assign_donations", "fundraiser_name": target_fname})
+            broadcast_event_sync("FUNDRAISER_UPDATED", {"action": "assign_donations", "fundraiser_name": target_fname})
+        except Exception:
+            pass
+
     return {
         "status": "success",
         "updated_donations_count": updated_rows,
@@ -1014,7 +1072,7 @@ def assign_unassigned_donations(payload: AssignDonationsRequest):
 
 @router.delete("/{fundraiser_id}")
 def delete_fundraiser(fundraiser_id: str, user_role: str = "guest", can_edit_donors: bool = False):
-    """Deletes a fundraiser and all its campaign assignments (Super Admin only)."""
+    """Deletes a fundraiser, unlinks its campaigns, and clears fundraiser_name on its donations (Super Admin only)."""
     _check_super_admin(user_role, can_edit_donors)
 
     init_fundraiser_db()
@@ -1030,16 +1088,27 @@ def delete_fundraiser(fundraiser_id: str, user_role: str = "guest", can_edit_don
 
         cur.execute("DELETE FROM fundraiser_campaigns WHERE fundraiser_id = ?", (fundraiser_id,))
         cur.execute("DELETE FROM fundraisers WHERE id = ?", (fundraiser_id,))
+
+        # Clear fundraiser_name in donations table so it's permanently unassigned and not re-discovered
+        cur.execute("""
+            UPDATE donations 
+            SET fundraiser_name = NULL 
+            WHERE LOWER(TRIM(fundraiser_name)) = LOWER(TRIM(?))
+        """, (f_name,))
+
         conn.commit()
     finally:
         conn.close()
 
+    _sync_parquet_and_cache_from_sqlite()
+
     try:
+        broadcast_event_sync("DONORS_UPDATED", {"source": "fundraiser_delete", "fundraiser_name": f_name})
         broadcast_event_sync("FUNDRAISER_UPDATED", {"action": "delete", "id": fundraiser_id, "name": f_name})
     except Exception:
         pass
 
     return {
         "status": "success",
-        "message": f"Successfully deleted fundraiser '{f_name}'."
+        "message": f"Successfully deleted fundraiser '{f_name}' and cleared donor assignments."
     }
