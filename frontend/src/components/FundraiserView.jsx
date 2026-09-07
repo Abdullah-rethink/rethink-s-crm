@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { 
   HeartHandshake, PlusCircle, Search, Filter, Calendar, Target, 
   TrendingUp, Users, DollarSign, Edit3, Trash2, Eye, X, Check, 
@@ -79,8 +79,9 @@ export default function FundraiserView({ user, accentColor = 'cyan' }) {
   const [loadingDrilldown, setLoadingDrilldown] = useState(false);
   const [drilldownStartDate, setDrilldownStartDate] = useState('');
   const [drilldownEndDate, setDrilldownEndDate] = useState('');
-  const [campaignBreakdownExpanded, setCampaignBreakdownExpanded] = useState(false);
+  const [campaignBreakdownExpanded, setCampaignBreakdownExpanded] = useState(true);
   const [campaignBreakdownSearch, setCampaignBreakdownSearch] = useState('');
+  const drawerBodyRef = useRef(null);
 
   // Synchronize applied date filters based on preset buttons
   const handleDatePresetChange = (mode) => {
@@ -186,7 +187,16 @@ export default function FundraiserView({ user, accentColor = 'cyan' }) {
       .then(res => res.json())
       .then(data => {
         setDrilldownData(data);
+        // Auto-expand for normal fundraisers (<= 5 campaigns) so breakdown table is immediately visible,
+        // collapse only for heavy fundraisers (> 5 campaigns) so view is clean
+        const count = (data?.campaign_breakdown || []).length;
+        setCampaignBreakdownExpanded(count <= 5);
         setLoadingDrilldown(false);
+        setTimeout(() => {
+          if (drawerBodyRef.current) {
+            drawerBodyRef.current.scrollTop = 0;
+          }
+        }, 0);
       })
       .catch(err => {
         console.error('Error loading drilldown:', err);
@@ -1106,7 +1116,7 @@ export default function FundraiserView({ user, accentColor = 'cyan' }) {
                   <button
                     onClick={() => {
                       setSelectedFundraiserId(f.id);
-                      setCampaignBreakdownExpanded(false);
+                      setCampaignBreakdownExpanded((f.assigned_campaigns || []).length <= 5);
                       setCampaignBreakdownSearch('');
                       setDrilldownStartDate(appliedStartDate);
                       setDrilldownEndDate(appliedEndDate);
@@ -1305,7 +1315,7 @@ export default function FundraiserView({ user, accentColor = 'cyan' }) {
                         <button
                           onClick={() => {
                             setSelectedFundraiserId(f.id);
-                            setCampaignBreakdownExpanded(false);
+                            setCampaignBreakdownExpanded((f.assigned_campaigns || []).length <= 5);
                             setCampaignBreakdownSearch('');
                             setDrilldownStartDate(appliedStartDate);
                             setDrilldownEndDate(appliedEndDate);
@@ -1488,7 +1498,7 @@ export default function FundraiserView({ user, accentColor = 'cyan' }) {
             </div>
 
             {/* Drawer Body */}
-            <div className="flex-1 overflow-y-auto p-4 custom-scrollbar flex flex-col gap-4">
+            <div ref={drawerBodyRef} className="flex-1 overflow-y-auto p-4 custom-scrollbar flex flex-col gap-4">
               {loadingDrilldown ? (
                 <div className="text-center py-10 flex flex-col items-center justify-center gap-2">
                   <RefreshCw className="w-7 h-7 text-cyan-500 animate-spin" />
@@ -1529,7 +1539,7 @@ export default function FundraiserView({ user, accentColor = 'cyan' }) {
 
                       <div className="flex items-center gap-2">
                         <span className="text-xs font-semibold px-2.5 py-1 rounded-md border text-slate-500 dark:text-slate-400 group-hover:border-cyan-500/40 group-hover:text-cyan-500 transition-colors" style={{ borderColor: 'var(--border-glass)' }}>
-                          {campaignBreakdownExpanded ? 'Collapse' : 'Expand'}
+                          {campaignBreakdownExpanded ? 'Hide Breakdown' : 'Show Breakdown'}
                         </span>
                         <div className={`p-1 rounded-full text-slate-400 group-hover:text-cyan-500 transition-transform duration-200 ${campaignBreakdownExpanded ? 'rotate-180 text-cyan-500' : ''}`}>
                           <ChevronDown className="w-4 h-4" />
