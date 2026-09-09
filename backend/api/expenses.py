@@ -68,6 +68,21 @@ def init_expense_db():
             );
         """)
         cursor.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_system_settings_key ON system_settings(setting_key);")
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS code_transfers (
+                id TEXT PRIMARY KEY,
+                transfer_date TEXT,
+                source_code TEXT NOT NULL,
+                destination_code TEXT NOT NULL,
+                amount REAL NOT NULL,
+                reason TEXT NOT NULL,
+                transferred_by TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        """)
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_code_transfers_src ON code_transfers(source_code);")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_code_transfers_dst ON code_transfers(destination_code);")
         
         # Seed SMTP settings from .env as defaults (INSERT OR IGNORE = only on first run)
         smtp_defaults = [
@@ -138,6 +153,22 @@ class TestEmailRequest(BaseModel):
 class DeleteExpenseRequest(BaseModel):
     expense_id: str
     user_role: str
+    can_edit_donors: Optional[bool] = False
+
+
+class TransferFundsRequest(BaseModel):
+    source_code: str
+    destination_code: str
+    amount: float
+    reason: str
+    transfer_date: Optional[str] = ""
+    user_role: Optional[str] = "super_admin"
+    can_edit_donors: Optional[bool] = False
+    transferred_by: Optional[str] = "Admin User"
+
+
+class VoidTransferRequest(BaseModel):
+    user_role: Optional[str] = "super_admin"
     can_edit_donors: Optional[bool] = False
 
 
@@ -280,6 +311,27 @@ def get_project_codes(force_reload: bool = False):
         # 1. Fetch approved expenses per code
         cur.execute("SELECT code, SUM(amount) FROM expense_requests WHERE status = 'APPROVED' GROUP BY code")
         approved_expense_map = {str(row[0]).strip().upper(): float(row[1] or 0.0) for row in cur.fetchall() if row[0]}
+
+        # 1b. Fetch internal fund transfers in and out per code
+        try:
+            cur.execute("""
+                SELECT UPPER(TRIM(source_code)), SUM(amount)
+                FROM code_transfers
+                WHERE source_code IS NOT NULL AND TRIM(source_code) != ''
+                GROUP BY UPPER(TRIM(source_code))
+            """)
+            transfers_out_map = {str(r[0]).strip().upper(): float(r[1] or 0.0) for r in cur.fetchall() if r[0]}
+
+            cur.execute("""
+                SELECT UPPER(TRIM(destination_code)), SUM(amount)
+                FROM code_transfers
+                WHERE destination_code IS NOT NULL AND TRIM(destination_code) != ''
+                GROUP BY UPPER(TRIM(destination_code))
+            """)
+            transfers_in_map = {str(r[0]).strip().upper(): float(r[1] or 0.0) for r in cur.fetchall() if r[0]}
+        except Exception:
+            transfers_out_map = {}
+            transfers_in_map = {}
         
         # 2. Fetch ALL canonical codes from master_project_codes (single source of truth - 190 codes)
         cur.execute("""
@@ -346,6 +398,9 @@ def get_project_codes(force_reload: bool = False):
         # Financial enrichment: prefer donations gross, fall back to payouts
         gross_val = gross_from_donations.get(code_str, gross_from_payouts.get(code_str, 0.0))
         exp_amt = approved_expense_map.get(code_str, 0.0)
+        t_in = transfers_in_map.get(code_str, 0.0)
+        t_out = transfers_out_map.get(code_str, 0.0)
+        net_t = round(t_in - t_out, 2)
         code_map[code_str] = {
             "code": code_str,
             "heading": str(department or "Unassigned"),
@@ -363,13 +418,19 @@ def get_project_codes(force_reload: bool = False):
             "campaign_name": "N/A",
             "gross_raised": round(gross_val, 2),
             "approved_expenses": round(exp_amt, 2),
-            "net_balance": round(gross_val - exp_amt, 2),
+            "transfers_in": round(t_in, 2),
+            "transfers_out": round(t_out, 2),
+            "net_transfers": net_t,
+            "net_balance": round(gross_val - exp_amt + t_in - t_out, 2),
         }
 
     # Safety net: include any approved expense codes filed against a code not yet in master register
     for exp_code, exp_amt in approved_expense_map.items():
         if exp_code not in code_map:
             gross_val = gross_from_donations.get(exp_code, gross_from_payouts.get(exp_code, 0.0))
+            t_in = transfers_in_map.get(exp_code, 0.0)
+            t_out = transfers_out_map.get(exp_code, 0.0)
+            net_t = round(t_in - t_out, 2)
             code_map[exp_code] = {
                 "code": exp_code,
                 "heading": "Unassigned",
@@ -387,7 +448,10 @@ def get_project_codes(force_reload: bool = False):
                 "campaign_name": "N/A",
                 "gross_raised": round(gross_val, 2),
                 "approved_expenses": round(exp_amt, 2),
-                "net_balance": round(gross_val - exp_amt, 2),
+                "transfers_in": round(t_in, 2),
+                "transfers_out": round(t_out, 2),
+                "net_transfers": net_t,
+                "net_balance": round(gross_val - exp_amt + t_in - t_out, 2),
             }
 
     sorted_codes = sorted(list(code_map.values()), key=lambda x: x["code"])
@@ -860,3 +924,194 @@ def test_smtp_email(payload: TestEmailRequest):
         return {"status": "success", "message": f"Test email sent successfully to '{dest_email}'! Check your inbox."}
     else:
         raise HTTPException(status_code=500, detail=f"Test email failed: {error}")
+
+
+# ── Internal Fund Transfers Between Project Codes ───────────────────────
+
+@router.get("/transfers")
+def get_code_transfers(code: Optional[str] = None, search: Optional[str] = None, limit: int = 500):
+    """Retrieves all internal fund transfer records with optional code and keyword search."""
+    init_expense_db()
+    conn = sqlite3.connect(LOCAL_DB_PATH, timeout=10.0)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+
+    query = "SELECT * FROM code_transfers WHERE 1=1"
+    params = []
+    if code and code.strip():
+        c_clean = code.strip().upper()
+        query += " AND (UPPER(source_code) = ? OR UPPER(destination_code) = ?)"
+        params.extend([c_clean, c_clean])
+    if search and search.strip():
+        s_clean = f"%{search.strip().upper()}%"
+        query += " AND (UPPER(source_code) LIKE ? OR UPPER(destination_code) LIKE ? OR UPPER(reason) LIKE ? OR UPPER(transferred_by) LIKE ? OR UPPER(id) LIKE ?)"
+        params.extend([s_clean, s_clean, s_clean, s_clean, s_clean])
+
+    query += " ORDER BY created_at DESC LIMIT ?"
+    params.append(limit)
+
+    cur.execute(query, params)
+    rows = [dict(r) for r in cur.fetchall()]
+    conn.close()
+
+    total_amount = sum(r.get("amount", 0.0) for r in rows)
+    return {
+        "transfers": rows,
+        "total_count": len(rows),
+        "total_amount": round(total_amount, 2)
+    }
+
+
+@router.post("/transfers")
+def create_code_transfer(payload: TransferFundsRequest):
+    """Transfers funds from one project code to another, validating available balance and Super Admin permissions."""
+    if payload.user_role not in ["super_admin", "admin"] and not payload.can_edit_donors:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Transferring funds between project codes is restricted to Super Admins."
+        )
+
+    src = payload.source_code.strip().upper()
+    dst = payload.destination_code.strip().upper()
+    amount = float(payload.amount or 0)
+    reason = payload.reason.strip()
+
+    if not src or not dst:
+        raise HTTPException(status_code=400, detail="Source and destination project codes are required.")
+    if src == dst:
+        raise HTTPException(status_code=400, detail="Source and destination project codes cannot be identical.")
+    if amount <= 0:
+        raise HTTPException(status_code=400, detail="Transfer amount must be greater than £0.00.")
+    if not reason:
+        raise HTTPException(status_code=400, detail="A reason / reference note is required for financial audit tracking.")
+
+    init_expense_db()
+
+    # Verify source code available balance
+    all_codes = get_project_codes(force_reload=True)
+    src_obj = next((c for c in all_codes if c["code"] == src), None)
+    if not src_obj:
+        raise HTTPException(status_code=404, detail=f"Source project code '{src}' does not exist.")
+
+    available_balance = src_obj.get("net_balance", 0.0)
+    if amount > available_balance:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Insufficient funds on '{src}'. Available balance is £{available_balance:,.2f}, but requested transfer is £{amount:,.2f}."
+        )
+
+    dst_obj = next((c for c in all_codes if c["code"] == dst), None)
+    if not dst_obj:
+        raise HTTPException(status_code=404, detail=f"Destination project code '{dst}' does not exist.")
+
+    transfer_id = f"TRF-{datetime.now().strftime('%Y%m%d')}-{uuid.uuid4().hex[:6].upper()}"
+    t_date = payload.transfer_date.strip() if payload.transfer_date else datetime.now().strftime("%Y-%m-%d")
+
+    conn = sqlite3.connect(LOCAL_DB_PATH, timeout=15.0)
+    cursor = conn.cursor()
+    cursor.execute("""
+        INSERT INTO code_transfers (id, transfer_date, source_code, destination_code, amount, reason, transferred_by, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+    """, (transfer_id, t_date, src, dst, amount, reason, payload.transferred_by or "Super Admin"))
+    conn.commit()
+    conn.close()
+
+    clear_expenses_cache()
+    broadcast_event_sync("BALANCE_TRANSFERRED", {
+        "id": transfer_id,
+        "source_code": src,
+        "destination_code": dst,
+        "amount": amount,
+        "reason": reason,
+        "transferred_by": payload.transferred_by
+    })
+
+    return {
+        "status": "success",
+        "message": f"Successfully transferred £{amount:,.2f} from '{src}' to '{dst}'.",
+        "transfer_id": transfer_id,
+        "source_code": src,
+        "destination_code": dst,
+        "amount": amount
+    }
+
+
+@router.delete("/transfers/{transfer_id}")
+def void_code_transfer(transfer_id: str, user_role: str = "super_admin", can_edit_donors: bool = False):
+    """Voids / deletes an internal fund transfer, restoring the original balances."""
+    if user_role not in ["super_admin", "admin"] and not can_edit_donors:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Voiding fund transfers is restricted to Super Admins."
+        )
+
+    init_expense_db()
+    conn = sqlite3.connect(LOCAL_DB_PATH, timeout=10.0)
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM code_transfers WHERE id = ?", (transfer_id,))
+    row = cur.fetchone()
+    if not row:
+        conn.close()
+        raise HTTPException(status_code=404, detail=f"Transfer ID '{transfer_id}' not found.")
+
+    cur.execute("DELETE FROM code_transfers WHERE id = ?", (transfer_id,))
+    conn.commit()
+    conn.close()
+
+    clear_expenses_cache()
+    broadcast_event_sync("BALANCE_TRANSFERRED", {"id": transfer_id, "action": "VOIDED"})
+
+    return {
+        "status": "success",
+        "message": f"Transfer '{transfer_id}' has been voided and balances have been restored."
+    }
+
+
+@router.get("/transfers/export")
+def export_transfers(format: str = "csv", code: Optional[str] = None):
+    """Exports all fund transfers to CSV or Excel format."""
+    init_expense_db()
+    conn = sqlite3.connect(LOCAL_DB_PATH, timeout=10.0)
+    query = "SELECT * FROM code_transfers"
+    params = []
+    if code and code.strip():
+        c_clean = code.strip().upper()
+        query += " WHERE UPPER(source_code) = ? OR UPPER(destination_code) = ?"
+        params.extend([c_clean, c_clean])
+    query += " ORDER BY created_at DESC"
+
+    df = pd.read_sql_query(query, conn, params=params)
+    conn.close()
+
+    rename_map = {
+        "id": "Transfer ID",
+        "transfer_date": "Transfer Date",
+        "source_code": "Source Code",
+        "destination_code": "Destination Code",
+        "amount": "Amount (£)",
+        "reason": "Reason / Reference Notes",
+        "transferred_by": "Transferred By",
+        "created_at": "Timestamp"
+    }
+    df = df.rename(columns=rename_map)
+    date_str = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+    if format.lower() == "xlsx":
+        buffer = io.BytesIO()
+        with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
+            df.to_excel(writer, index=False, sheet_name="Fund Transfers")
+        buffer.seek(0)
+        headers = {"Content-Disposition": f'attachment; filename="code_transfers_{date_str}.xlsx"'}
+        return Response(
+            content=buffer.getvalue(),
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers=headers
+        )
+    else:
+        csv_bytes = df.to_csv(index=False).encode("utf-8-sig")
+        headers = {"Content-Disposition": f'attachment; filename="code_transfers_{date_str}.csv"'}
+        return Response(
+            content=csv_bytes,
+            media_type="text/csv",
+            headers=headers
+        )

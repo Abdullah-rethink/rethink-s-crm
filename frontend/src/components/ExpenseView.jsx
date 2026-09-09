@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { CreditCard, PlusCircle, Check, X, Mail, Filter, Wallet, Search, ChevronLeft, ChevronRight, LayoutGrid, List, Trash2, AlertTriangle, Settings, Eye, EyeOff, SendHorizonal, ChevronDown, ChevronUp, ShieldCheck, Wifi, WifiOff, RefreshCw, Download, FileSpreadsheet } from 'lucide-react';
+import { CreditCard, PlusCircle, Check, X, Mail, Filter, Wallet, Search, ChevronLeft, ChevronRight, LayoutGrid, List, Trash2, AlertTriangle, Settings, Eye, EyeOff, SendHorizonal, ChevronDown, ChevronUp, ShieldCheck, Wifi, WifiOff, RefreshCw, Download, FileSpreadsheet, ArrowRightLeft, History } from 'lucide-react';
 import { API_BASE_URL } from '../config';
+import TransferFundsModal from './TransferFundsModal';
+import TransferHistoryModal from './TransferHistoryModal';
 
 export default function ExpenseView({ user }) {
   const formatDate = (val) => {
@@ -39,6 +41,12 @@ export default function ExpenseView({ user }) {
   const [selectedCodeDetail, setSelectedCodeDetail] = useState(null);
   const [codePage, setCodePage] = useState(1);
   const [codePageSize, setCodePageSize] = useState(6);
+
+  // Transfer Funds State (Super Admin)
+  const [showTransferModal, setShowTransferModal] = useState(false);
+  const [transferInitialSource, setTransferInitialSource] = useState('');
+  const [showTransferHistoryModal, setShowTransferHistoryModal] = useState(false);
+  const [historyFilterCode, setHistoryFilterCode] = useState('');
 
   // Form State
   const [selectedCode, setSelectedCode] = useState('');
@@ -197,7 +205,7 @@ export default function ExpenseView({ user }) {
           if ([
             'EXPENSE_SUBMITTED', 'EXPENSE_REVIEWED', 'EXPENSE_DELETED',
             'DONORS_UPDATED', 'DONOR_RECORD_UPDATED', 'BULK_DONORS_UPDATED',
-            'MATRIX_UPDATED', 'PAYOUTS_UPDATED'
+            'MATRIX_UPDATED', 'PAYOUTS_UPDATED', 'BALANCE_TRANSFERRED'
           ].includes(payload?.event)) {
             loadExpenses();
             loadCodes(true);
@@ -413,7 +421,7 @@ export default function ExpenseView({ user }) {
           <p className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>Approved expenses automatically deduct from total category/code donations in real time (singleton state).</p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2.5 flex-wrap">
           <button 
             onClick={() => { loadCodes(true); loadExpenses(); }}
             className="btn-secondary text-xs flex items-center gap-1.5"
@@ -421,6 +429,26 @@ export default function ExpenseView({ user }) {
           >
             <RefreshCw className="w-3.5 h-3.5" /> Refresh Balances
           </button>
+          
+          <button
+            onClick={() => { setHistoryFilterCode(''); setShowTransferHistoryModal(true); }}
+            className="btn-secondary text-xs flex items-center gap-1.5 border-purple-500/30 text-purple-300 hover:bg-purple-500/10"
+            title="View internal fund transfer audit history"
+          >
+            <History className="w-3.5 h-3.5 text-purple-400" /> Transfer History
+          </button>
+
+          {isSuperAdmin && (
+            <button
+              onClick={() => { setTransferInitialSource(''); setShowTransferModal(true); loadCodes(true); }}
+              className="btn-primary text-xs flex items-center gap-1.5 shadow-lg shadow-purple-500/20"
+              style={{ background: 'linear-gradient(135deg, #8B5CF6, #06B6D4)' }}
+              title="Transfer funds between project codes"
+            >
+              <ArrowRightLeft className="w-3.5 h-3.5" /> Transfer Funds
+            </button>
+          )}
+
           <button 
             onClick={() => { setShowSubmitModal(true); loadCodes(true); }}
             className="btn-primary text-xs flex items-center gap-1.5 shadow-lg shadow-cyan-500/20"
@@ -721,7 +749,7 @@ export default function ExpenseView({ user }) {
               <div 
                 key={b.code} 
                 onClick={() => setSelectedCodeDetail(b)}
-                className="p-4 rounded-xl border flex flex-col gap-2 transition-all shadow-sm hover:border-cyan-400 hover:scale-[1.02] cursor-pointer group"
+                className="p-4 rounded-xl border flex flex-col gap-2 transition-all shadow-sm hover:border-cyan-400 hover:scale-[1.01] cursor-pointer group relative"
                 style={{
                   backgroundColor: 'var(--bg-card-inner)',
                   borderColor: 'var(--border-glass)'
@@ -732,7 +760,22 @@ export default function ExpenseView({ user }) {
                   <span className="font-mono text-xs font-black text-cyan-400 tracking-wide flex items-center gap-1 group-hover:underline">
                     {b.code} <Eye className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
                   </span>
-                  <span className="badge badge-emerald">{b.country}</span>
+                  <div className="flex items-center gap-1.5">
+                    {isSuperAdmin && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setTransferInitialSource(b.code);
+                          setShowTransferModal(true);
+                        }}
+                        className="opacity-80 hover:opacity-100 p-1 rounded-md bg-purple-500/15 text-purple-300 hover:bg-purple-500/25 border border-purple-500/30 text-[10px] font-bold flex items-center gap-1 transition-all"
+                        title={`Transfer funds out of ${b.code}`}
+                      >
+                        <ArrowRightLeft className="w-2.5 h-2.5" /> Transfer
+                      </button>
+                    )}
+                    <span className="badge badge-emerald">{b.country}</span>
+                  </div>
                 </div>
 
                 <div className="text-xs font-bold truncate mt-0.5" style={{ color: 'var(--text-main)' }} title={b.heading}>{b.heading}</div>
@@ -751,6 +794,15 @@ export default function ExpenseView({ user }) {
                     </span>
                   </div>
 
+                  {(b.transfers_in > 0 || b.transfers_out > 0) && (
+                    <div className="flex justify-between text-xs">
+                      <span style={{ color: 'var(--text-muted)' }}>Net Transfers:</span>
+                      <span className={`font-bold ${b.net_transfers >= 0 ? 'text-cyan-400' : 'text-amber-400'}`}>
+                        {b.net_transfers >= 0 ? `+£${b.net_transfers?.toLocaleString(undefined, { minimumFractionDigits: 2 })}` : `-£${Math.abs(b.net_transfers)?.toLocaleString(undefined, { minimumFractionDigits: 2 })}`}
+                      </span>
+                    </div>
+                  )}
+
                   <div className="flex justify-between text-xs border-t pt-1.5 font-black" style={{ borderColor: 'var(--border-glass)' }}>
                     <span className="text-purple-400 font-bold">Net Remaining:</span>
                     <span className={b.net_balance >= 0 ? 'text-emerald-400 font-extrabold' : 'text-rose-400 font-extrabold'}>
@@ -759,8 +811,9 @@ export default function ExpenseView({ user }) {
                   </div>
                 </div>
 
-                <div className="text-[10px] text-cyan-400/70 font-semibold text-right pt-1 group-hover:text-cyan-400">
-                  Click for full details ➔
+                <div className="text-[10px] text-cyan-400/70 font-semibold text-right pt-1 group-hover:text-cyan-400 flex items-center justify-between">
+                  <span className="text-[9px] text-slate-500 font-normal">{b.zakat_eligibility || 'Non-Zakat'}</span>
+                  <span>Click for full details ➔</span>
                 </div>
               </div>
             ))}
@@ -1247,25 +1300,63 @@ export default function ExpenseView({ user }) {
             </div>
 
             {/* Financial Overview Stat Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div className="p-4 rounded-xl border flex flex-col gap-1" style={{ backgroundColor: 'var(--bg-card-inner)', borderColor: 'var(--border-glass)' }}>
-                <span className="text-[11px] font-bold uppercase" style={{ color: 'var(--text-muted)' }}>Gross Raised</span>
-                <span className="text-xl font-black text-white">£{selectedCodeDetail.gross_raised?.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+            {/* Financial Balance Summary */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="p-3.5 rounded-xl border flex flex-col gap-1" style={{ backgroundColor: 'var(--bg-card-inner)', borderColor: 'var(--border-glass)' }}>
+                <span className="text-[10px] font-bold uppercase" style={{ color: 'var(--text-muted)' }}>Gross Raised</span>
+                <span className="text-lg font-black text-white">£{selectedCodeDetail.gross_raised?.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
               </div>
-              <div className="p-4 rounded-xl border flex flex-col gap-1" style={{ backgroundColor: 'var(--bg-card-inner)', borderColor: 'var(--border-glass)' }}>
-                <span className="text-[11px] font-bold uppercase text-rose-400">Approved Deductions</span>
-                <span className="text-xl font-black text-rose-400">£{selectedCodeDetail.approved_expenses?.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+              <div className="p-3.5 rounded-xl border flex flex-col gap-1" style={{ backgroundColor: 'var(--bg-card-inner)', borderColor: 'var(--border-glass)' }}>
+                <span className="text-[10px] font-bold uppercase text-rose-400">Approved Deductions</span>
+                <span className="text-lg font-black text-rose-400">£{selectedCodeDetail.approved_expenses?.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
               </div>
-              <div className="p-4 rounded-xl border flex flex-col gap-1" style={{ backgroundColor: 'var(--bg-card-inner)', borderColor: 'var(--border-glass)' }}>
-                <span className="text-[11px] font-bold uppercase text-purple-400">Net Remaining Balance</span>
-                <span className={`text-xl font-black ${selectedCodeDetail.net_balance >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+              <div className="p-3.5 rounded-xl border flex flex-col gap-1" style={{ backgroundColor: 'var(--bg-card-inner)', borderColor: 'var(--border-glass)' }}>
+                <span className="text-[10px] font-bold uppercase text-cyan-400">Net Transfers</span>
+                <span className="text-lg font-black text-cyan-400">
+                  {selectedCodeDetail.net_transfers >= 0 ? `+£${selectedCodeDetail.net_transfers?.toLocaleString(undefined, { minimumFractionDigits: 2 })}` : `-£${Math.abs(selectedCodeDetail.net_transfers)?.toLocaleString(undefined, { minimumFractionDigits: 2 })}`}
+                </span>
+                <span className="text-[9px] text-slate-400">In: £{selectedCodeDetail.transfers_in || 0} • Out: £{selectedCodeDetail.transfers_out || 0}</span>
+              </div>
+              <div className="p-3.5 rounded-xl border flex flex-col gap-1" style={{ backgroundColor: 'var(--bg-card-inner)', borderColor: 'var(--border-glass)' }}>
+                <span className="text-[10px] font-bold uppercase text-purple-400">Net Remaining</span>
+                <span className={`text-lg font-black ${selectedCodeDetail.net_balance >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
                   £{selectedCodeDetail.net_balance?.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                 </span>
               </div>
             </div>
 
+            {/* Quick Actions for Selected Code */}
+            <div className="flex items-center gap-2 pt-1">
+              {isSuperAdmin && (
+                <button
+                  onClick={() => {
+                    const code = selectedCodeDetail.code;
+                    setSelectedCodeDetail(null);
+                    setTransferInitialSource(code);
+                    setShowTransferModal(true);
+                  }}
+                  className="btn-primary text-xs px-3 py-1.5 flex items-center gap-1.5 shadow-lg shadow-purple-500/20"
+                  style={{ background: 'linear-gradient(135deg, #8B5CF6, #06B6D4)' }}
+                >
+                  <ArrowRightLeft className="w-3.5 h-3.5" /> Transfer Funds From {selectedCodeDetail.code}
+                </button>
+              )}
+
+              <button
+                onClick={() => {
+                  const code = selectedCodeDetail.code;
+                  setSelectedCodeDetail(null);
+                  setHistoryFilterCode(code);
+                  setShowTransferHistoryModal(true);
+                }}
+                className="btn-secondary text-xs px-3 py-1.5 flex items-center gap-1.5"
+              >
+                <History className="w-3.5 h-3.5 text-purple-400" /> View Transfer Ledger for {selectedCodeDetail.code}
+              </button>
+            </div>
+
             {/* Related Expenses Table */}
-            <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-3 mt-2">
               <div className="flex items-center justify-between">
                 <h4 className="text-xs font-extrabold uppercase tracking-wider text-slate-300 flex items-center gap-2">
                   <CreditCard className="w-4 h-4 text-purple-400" /> Expense Claims under {selectedCodeDetail.code}
@@ -1357,6 +1448,38 @@ export default function ExpenseView({ user }) {
           </div>
         </div>
       )}
+
+      {/* ── Internal Fund Transfers Modals ───────────────────────── */}
+      <TransferFundsModal
+        isOpen={showTransferModal}
+        onClose={() => {
+          setShowTransferModal(false);
+          setTransferInitialSource('');
+        }}
+        codes={codes}
+        initialSourceCode={transferInitialSource}
+        onSuccess={() => {
+          loadCodes(true);
+          loadExpenses();
+        }}
+        user={user}
+        isSuperAdmin={isSuperAdmin}
+      />
+
+      <TransferHistoryModal
+        isOpen={showTransferHistoryModal}
+        onClose={() => {
+          setShowTransferHistoryModal(false);
+          setHistoryFilterCode('');
+        }}
+        user={user}
+        isSuperAdmin={isSuperAdmin}
+        filterCode={historyFilterCode}
+        onTransfersUpdated={() => {
+          loadCodes(true);
+          loadExpenses();
+        }}
+      />
     </div>
   );
 }
