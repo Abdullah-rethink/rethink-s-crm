@@ -205,10 +205,12 @@ export default function FundraiserView({ user, accentColor = 'cyan' }) {
     loadFundraisers();
     loadCampaignsList();
 
-    // WebSocket real-time events listener
+    // Build WS URL: use API_BASE_URL if set, otherwise assume FastAPI is on :8000 in dev
     const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsHost = API_BASE_URL ? API_BASE_URL.replace(/^http/, 'ws') : `${wsProtocol}//${window.location.host}`;
-    const wsUrl = `${wsHost}/ws/events`;
+    const wsBase = API_BASE_URL
+      ? API_BASE_URL.replace(/^https?/, API_BASE_URL.startsWith('https') ? 'wss' : 'ws')
+      : `${wsProtocol}//localhost:8000`;
+    const wsUrl = `${wsBase}/ws/events`;
 
     let socket;
     try {
@@ -1372,6 +1374,7 @@ export default function FundraiserView({ user, accentColor = 'cyan' }) {
           loadCampaignsList();
         }}
         isSuperAdmin={isSuperAdmin}
+        user={user}
       />
 
       {/* ── Super Admin: Delete Confirmation Modal ──────────────── */}

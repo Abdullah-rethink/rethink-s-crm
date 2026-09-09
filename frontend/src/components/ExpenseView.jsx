@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { CreditCard, PlusCircle, Check, X, Mail, Filter, Wallet, Search, ChevronLeft, ChevronRight, LayoutGrid, List, Trash2, AlertTriangle, Settings, Eye, EyeOff, SendHorizonal, ChevronDown, ChevronUp, ShieldCheck, Wifi, WifiOff, RefreshCw } from 'lucide-react';
+import { CreditCard, PlusCircle, Check, X, Mail, Filter, Wallet, Search, ChevronLeft, ChevronRight, LayoutGrid, List, Trash2, AlertTriangle, Settings, Eye, EyeOff, SendHorizonal, ChevronDown, ChevronUp, ShieldCheck, Wifi, WifiOff, RefreshCw, Download, FileSpreadsheet } from 'lucide-react';
 import { API_BASE_URL } from '../config';
 
 export default function ExpenseView({ user }) {
@@ -28,6 +28,7 @@ export default function ExpenseView({ user }) {
   };
 
   const [codes, setCodes] = useState([]);
+  const [codesLoading, setCodesLoading] = useState(true);
   const [expensesData, setExpensesData] = useState({ summary: {}, expenses: [] });
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('ALL');
@@ -49,6 +50,7 @@ export default function ExpenseView({ user }) {
   const [amount, setAmount] = useState('');
   const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0]);
   const [notes, setNotes] = useState('');
+  const [isZakat, setIsZakat] = useState(false);
 
   const [formMsg, setFormMsg] = useState('');
   const [reviewMsg, setReviewMsg] = useState('');
@@ -142,10 +144,11 @@ export default function ExpenseView({ user }) {
   };
 
   const loadCodes = (force = false) => {
+    setCodesLoading(true);
     fetch(`${API_BASE_URL}/api/expenses/codes${force ? '?force_reload=true' : ''}`)
       .then(res => res.json())
-      .then(data => setCodes(data))
-      .catch(err => console.error('Error fetching project codes:', err));
+      .then(data => { setCodes(Array.isArray(data) ? data : []); setCodesLoading(false); })
+      .catch(err => { console.error('Error fetching project codes:', err); setCodesLoading(false); });
   };
 
   const loadExpenses = () => {
@@ -163,12 +166,15 @@ export default function ExpenseView({ user }) {
   };
 
   useEffect(() => {
-    loadCodes(true);
+    loadCodes(false);  // Use cache on mount for fast initial paint — force_reload on refresh/events
+    loadExpenses();
     if (isSuperAdmin) loadSettings();
 
     // WebSocket real-time events listener with HTTP polling fallback for Vercel Serverless
     const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsHost = API_BASE_URL ? API_BASE_URL.replace(/^http/, 'ws') : `${wsProtocol}//${window.location.host}`;
+    const wsHost = API_BASE_URL
+      ? API_BASE_URL.replace(/^https?/, API_BASE_URL.startsWith('https') ? 'wss' : 'ws')
+      : `${wsProtocol}//localhost:8000`;
     const wsUrl = `${wsHost}/ws/events`;
 
     let socket;
@@ -239,6 +245,13 @@ export default function ExpenseView({ user }) {
   };
 
   // Submit Expense Request
+  const matchedSelected = codes.find(c => c.code === selectedCode);
+  const previewGlCode = matchedSelected 
+    ? (isZakat 
+        ? (matchedSelected.legacy_zakat_code || matchedSelected.legacy_non_zakat_code || '') 
+        : (matchedSelected.legacy_non_zakat_code || matchedSelected.legacy_zakat_code || ''))
+    : '';
+
   const handleSubmitExpense = (e) => {
     e.preventDefault();
     if (!selectedCode || !amount || !title) {
@@ -258,6 +271,8 @@ export default function ExpenseView({ user }) {
         amount: parseFloat(amount),
         payment_date: paymentDate,
         notes: notes,
+        is_zakat: isZakat,
+        gl_code: previewGlCode,
         requested_by: user?.email || user?.display_name || 'Admin User'
       })
     })
@@ -284,6 +299,7 @@ export default function ExpenseView({ user }) {
             setShowSubmitModal(false);
             setFormMsg('');
             setSelectedCode('');
+            setIsZakat(false);
             setHeading('');
             setSubHeading('');
             setCountry('');
@@ -677,9 +693,27 @@ export default function ExpenseView({ user }) {
         </div>
 
         {/* Paginated Balances Display - Cards Grid */}
-        {filteredCodes.length === 0 ? (
+        {codesLoading ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="p-4 rounded-xl border flex flex-col gap-3 animate-pulse" style={{ backgroundColor: 'var(--bg-card-inner)', borderColor: 'var(--border-glass)' }}>
+                <div className="flex items-center justify-between">
+                  <div className="h-3 w-28 rounded-full" style={{ backgroundColor: 'var(--border-glass)' }} />
+                  <div className="h-4 w-16 rounded-full" style={{ backgroundColor: 'var(--border-glass)' }} />
+                </div>
+                <div className="h-3 w-3/4 rounded-full" style={{ backgroundColor: 'var(--border-glass)' }} />
+                <div className="h-2.5 w-1/2 rounded-full" style={{ backgroundColor: 'var(--border-glass)' }} />
+                <div className="border-t pt-2.5 mt-1 flex flex-col gap-2" style={{ borderColor: 'var(--border-glass)' }}>
+                  <div className="flex justify-between"><div className="h-2.5 w-20 rounded-full" style={{ backgroundColor: 'var(--border-glass)' }} /><div className="h-2.5 w-16 rounded-full" style={{ backgroundColor: 'var(--border-glass)' }} /></div>
+                  <div className="flex justify-between"><div className="h-2.5 w-24 rounded-full" style={{ backgroundColor: 'var(--border-glass)' }} /><div className="h-2.5 w-12 rounded-full" style={{ backgroundColor: 'var(--border-glass)' }} /></div>
+                  <div className="flex justify-between border-t pt-1.5" style={{ borderColor: 'var(--border-glass)' }}><div className="h-3 w-20 rounded-full" style={{ backgroundColor: 'var(--border-glass)' }} /><div className="h-3 w-20 rounded-full" style={{ backgroundColor: 'var(--border-glass)' }} /></div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : filteredCodes.length === 0 ? (
           <div className="py-8 text-center text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>
-            No project codes found matching search term '{codeSearch}'.
+            {codeSearch ? `No project codes found matching '${codeSearch}'.` : 'No project codes available.'}
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -761,30 +795,76 @@ export default function ExpenseView({ user }) {
         </div>
       </div>
 
-      {/* Filter Tabs */}
-      <div className="flex items-center gap-2 border-b pb-3" style={{ borderColor: 'var(--border-glass)' }}>
-        <Filter className="w-4 h-4 ml-1" style={{ color: 'var(--text-muted)' }} />
-        <span className="text-xs font-bold mr-2" style={{ color: 'var(--text-muted)' }}>Filter Claims Status:</span>
-        {['ALL', 'PENDING_APPROVAL', 'APPROVED', 'REJECTED'].map(st => (
-          <button
-            key={st}
-            onClick={() => setStatusFilter(st)}
-            className={`btn-secondary text-xs px-3.5 py-1.5 rounded-lg font-bold transition-all ${
-              statusFilter === st 
-                ? 'bg-cyan-500/20 text-cyan-400 border-cyan-400 shadow-md shadow-cyan-500/10' 
-                : 'border-transparent'
-            }`}
-            style={{ color: statusFilter === st ? '' : 'var(--text-muted)' }}
+      {/* Filter Tabs & Export */}
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b pb-3" style={{ borderColor: 'var(--border-glass)' }}>
+        <div className="flex items-center gap-2 flex-wrap">
+          <Filter className="w-4 h-4 ml-1" style={{ color: 'var(--text-muted)' }} />
+          <span className="text-xs font-bold mr-1" style={{ color: 'var(--text-muted)' }}>Filter Claims:</span>
+          {['ALL', 'PENDING_APPROVAL', 'APPROVED', 'REJECTED'].map(st => (
+            <button
+              key={st}
+              onClick={() => setStatusFilter(st)}
+              className={`btn-secondary text-xs px-3 py-1.5 rounded-lg font-bold transition-all ${
+                statusFilter === st 
+                  ? 'bg-cyan-500/20 text-cyan-400 border-cyan-400 shadow-md shadow-cyan-500/10' 
+                  : 'border-transparent'
+              }`}
+              style={{ color: statusFilter === st ? '' : 'var(--text-muted)' }}
+            >
+              {st === 'ALL' ? 'All Expenses' : st === 'PENDING_APPROVAL' ? '⏳ Pending' : st === 'APPROVED' ? '✓ Approved' : '✗ Rejected'}
+            </button>
+          ))}
+        </div>
+
+        {/* Download CSV / Excel Export */}
+        <div className="flex items-center gap-2">
+          <a
+            href={`${API_BASE_URL}/api/expenses/export?status_filter=${statusFilter}&format=csv`}
+            download
+            className="px-2.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/30 transition-all cursor-pointer"
+            title="Export filtered expense claims as CSV"
           >
-            {st === 'ALL' ? 'All Expenses' : st === 'PENDING_APPROVAL' ? '⏳ Pending' : st === 'APPROVED' ? '✓ Approved' : '✗ Rejected'}
-          </button>
-        ))}
+            <Download className="w-3.5 h-3.5" /> CSV
+          </a>
+          <a
+            href={`${API_BASE_URL}/api/expenses/export?status_filter=${statusFilter}&format=xlsx`}
+            download
+            className="px-2.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/30 transition-all cursor-pointer"
+            title="Export filtered expense claims as Excel (.xlsx)"
+          >
+            <FileSpreadsheet className="w-3.5 h-3.5" /> Excel
+          </a>
+        </div>
       </div>
 
       {/* Expense Log Table */}
       {loading ? (
-        <div className="py-24 text-center text-xs font-semibold animate-pulse" style={{ color: 'var(--text-muted)' }}>
-          ⚡ Loading Expense Records...
+        <div className="glass-panel overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="crm-table">
+              <thead>
+                <tr>
+                  <th>Expense ID</th><th>Date</th><th>Project Code</th><th>GL Ledger Code</th>
+                  <th>Zakat</th><th>Department</th><th>Office</th><th>Amount</th><th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <tr key={i} className="animate-pulse">
+                    <td><div className="h-3 w-28 rounded-full" style={{ backgroundColor: 'var(--border-glass)' }} /></td>
+                    <td><div className="h-3 w-20 rounded-full" style={{ backgroundColor: 'var(--border-glass)' }} /></td>
+                    <td><div className="h-3 w-24 rounded-full" style={{ backgroundColor: 'var(--border-glass)' }} /></td>
+                    <td><div className="h-3 w-20 rounded-full" style={{ backgroundColor: 'var(--border-glass)' }} /></td>
+                    <td><div className="h-4 w-14 rounded-full" style={{ backgroundColor: 'var(--border-glass)' }} /></td>
+                    <td><div className="h-3 w-20 rounded-full" style={{ backgroundColor: 'var(--border-glass)' }} /></td>
+                    <td><div className="h-3 w-20 rounded-full" style={{ backgroundColor: 'var(--border-glass)' }} /></td>
+                    <td><div className="h-3 w-14 rounded-full" style={{ backgroundColor: 'var(--border-glass)' }} /></td>
+                    <td><div className="h-4 w-16 rounded-full" style={{ backgroundColor: 'var(--border-glass)' }} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       ) : (
         <div className="glass-panel overflow-hidden">
@@ -795,8 +875,10 @@ export default function ExpenseView({ user }) {
                   <th>Expense ID</th>
                   <th>Date</th>
                   <th>Project Code</th>
-                  <th>Category Heading</th>
-                  <th>Sub-Heading</th>
+                  <th>GL Ledger Code</th>
+                  <th>Zakat</th>
+                  <th>Department</th>
+                  <th>Office</th>
                   <th>Country</th>
                   <th>Title & Vendor</th>
                   <th>Amount</th>
@@ -807,7 +889,7 @@ export default function ExpenseView({ user }) {
               <tbody>
                 {expensesData.expenses?.length === 0 ? (
                   <tr>
-                    <td colSpan={isSuperAdmin ? 10 : 9} className="text-center py-12 text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>
+                    <td colSpan={isSuperAdmin ? 12 : 11} className="text-center py-12 text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>
                       No expense claims found matching filter '{statusFilter}'.
                     </td>
                   </tr>
@@ -817,6 +899,22 @@ export default function ExpenseView({ user }) {
                       <td className="font-mono text-xs font-bold text-cyan-400">{exp.id}</td>
                       <td className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>{exp.payment_date}</td>
                       <td className="font-mono text-xs font-bold text-purple-400">{exp.code}</td>
+                      <td>
+                        {exp.gl_code ? (
+                          <span className="font-mono text-xs font-bold px-2 py-0.5 rounded bg-slate-900/90 text-cyan-300 border border-cyan-500/30 shadow-xs">
+                            {exp.gl_code}
+                          </span>
+                        ) : (
+                          <span className="text-slate-500 text-xs italic">—</span>
+                        )}
+                      </td>
+                      <td>
+                        {exp.is_zakat in [1, true, '1'] ? (
+                          <span className="badge badge-emerald text-[10px] font-bold">Zakat</span>
+                        ) : (
+                          <span className="badge badge-secondary text-[10px] font-bold">Non-Zakat</span>
+                        )}
+                      </td>
                       <td className="text-xs font-semibold" style={{ color: 'var(--text-main)' }}>{exp.heading}</td>
                       <td className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>{exp.sub_heading}</td>
                       <td className="text-xs font-medium">
@@ -962,11 +1060,11 @@ export default function ExpenseView({ user }) {
               {selectedCode && (
                 <div className="grid grid-cols-3 gap-3 p-3 rounded-lg border" style={{ backgroundColor: 'var(--bg-card-inner)', borderColor: 'var(--border-glass)' }}>
                   <div>
-                    <span className="block text-[10px] font-bold uppercase" style={{ color: 'var(--text-muted)' }}>Category Heading</span>
+                    <span className="block text-[10px] font-bold uppercase" style={{ color: 'var(--text-muted)' }}>Department</span>
                     <span className="text-xs font-extrabold text-cyan-400 truncate block">{heading || 'N/A'}</span>
                   </div>
                   <div>
-                    <span className="block text-[10px] font-bold uppercase" style={{ color: 'var(--text-muted)' }}>Sub-Heading</span>
+                    <span className="block text-[10px] font-bold uppercase" style={{ color: 'var(--text-muted)' }}>Office</span>
                     <span className="text-xs font-extrabold text-purple-400 truncate block">{subHeading || 'N/A'}</span>
                   </div>
                   <div>
@@ -975,6 +1073,34 @@ export default function ExpenseView({ user }) {
                   </div>
                 </div>
               )}
+
+              {/* Zakat Expense Toggle & Auto-Tagged GL Code */}
+              <div className="p-3.5 rounded-xl border flex flex-col gap-2.5" style={{ backgroundColor: 'var(--bg-card-inner)', borderColor: isZakat ? 'rgba(16, 185, 129, 0.4)' : 'var(--border-glass)' }}>
+                <div className="flex items-center justify-between">
+                  <label className="flex items-center gap-2 cursor-pointer select-none">
+                    <input 
+                      type="checkbox" 
+                      checked={isZakat} 
+                      onChange={e => setIsZakat(e.target.checked)}
+                      className="w-4 h-4 rounded text-emerald-500 focus:ring-emerald-400 cursor-pointer accent-emerald-500"
+                    />
+                    <span className="text-xs font-bold" style={{ color: 'var(--text-main)' }}>
+                      This is a Zakat-Eligible Expense
+                    </span>
+                  </label>
+                  <span className={`text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full ${isZakat ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40' : 'bg-slate-500/20 text-slate-400 border border-slate-500/30'}`}>
+                    {isZakat ? 'Zakat Fund' : 'Non-Zakat / General'}
+                  </span>
+                </div>
+
+                {/* Auto-Assigned GL Ledger Code Preview */}
+                <div className="flex items-center justify-between text-xs pt-1 border-t border-white/5">
+                  <span className="text-[11px] font-semibold" style={{ color: 'var(--text-muted)' }}>Auto-Assigned GL Ledger Code:</span>
+                  <span className="font-mono font-bold text-xs px-2.5 py-1 rounded bg-slate-900 text-cyan-300 border border-cyan-500/30 shadow-xs">
+                    {previewGlCode ? `GL: ${previewGlCode}` : '— (Auto-resolved from Code)'}
+                  </span>
+                </div>
+              </div>
 
               {/* Title & Vendor */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

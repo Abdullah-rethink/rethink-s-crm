@@ -234,113 +234,17 @@ def load_data():
 
 
 def init_classification_db():
-    """Ensure campaign_classifications table exists in SQLite DB."""
-    try:
-        conn = sqlite3.connect(LOCAL_DB_PATH, timeout=30.0)
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS campaign_classifications (
-                campaign_name TEXT NOT NULL,
-                community_name TEXT NOT NULL,
-                heading TEXT DEFAULT 'Unassigned',
-                sub_heading TEXT DEFAULT 'Unassigned',
-                country TEXT DEFAULT 'Unassigned',
-                code TEXT DEFAULT 'Unassigned',
-                zakat_eligibility TEXT DEFAULT 'Unassigned',
-                PRIMARY KEY (campaign_name, community_name)
-            );
-        """)
-        conn.commit()
-        conn.close()
-    except Exception as e:
-        print(f"Classification DB init notice: {e}")
+    """Ensure two-tier classifications schema exists in SQLite DB."""
+    from core.data_processor import init_classification_db as _init_db
+    return _init_db()
 
 def sync_donor_classifications_to_matrix(df_raw):
     """
     Extracts updated campaign classifications from donor records and syncs them
-    into campaign_classifications and givebright_classifications SQLite tables.
+    into master_project_codes and platform_campaign_mappings.
     """
-    if df_raw.empty or "Campaign Name" not in df_raw.columns:
-        return
-        
-    target_cols = ["Heading", "Sub-Heading", "Country", "Code", "Zakat Eligibility"]
-    available_targets = [c for c in target_cols if c in df_raw.columns]
-    if not available_targets:
-        return
-
-    init_classification_db()
-    init_givebright_classification_db()
-    
-    conn = sqlite3.connect(LOCAL_DB_PATH, timeout=30.0)
-    try:
-        # 1. Sync LaunchGood / Default rows
-        lg_mask = df_raw.get("Platform", pd.Series("", index=df_raw.index)) != "GiveBright"
-        if lg_mask.any():
-            lg_df = df_raw[lg_mask].copy()
-            lg_df["Campaign Name"] = lg_df["Campaign Name"].astype(str).fillna("N/A").replace({'nan': 'N/A', '': 'N/A', 'None': 'N/A'})
-            if "Community Name" in lg_df.columns:
-                lg_df["Community Name"] = lg_df["Community Name"].astype(str).fillna("N/A").replace({'nan': 'N/A', '': 'N/A', 'None': 'N/A'})
-            else:
-                lg_df["Community Name"] = "N/A"
-
-            group_cols = ["Campaign Name", "Community Name"]
-            
-            lg_matrix = lg_df.groupby(group_cols, dropna=False)[available_targets].first().reset_index()
-                
-            lg_save = lg_matrix.rename(columns={
-                "Campaign Name": "campaign_name",
-                "Community Name": "community_name",
-                "Heading": "heading",
-                "Sub-Heading": "sub_heading",
-                "Country": "country",
-                "Code": "code",
-                "Zakat Eligibility": "zakat_eligibility"
-            })
-            
-            db_cols = ["campaign_name", "community_name", "heading", "sub_heading", "country", "code", "zakat_eligibility"]
-            lg_save = lg_save[[c for c in db_cols if c in lg_save.columns]]
-            
-            try:
-                existing_lg = pd.read_sql_query("SELECT * FROM campaign_classifications", conn)
-                if not existing_lg.empty:
-                    lg_save = pd.concat([existing_lg, lg_save], ignore_index=True).drop_duplicates(subset=["campaign_name", "community_name"], keep="last")
-            except Exception:
-                pass
-                
-            lg_save.to_sql("campaign_classifications", con=conn, if_exists="replace", index=False)
-
-        # 2. Sync GiveBright rows
-        gb_mask = df_raw.get("Platform", pd.Series("", index=df_raw.index)) == "GiveBright"
-        if gb_mask.any():
-            gb_df = df_raw[gb_mask].copy()
-            gb_df["Campaign Name"] = gb_df["Campaign Name"].astype(str).fillna("N/A").replace({'nan': 'N/A', '': 'N/A', 'None': 'N/A'})
-            gb_matrix = gb_df.groupby("Campaign Name", dropna=False)[available_targets].first().reset_index()
-            
-            gb_save = gb_matrix.rename(columns={
-                "Campaign Name": "campaign_name",
-                "Heading": "heading",
-                "Sub-Heading": "sub_heading",
-                "Country": "country",
-                "Code": "code",
-                "Zakat Eligibility": "zakat_eligibility"
-            })
-            
-            db_cols_gb = ["campaign_name", "heading", "sub_heading", "country", "code", "zakat_eligibility"]
-            gb_save = gb_save[[c for c in db_cols_gb if c in gb_save.columns]]
-            
-            try:
-                existing_gb = pd.read_sql_query("SELECT * FROM givebright_classifications", conn)
-                if not existing_gb.empty:
-                    gb_save = pd.concat([existing_gb, gb_save], ignore_index=True).drop_duplicates(subset=["campaign_name"], keep="last")
-            except Exception:
-                pass
-                
-            gb_save.to_sql("givebright_classifications", con=conn, if_exists="replace", index=False)
-            
-        conn.commit()
-    except Exception as e:
-        print(f"Error syncing donor classifications to matrix: {e}")
-    finally:
-        conn.close()
+    from core.data_processor import sync_donors_to_classification_matrix
+    return sync_donors_to_classification_matrix(df_raw)
 
 def _mode_or_last(series):
     """Returns the most frequently occurring non-Unassigned value in the series, or the last value as fallback."""

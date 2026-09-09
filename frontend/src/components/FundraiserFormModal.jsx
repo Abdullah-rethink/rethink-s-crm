@@ -10,7 +10,8 @@ export default function FundraiserFormModal({
   editingFundraiser,
   availableCampaigns = [],
   onSuccess,
-  isSuperAdmin
+  isSuperAdmin,
+  user
 }) {
   // Form fields state (decoupled so typing in text inputs doesn't trigger campaign re-filtering)
   const [formFields, setFormFields] = useState({
@@ -164,7 +165,9 @@ export default function FundraiserFormModal({
       start_date: formFields.start_date || '',
       status: formFields.status,
       notes: formFields.notes,
-      assigned_campaigns: assignedCampaigns
+      assigned_campaigns: assignedCampaigns,
+      user_role: user?.role || 'super_admin',
+      can_edit_donors: user?.can_edit_donors === 1 || user?.role === 'super_admin'
     };
 
     const isEdit = !!editingFundraiser;
@@ -189,7 +192,12 @@ export default function FundraiserFormModal({
             setFormMsg('');
           }, 1000);
         } else {
-          setFormMsg(`❌ ${res.detail || 'Failed to save fundraiser.'}`);
+          // FastAPI 422 detail is an array of error objects; safely stringify it
+          const detail = res.detail;
+          const detailStr = Array.isArray(detail)
+            ? detail.map(d => `${(d.loc || []).slice(-1)[0] || 'field'}: ${d.msg}`).join('; ')
+            : (typeof detail === 'object' && detail !== null ? JSON.stringify(detail) : String(detail || 'Failed to save fundraiser.'));
+          setFormMsg(`❌ ${detailStr}`);
         }
       })
       .catch(err => {

@@ -23,6 +23,7 @@ const INITIAL_FILTERS = {
   payment_type: 'All Payment Types',
   tier: 'All Classifications',
   source: 'All Sources (Combined)',
+  programme_fund: 'All Programme Funds',
   heading: 'All Headings',
   subheading: 'All Sub-Headings',
   country: 'All Project Countries',
@@ -150,6 +151,7 @@ export default function App() {
       if (filters.payment_type) params.append('payment_type', filters.payment_type);
       if (filters.tier) params.append('tier', filters.tier);
       if (filters.source) params.append('source', filters.source);
+      if (filters.programme_fund) params.append('programme_fund', filters.programme_fund);
       if (filters.heading) params.append('heading', filters.heading);
       if (filters.subheading) params.append('subheading', filters.subheading);
       if (filters.country) params.append('country', filters.country);

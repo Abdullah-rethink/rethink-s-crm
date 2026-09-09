@@ -164,9 +164,10 @@ _CACHED_CODE_MAP = None
 
 def get_code_to_classification_map(force_reload: bool = False):
     """
-    Queries all known classifications from campaign, givebright, and paysuite classification tables
+    Queries all known classifications from master_project_codes (Two-Tier Model)
     to build a dynamic dictionary mapping a Code (case-insensitive) to its corresponding
-    Heading, Sub-Heading, Country, and Zakat Eligibility in < 1ms via in-memory caching.
+    Department, Office, Portfolio, Country, and Zakat Eligibility in < 1ms via in-memory caching.
+    Provides backward-compatible aliases for 'Heading' and 'Sub-Heading'.
     """
     global _CACHED_CODE_MAP
     if not force_reload and _CACHED_CODE_MAP is not None:
@@ -175,37 +176,85 @@ def get_code_to_classification_map(force_reload: bool = False):
     code_map = {}
     conn = sqlite3.connect(LOCAL_DB_PATH, timeout=10.0)
     try:
-        tables = ["campaign_classifications", "givebright_classifications", "paysuite_classifications", "rethink_website_classifications"]
-        for tbl in tables:
-            try:
-                df = pd.read_sql_query(f"SELECT code, heading, sub_heading, country, zakat_eligibility FROM {tbl}", conn)
-                for _, row in df.iterrows():
-                    code = str(row.get("code") or "").strip()
-                    code_lower = code.lower()
-                    if not code or code_lower in ["unassigned", "nan", "none", ""]:
-                        continue
-                    
-                    heading = str(row.get("heading") or "").strip()
-                    sub_heading = str(row.get("sub_heading") or "").strip()
-                    country = str(row.get("country") or "").strip()
-                    zakat = str(row.get("zakat_eligibility") or "").strip()
+        cur = conn.cursor()
+        cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='master_project_codes'")
+        if cur.fetchone():
+            # Check columns in master_project_codes
+            mpc_cols = [r[1] for r in cur.execute("PRAGMA table_info(master_project_codes)").fetchall()]
+            select_cols = ["code", "department", "office", "portfolio", "country", "zakat_eligibility"]
+            if "programme_fund" in mpc_cols:
+                select_cols.extend(["programme_fund", "fund_code", "legacy_non_zakat_code", "legacy_zakat_code", "old_codes"])
+            
+            df = pd.read_sql_query(f"SELECT {', '.join(select_cols)} FROM master_project_codes", conn)
+            for _, row in df.iterrows():
+                code = str(row.get("code") or "").strip()
+                if not code or code.lower() in ["unassigned", "nan", "none", ""]:
+                    continue
+                code_lower = code.lower()
+                dept = str(row.get("department") or "Unassigned").strip()
+                off = str(row.get("office") or "Unassigned").strip()
+                port = str(row.get("portfolio") or "").strip()
+                cntry = str(row.get("country") or "Unassigned").strip()
+                zkt = str(row.get("zakat_eligibility") or "Unassigned").strip()
+                prog_fund = str(row.get("programme_fund") or "").strip()
+                fund_code = str(row.get("fund_code") or "").strip()
+                non_zakat_gl = str(row.get("legacy_non_zakat_code") or "").strip()
+                zakat_gl = str(row.get("legacy_zakat_code") or "").strip()
+                old_raw = str(row.get("old_codes") or "").strip()
 
-                    if (heading.lower() in ["unassigned", ""] and 
-                        sub_heading.lower() in ["unassigned", ""] and 
-                        country.lower() in ["unassigned", ""]):
-                        continue
+                entry = {
+                    "Code": code,
+                    "Department": dept if dept.lower() not in ["unassigned", ""] else "Unassigned",
+                    "Office": off if off.lower() not in ["unassigned", ""] else "Unassigned",
+                    "Portfolio": port,
+                    "Programme Fund": prog_fund,
+                    "Fund Code": fund_code,
+                    "Legacy Non-Zakat Code": non_zakat_gl,
+                    "Legacy Zakat Code": zakat_gl,
+                    "Old Code": old_raw,
+                    # Backward-compatible aliases
+                    "Heading": dept if dept.lower() not in ["unassigned", ""] else "Unassigned",
+                    "Sub-Heading": off if off.lower() not in ["unassigned", ""] else "Unassigned",
+                    "Country": cntry if cntry.lower() not in ["unassigned", ""] else "Unassigned",
+                    "Zakat Eligibility": zkt if zkt.lower() not in ["unassigned", ""] else "Unassigned"
+                }
 
-                    code_lower_clean = code.strip().lower()
+                code_map[code_lower] = entry
 
-                    if code_lower_clean not in code_map:
-                        code_map[code_lower_clean] = {
-                            "Heading": heading if heading.lower() not in ["unassigned", ""] else "Unassigned",
-                            "Sub-Heading": sub_heading if sub_heading.lower() not in ["unassigned", ""] else "Unassigned",
-                            "Country": country if country.lower() not in ["unassigned", ""] else "Unassigned",
-                            "Zakat Eligibility": zakat if zakat.lower() not in ["unassigned", ""] else "Unassigned"
-                        }
-            except Exception:
-                pass
+                # Also alias each legacy code from old_codes to point to this entry
+                if old_raw:
+                    for tok in [t.strip().lower() for t in old_raw.replace(",", ";").split(";") if t.strip()]:
+                        if tok and tok not in code_map:
+                            code_map[tok] = entry
+        else:
+            # Fallback for unmigrated environments
+            tables = ["campaign_classifications", "givebright_classifications", "paysuite_classifications", "rethink_website_classifications"]
+            for tbl in tables:
+                try:
+                    df = pd.read_sql_query(f"SELECT code, heading, sub_heading, country, zakat_eligibility FROM {tbl}", conn)
+                    for _, row in df.iterrows():
+                        code = str(row.get("code") or "").strip()
+                        code_lower = code.lower()
+                        if not code or code_lower in ["unassigned", "nan", "none", ""]:
+                            continue
+                        heading = str(row.get("heading") or "Unassigned").strip()
+                        sub_heading = str(row.get("sub_heading") or "Unassigned").strip()
+                        country = str(row.get("country") or "Unassigned").strip()
+                        zakat = str(row.get("zakat_eligibility") or "Unassigned").strip()
+                        if code_lower not in code_map:
+                            code_map[code_lower] = {
+                                "Department": heading,
+                                "Office": sub_heading,
+                                "Portfolio": "",
+                                "Heading": heading,
+                                "Sub-Heading": sub_heading,
+                                "Country": country,
+                                "Zakat Eligibility": zakat
+                            }
+                except Exception:
+                    pass
+    except Exception as e:
+        print(f"Error loading master code map: {e}")
     finally:
         conn.close()
 
@@ -242,239 +291,171 @@ def _mode_or_last(series):
     return mode_vals.iloc[0] if not mode_vals.empty else clean.iloc[-1]
 
 def init_classification_db():
-    """Ensure SQLite campaign_classifications, paysuite_classifications, and sponsorship_targets tables exist with composite (campaign_name, code) primary keys."""
+    """Ensure two-tier schema (master_project_codes, platform_campaign_mappings), backward-compatible views, and sponsorship_targets exist."""
     try:
         with _DB_LOCK:
             conn = get_db_connection(timeout=60.0)
             cur = conn.cursor()
-        
-        # 1. Migrate / Initialize campaign_classifications with composite PRIMARY KEY (campaign_name, code)
-        cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='campaign_classifications'")
-        if cur.fetchone():
-            cur.execute("PRAGMA table_info(campaign_classifications)")
-            cols_info = cur.fetchall()
-            pk_cols = [c[1] for c in cols_info if c[5] > 0]
-            if pk_cols != ["campaign_name", "code"]:
-                conn.execute("""
-                    CREATE TABLE IF NOT EXISTS campaign_classifications_new (
-                        campaign_name TEXT NOT NULL,
-                        code TEXT NOT NULL DEFAULT 'Unassigned',
-                        community_name TEXT DEFAULT 'N/A',
-                        campaign_url TEXT DEFAULT '',
-                        heading TEXT DEFAULT 'Unassigned',
-                        sub_heading TEXT DEFAULT 'Unassigned',
-                        country TEXT DEFAULT 'Unassigned',
-                        zakat_eligibility TEXT DEFAULT 'Unassigned',
-                        PRIMARY KEY (campaign_name, code)
-                    )
-                """)
-                conn.execute("""
-                    INSERT OR IGNORE INTO campaign_classifications_new (campaign_name, code, community_name, campaign_url, heading, sub_heading, country, zakat_eligibility)
-                    SELECT 
-                        TRIM(COALESCE(campaign_name, 'Unassigned')), 
-                        TRIM(COALESCE(NULLIF(code, ''), 'Unassigned')), 
-                        TRIM(COALESCE(community_name, 'N/A')), 
-                        TRIM(COALESCE(campaign_url, '')), 
-                        TRIM(COALESCE(heading, 'Unassigned')), 
-                        TRIM(COALESCE(sub_heading, 'Unassigned')), 
-                        TRIM(COALESCE(country, 'Unassigned')), 
-                        TRIM(COALESCE(zakat_eligibility, 'Unassigned'))
-                    FROM campaign_classifications
-                """)
-                conn.execute("DROP TABLE campaign_classifications")
-                conn.execute("ALTER TABLE campaign_classifications_new RENAME TO campaign_classifications")
-        else:
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS campaign_classifications (
-                    campaign_name TEXT NOT NULL,
-                    code TEXT NOT NULL DEFAULT 'Unassigned',
-                    community_name TEXT DEFAULT 'N/A',
-                    campaign_url TEXT DEFAULT '',
-                    heading TEXT DEFAULT 'Unassigned',
-                    sub_heading TEXT DEFAULT 'Unassigned',
-                    country TEXT DEFAULT 'Unassigned',
-                    zakat_eligibility TEXT DEFAULT 'Unassigned',
-                    PRIMARY KEY (campaign_name, code)
+            
+            # 1. Master Project Codes Table
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS master_project_codes (
+                    code TEXT PRIMARY KEY,
+                    department TEXT NOT NULL DEFAULT 'Unassigned',
+                    office TEXT NOT NULL DEFAULT 'Unassigned',
+                    portfolio TEXT DEFAULT '',
+                    country TEXT NOT NULL DEFAULT 'Unassigned',
+                    zakat_eligibility TEXT NOT NULL DEFAULT 'Zakat',
+                    description TEXT DEFAULT '',
+                    is_active INTEGER DEFAULT 1,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
             """)
 
-        # 2. Migrate / Initialize givebright_classifications
-        cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='givebright_classifications'")
-        if cur.fetchone():
-            cur.execute("PRAGMA table_info(givebright_classifications)")
-            cols_info = cur.fetchall()
-            pk_cols = [c[1] for c in cols_info if c[5] > 0]
-            if pk_cols != ["campaign_name", "code"]:
-                conn.execute("""
-                    CREATE TABLE IF NOT EXISTS givebright_classifications_new (
-                        campaign_name TEXT NOT NULL,
-                        code TEXT NOT NULL DEFAULT 'Unassigned',
-                        campaign_url TEXT DEFAULT '',
-                        heading TEXT DEFAULT 'Unassigned',
-                        sub_heading TEXT DEFAULT 'Unassigned',
-                        country TEXT DEFAULT 'Unassigned',
-                        zakat_eligibility TEXT DEFAULT 'Unassigned',
-                        PRIMARY KEY (campaign_name, code)
-                    )
-                """)
-                conn.execute("""
-                    INSERT OR IGNORE INTO givebright_classifications_new (campaign_name, code, campaign_url, heading, sub_heading, country, zakat_eligibility)
-                    SELECT 
-                        TRIM(COALESCE(campaign_name, 'Unassigned')), 
-                        TRIM(COALESCE(NULLIF(code, ''), 'Unassigned')), 
-                        TRIM(COALESCE(campaign_url, '')), 
-                        TRIM(COALESCE(heading, 'Unassigned')), 
-                        TRIM(COALESCE(sub_heading, 'Unassigned')), 
-                        TRIM(COALESCE(country, 'Unassigned')), 
-                        TRIM(COALESCE(zakat_eligibility, 'Unassigned'))
-                    FROM givebright_classifications
-                """)
-                conn.execute("DROP TABLE givebright_classifications")
-                conn.execute("ALTER TABLE givebright_classifications_new RENAME TO givebright_classifications")
-        else:
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS givebright_classifications (
+            # 2. Platform Campaign Mappings Table
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS platform_campaign_mappings (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    platform TEXT NOT NULL,
                     campaign_name TEXT NOT NULL,
-                    code TEXT NOT NULL DEFAULT 'Unassigned',
-                    campaign_url TEXT DEFAULT '',
-                    heading TEXT DEFAULT 'Unassigned',
-                    sub_heading TEXT DEFAULT 'Unassigned',
-                    country TEXT DEFAULT 'Unassigned',
-                    zakat_eligibility TEXT DEFAULT 'Unassigned',
-                    PRIMARY KEY (campaign_name, code)
-                );
-            """)
-
-        # 3. Migrate / Initialize paysuite_classifications
-        cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='paysuite_classifications'")
-        if cur.fetchone():
-            cur.execute("PRAGMA table_info(paysuite_classifications)")
-            cols_info = cur.fetchall()
-            pk_cols = [c[1] for c in cols_info if c[5] > 0]
-            if pk_cols != ["campaign_name", "code"]:
-                conn.execute("""
-                    CREATE TABLE IF NOT EXISTS paysuite_classifications_new (
-                        campaign_name TEXT NOT NULL,
-                        code TEXT NOT NULL DEFAULT 'Unassigned',
-                        community_name TEXT DEFAULT 'N/A',
-                        heading TEXT DEFAULT 'Unassigned',
-                        sub_heading TEXT DEFAULT 'Unassigned',
-                        country TEXT DEFAULT 'Unassigned',
-                        zakat_eligibility TEXT DEFAULT 'Unassigned',
-                        donor_name TEXT DEFAULT '',
-                        donor_email TEXT DEFAULT '',
-                        PRIMARY KEY (campaign_name, code)
-                    )
-                """)
-                conn.execute("""
-                    INSERT OR IGNORE INTO paysuite_classifications_new (campaign_name, code, community_name, heading, sub_heading, country, zakat_eligibility, donor_name, donor_email)
-                    SELECT 
-                        TRIM(COALESCE(campaign_name, 'Unassigned')), 
-                        TRIM(COALESCE(NULLIF(code, ''), 'Unassigned')), 
-                        TRIM(COALESCE(community_name, 'N/A')), 
-                        TRIM(COALESCE(heading, 'Unassigned')), 
-                        TRIM(COALESCE(sub_heading, 'Unassigned')), 
-                        TRIM(COALESCE(country, 'Unassigned')), 
-                        TRIM(COALESCE(zakat_eligibility, 'Unassigned')),
-                        TRIM(COALESCE(donor_name, '')),
-                        TRIM(COALESCE(donor_email, ''))
-                    FROM paysuite_classifications
-                """)
-                conn.execute("DROP TABLE paysuite_classifications")
-                conn.execute("ALTER TABLE paysuite_classifications_new RENAME TO paysuite_classifications")
-        else:
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS paysuite_classifications (
-                    campaign_name TEXT NOT NULL,
-                    code TEXT NOT NULL DEFAULT 'Unassigned',
+                    code TEXT NOT NULL,
                     community_name TEXT DEFAULT 'N/A',
-                    heading TEXT DEFAULT 'Unassigned',
-                    sub_heading TEXT DEFAULT 'Unassigned',
-                    country TEXT DEFAULT 'Unassigned',
-                    zakat_eligibility TEXT DEFAULT 'Unassigned',
+                    campaign_url TEXT DEFAULT '',
+                    is_primary INTEGER DEFAULT 0,
                     donor_name TEXT DEFAULT '',
                     donor_email TEXT DEFAULT '',
-                    PRIMARY KEY (campaign_name, code)
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(platform, campaign_name, code)
                 );
             """)
 
-        # 4. Migrate / Initialize rethink_website_classifications
-        cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='rethink_website_classifications'")
-        if cur.fetchone():
-            cur.execute("PRAGMA table_info(rethink_website_classifications)")
-            cols_info = cur.fetchall()
-            pk_cols = [c[1] for c in cols_info if c[5] > 0]
-            if pk_cols != ["campaign_name", "code"]:
-                conn.execute("""
-                    CREATE TABLE IF NOT EXISTS rethink_website_classifications_new (
-                        campaign_name TEXT NOT NULL,
-                        code TEXT NOT NULL DEFAULT 'Unassigned',
-                        community_name TEXT DEFAULT 'N/A',
-                        heading TEXT DEFAULT 'Unassigned',
-                        sub_heading TEXT DEFAULT 'Unassigned',
-                        country TEXT DEFAULT 'Unassigned',
-                        zakat_eligibility TEXT DEFAULT 'Unassigned',
-                        PRIMARY KEY (campaign_name, code)
-                    )
-                """)
-                conn.execute("""
-                    INSERT OR IGNORE INTO rethink_website_classifications_new (campaign_name, code, community_name, heading, sub_heading, country, zakat_eligibility)
+            # 3. Create views if they don't exist
+            cur.execute("SELECT name, type FROM sqlite_master WHERE name IN ('campaign_classifications', 'givebright_classifications', 'paysuite_classifications', 'rethink_website_classifications')")
+            existing_objects = {row[0]: row[1] for row in cur.fetchall()}
+
+            for tbl, plat in [
+                ("campaign_classifications", "launchgood"),
+                ("givebright_classifications", "givebright"),
+                ("paysuite_classifications", "paysuite"),
+                ("rethink_website_classifications", "website")
+            ]:
+                if existing_objects.get(tbl) == "table":
+                    try:
+                        cur.execute(f"DROP TABLE IF EXISTS _legacy_{tbl}")
+                        cur.execute(f"ALTER TABLE {tbl} RENAME TO _legacy_{tbl}")
+                        existing_objects.pop(tbl, None)
+                    except Exception:
+                        pass
+
+            if existing_objects.get("campaign_classifications") != "view":
+                cur.execute("DROP VIEW IF EXISTS campaign_classifications")
+                cur.execute("""
+                    CREATE VIEW campaign_classifications AS
                     SELECT 
-                        TRIM(COALESCE(campaign_name, 'Unassigned')), 
-                        TRIM(COALESCE(NULLIF(code, ''), 'Unassigned')), 
-                        TRIM(COALESCE(community_name, 'N/A')), 
-                        TRIM(COALESCE(heading, 'Unassigned')), 
-                        TRIM(COALESCE(sub_heading, 'Unassigned')), 
-                        TRIM(COALESCE(country, 'Unassigned')), 
-                        TRIM(COALESCE(zakat_eligibility, 'Unassigned'))
-                    FROM rethink_website_classifications
+                        m.campaign_name,
+                        m.code,
+                        COALESCE(m.community_name, 'N/A') AS community_name,
+                        COALESCE(m.campaign_url, '') AS campaign_url,
+                        COALESCE(c.department, 'Unassigned') AS department,
+                        COALESCE(c.office, 'Unassigned') AS office,
+                        COALESCE(c.portfolio, '') AS portfolio,
+                        COALESCE(c.department, 'Unassigned') AS heading,
+                        COALESCE(c.office, 'Unassigned') AS sub_heading,
+                        COALESCE(c.country, 'Unassigned') AS country,
+                        COALESCE(c.zakat_eligibility, 'Unassigned') AS zakat_eligibility,
+                        COALESCE(m.is_primary, 0) AS is_primary
+                    FROM platform_campaign_mappings m
+                    LEFT JOIN master_project_codes c ON UPPER(TRIM(m.code)) = UPPER(TRIM(c.code))
+                    WHERE m.platform = 'launchgood';
                 """)
-                conn.execute("DROP TABLE rethink_website_classifications")
-                conn.execute("ALTER TABLE rethink_website_classifications_new RENAME TO rethink_website_classifications")
-        else:
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS rethink_website_classifications (
-                    campaign_name TEXT NOT NULL,
-                    code TEXT NOT NULL DEFAULT 'Unassigned',
-                    community_name TEXT DEFAULT 'N/A',
-                    heading TEXT DEFAULT 'Unassigned',
-                    sub_heading TEXT DEFAULT 'Unassigned',
-                    country TEXT DEFAULT 'Unassigned',
-                    zakat_eligibility TEXT DEFAULT 'Unassigned',
-                    PRIMARY KEY (campaign_name, code)
+
+            if existing_objects.get("givebright_classifications") != "view":
+                cur.execute("DROP VIEW IF EXISTS givebright_classifications")
+                cur.execute("""
+                    CREATE VIEW givebright_classifications AS
+                    SELECT 
+                        m.campaign_name,
+                        m.code,
+                        COALESCE(m.campaign_url, '') AS campaign_url,
+                        COALESCE(c.department, 'Unassigned') AS department,
+                        COALESCE(c.office, 'Unassigned') AS office,
+                        COALESCE(c.portfolio, '') AS portfolio,
+                        COALESCE(c.department, 'Unassigned') AS heading,
+                        COALESCE(c.office, 'Unassigned') AS sub_heading,
+                        COALESCE(c.country, 'Unassigned') AS country,
+                        COALESCE(c.zakat_eligibility, 'Unassigned') AS zakat_eligibility,
+                        COALESCE(m.is_primary, 0) AS is_primary
+                    FROM platform_campaign_mappings m
+                    LEFT JOIN master_project_codes c ON UPPER(TRIM(m.code)) = UPPER(TRIM(c.code))
+                    WHERE m.platform = 'givebright';
+                """)
+
+            if existing_objects.get("paysuite_classifications") != "view":
+                cur.execute("DROP VIEW IF EXISTS paysuite_classifications")
+                cur.execute("""
+                    CREATE VIEW paysuite_classifications AS
+                    SELECT 
+                        m.campaign_name,
+                        m.code,
+                        COALESCE(m.community_name, 'N/A') AS community_name,
+                        COALESCE(c.department, 'Unassigned') AS department,
+                        COALESCE(c.office, 'Unassigned') AS office,
+                        COALESCE(c.portfolio, '') AS portfolio,
+                        COALESCE(c.department, 'Unassigned') AS heading,
+                        COALESCE(c.office, 'Unassigned') AS sub_heading,
+                        COALESCE(c.country, 'Unassigned') AS country,
+                        COALESCE(c.zakat_eligibility, 'Unassigned') AS zakat_eligibility,
+                        COALESCE(m.donor_name, '') AS donor_name,
+                        COALESCE(m.donor_email, '') AS donor_email,
+                        COALESCE(m.is_primary, 0) AS is_primary
+                    FROM platform_campaign_mappings m
+                    LEFT JOIN master_project_codes c ON UPPER(TRIM(m.code)) = UPPER(TRIM(c.code))
+                    WHERE m.platform = 'paysuite';
+                """)
+
+            if existing_objects.get("rethink_website_classifications") != "view":
+                cur.execute("DROP VIEW IF EXISTS rethink_website_classifications")
+                cur.execute("""
+                    CREATE VIEW rethink_website_classifications AS
+                    SELECT 
+                        m.campaign_name,
+                        m.code,
+                        COALESCE(m.community_name, 'N/A') AS community_name,
+                        COALESCE(c.department, 'Unassigned') AS department,
+                        COALESCE(c.office, 'Unassigned') AS office,
+                        COALESCE(c.portfolio, '') AS portfolio,
+                        COALESCE(c.department, 'Unassigned') AS heading,
+                        COALESCE(c.office, 'Unassigned') AS sub_heading,
+                        COALESCE(c.country, 'Unassigned') AS country,
+                        COALESCE(c.zakat_eligibility, 'Unassigned') AS zakat_eligibility,
+                        COALESCE(m.is_primary, 0) AS is_primary
+                    FROM platform_campaign_mappings m
+                    LEFT JOIN master_project_codes c ON UPPER(TRIM(m.code)) = UPPER(TRIM(c.code))
+                    WHERE m.platform IN ('website', 'rethink_website');
+                """)
+
+            # Ensure sponsorship targets table exists
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS sponsorship_targets (
+                    sponsorship_type TEXT PRIMARY KEY,
+                    target_value REAL
                 );
             """)
-
-        # Ensure is_primary column exists across all classification tables
-        for tbl in ["campaign_classifications", "givebright_classifications", "paysuite_classifications", "rethink_website_classifications"]:
-            try:
-                cur.execute(f"PRAGMA table_info({tbl})")
-                cols = [c[1] for c in cur.fetchall()]
-                if "is_primary" not in cols and len(cols) > 0:
-                    conn.execute(f"ALTER TABLE {tbl} ADD COLUMN is_primary INTEGER DEFAULT 0")
-            except Exception:
-                pass
-
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS sponsorship_targets (
-                sponsorship_type TEXT PRIMARY KEY,
-                target_value REAL
-            );
-        """)
-        # Seed default target values if not exists
-        cur.execute("SELECT count(*) FROM sponsorship_targets")
-        if cur.fetchone()[0] == 0:
-            conn.executemany("""
-                INSERT INTO sponsorship_targets (sponsorship_type, target_value)
-                VALUES (?, ?)
-            """, [
-                ("Hafiz", 240.0),
-                ("Orphan", 480.0),
-                ("Widow", 1080.0),
-                ("Ex-Prisoner", 1080.0)
-            ])
-        conn.commit()
-        conn.close()
+            cur.execute("SELECT count(*) FROM sponsorship_targets")
+            if cur.fetchone()[0] == 0:
+                cur.executemany("""
+                    INSERT INTO sponsorship_targets (sponsorship_type, target_value)
+                    VALUES (?, ?)
+                """, [
+                    ("Hafiz", 240.0),
+                    ("Orphan", 480.0),
+                    ("Widow", 1080.0),
+                    ("Ex-Prisoner", 1080.0)
+                ])
+            conn.commit()
+            conn.close()
     except Exception as e:
         print(f"Classification DB init notice: {e}")
 
@@ -598,7 +579,7 @@ def get_classification_matrix(df_raw=None):
     code_map = get_code_to_classification_map()
     if code_map and "Code" in matrix_df.columns:
         code_clean = matrix_df["Code"].astype(str).str.strip().str.lower()
-        for tc in ["Heading", "Sub-Heading", "Country", "Zakat Eligibility"]:
+        for tc in ["Department", "Office", "Portfolio", "Heading", "Sub-Heading", "Country", "Zakat Eligibility"]:
             if tc in matrix_df.columns:
                 target_map = {k: v[tc] for k, v in code_map.items() if tc in v and str(v[tc]).lower() != "unassigned"}
                 mask_unassigned = matrix_df[tc].astype(str).str.strip().str.lower().isin(["", "unassigned", "nan", "none"])
@@ -629,9 +610,8 @@ def sanitize_df_dtypes_for_parquet(df):
 
 def sync_donors_to_classification_matrix(df_raw=None):
     """
-    Synchronizes updated classifications (Code, Heading, Sub-Heading, Country, Zakat Eligibility)
-    from active donor transactions into SQLite classification matrix tables with (campaign_name, code) granularity.
-    Ensures that when donor records are edited, the classification matrix is immediately updated.
+    Synchronizes updated classifications (Code, Department/Heading, Office/Sub-Heading, Portfolio, Country, Zakat Eligibility)
+    from active donor transactions into SQLite master_project_codes and platform_campaign_mappings.
     """
     global _CACHED_CODE_MAP
     _CACHED_CODE_MAP = None  # Invalidate cached code map
@@ -645,177 +625,102 @@ def sync_donors_to_classification_matrix(df_raw=None):
     cursor = conn.cursor()
     synced_total = 0
 
-    # Ensure all target columns exist defensively
-    for col_def, default_val in [
-        ("Community Name", "N/A"),
-        ("Campaign URL", ""),
-        ("Heading", "Unassigned"),
-        ("Sub-Heading", "Unassigned"),
-        ("Country", "Unassigned"),
-        ("Code", "Unassigned"),
-        ("Zakat Eligibility", "Unassigned"),
-        ("First Name", ""),
-        ("Last Name", ""),
-        ("Email", "")
-    ]:
-        if col_def not in df.columns:
-            df[col_def] = default_val
-
     try:
         platform_s = df.get("Platform", pd.Series("", index=df.index)).astype(str).str.lower()
         source_s = df.get("Source", pd.Series("", index=df.index)).astype(str).str.lower()
 
-        # Partition Platform Masks strictly
+        # Partition Platform Masks
         ws_mask = platform_s.isin(["rethink website", "website"]) | source_s.str.contains("rethink|website", na=False)
         gb_mask = platform_s.isin(["givebright"]) | source_s.str.contains("givebright|give_bright", na=False)
         ps_mask = platform_s.isin(["paysuite"]) | source_s.str.contains("paysuite", na=False)
         lg_mask = (~ws_mask) & (~gb_mask) & (~ps_mask)
 
-        # 1. Sync LaunchGood Campaigns (Keyed by Campaign Name + Code)
-        lg_df = df[lg_mask]
-        if not lg_df.empty:
-            lg_grouped = lg_df.groupby(["Campaign Name", "Code"], as_index=False).agg({
-                "Community Name": "first" if "Community Name" in lg_df.columns else lambda x: "N/A",
-                "Campaign URL": "first" if "Campaign URL" in lg_df.columns else lambda x: "",
-                "Heading": "last",
-                "Sub-Heading": "last",
-                "Country": "last",
-                "Zakat Eligibility": "last"
-            })
-            for _, r in lg_grouped.iterrows():
+        platforms_data = [
+            ("launchgood", df[lg_mask]),
+            ("givebright", df[gb_mask]),
+            ("paysuite", df[ps_mask]),
+            ("website", df[ws_mask])
+        ]
+
+        for plat_name, p_df in platforms_data:
+            if p_df.empty:
+                continue
+
+            agg_cols = {}
+            for c_name, fn in [
+                ("Community Name", "first"),
+                ("Campaign URL", "first"),
+                ("Department", "last"),
+                ("Office", "last"),
+                ("Portfolio", "last"),
+                ("Heading", "last"),
+                ("Sub-Heading", "last"),
+                ("Country", "last"),
+                ("Zakat Eligibility", "last"),
+                ("First Name", "last"),
+                ("Last Name", "last"),
+                ("Email", "last")
+            ]:
+                if c_name in p_df.columns:
+                    agg_cols[c_name] = fn
+
+            if agg_cols:
+                grouped = p_df.groupby(["Campaign Name", "Code"], as_index=False).agg(agg_cols)
+            else:
+                grouped = p_df[["Campaign Name", "Code"]].drop_duplicates()
+
+            master_rows = []
+            mapping_rows = []
+
+            for _, r in grouped.iterrows():
                 cname = str(r["Campaign Name"]).strip()
-                code = str(r.get("Code") or "Unassigned").strip()
+                code = str(r.get("Code") or "Unassigned").strip().upper()
                 if not cname or cname.lower() in ["nan", "none", "n/a", ""]:
                     continue
+
+                dept = str(r.get("Department") or r.get("Heading") or "Unassigned").strip()
+                off = str(r.get("Office") or r.get("Sub-Heading") or "Unassigned").strip()
+                port = str(r.get("Portfolio") or "").strip()
+                country = str(r.get("Country") or "Unassigned").strip()
+                zakat = str(r.get("Zakat Eligibility") or "Unassigned").strip()
+                if zakat == "Unassigned":
+                    zakat = "Zakat"
+
+                if code and code not in ["UNASSIGNED", "NAN", "NONE", "N/A", ""]:
+                    master_rows.append((code, dept, off, port, country, zakat))
+
                 comm = str(r.get("Community Name") or "N/A").strip()
                 curl = str(r.get("Campaign URL") or "").strip()
-                heading = str(r.get("Heading") or "Unassigned").strip()
-                subheading = str(r.get("Sub-Heading") or "Unassigned").strip()
-                country = str(r.get("Country") or "Unassigned").strip()
-                zakat = str(r.get("Zakat Eligibility") or "Unassigned").strip()
-
-                cursor.execute("""
-                    INSERT INTO campaign_classifications (campaign_name, code, community_name, campaign_url, heading, sub_heading, country, zakat_eligibility)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                    ON CONFLICT(campaign_name, code) DO UPDATE SET
-                        community_name = excluded.community_name,
-                        campaign_url = COALESCE(NULLIF(excluded.campaign_url, ''), campaign_classifications.campaign_url),
-                        heading = CASE WHEN excluded.heading != 'Unassigned' THEN excluded.heading ELSE campaign_classifications.heading END,
-                        sub_heading = CASE WHEN excluded.sub_heading != 'Unassigned' THEN excluded.sub_heading ELSE campaign_classifications.sub_heading END,
-                        country = CASE WHEN excluded.country != 'Unassigned' THEN excluded.country ELSE campaign_classifications.country END,
-                        zakat_eligibility = CASE WHEN excluded.zakat_eligibility != 'Unassigned' THEN excluded.zakat_eligibility ELSE campaign_classifications.zakat_eligibility END
-                """, (cname, code, comm, curl, heading, subheading, country, zakat))
-                synced_total += 1
-
-        # 2. Sync GiveBright Campaigns (Keyed by Campaign Name + Code)
-        gb_df = df[gb_mask]
-        if not gb_df.empty:
-            gb_grouped = gb_df.groupby(["Campaign Name", "Code"], as_index=False).agg({
-                "Campaign URL": "first" if "Campaign URL" in gb_df.columns else lambda x: "",
-                "Heading": "last",
-                "Sub-Heading": "last",
-                "Country": "last",
-                "Zakat Eligibility": "last"
-            })
-            for _, r in gb_grouped.iterrows():
-                cname = str(r["Campaign Name"]).strip()
-                code = str(r.get("Code") or "Unassigned").strip()
-                if not cname or cname.lower() in ["nan", "none", "n/a", ""]:
-                    continue
-                curl = str(r.get("Campaign URL") or "").strip()
-                heading = str(r.get("Heading") or "Unassigned").strip()
-                subheading = str(r.get("Sub-Heading") or "Unassigned").strip()
-                country = str(r.get("Country") or "Unassigned").strip()
-                zakat = str(r.get("Zakat Eligibility") or "Unassigned").strip()
-
-                cursor.execute("""
-                    INSERT INTO givebright_classifications (campaign_name, code, campaign_url, heading, sub_heading, country, zakat_eligibility)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
-                    ON CONFLICT(campaign_name, code) DO UPDATE SET
-                        campaign_url = COALESCE(NULLIF(excluded.campaign_url, ''), givebright_classifications.campaign_url),
-                        heading = CASE WHEN excluded.heading != 'Unassigned' THEN excluded.heading ELSE givebright_classifications.heading END,
-                        sub_heading = CASE WHEN excluded.sub_heading != 'Unassigned' THEN excluded.sub_heading ELSE givebright_classifications.sub_heading END,
-                        country = CASE WHEN excluded.country != 'Unassigned' THEN excluded.country ELSE givebright_classifications.country END,
-                        zakat_eligibility = CASE WHEN excluded.zakat_eligibility != 'Unassigned' THEN excluded.zakat_eligibility ELSE givebright_classifications.zakat_eligibility END
-                """, (cname, code, curl, heading, subheading, country, zakat))
-                synced_total += 1
-
-        # 3. Sync Paysuite Campaigns (Keyed by Campaign Name + Code)
-        ps_mask = (platform_s == "paysuite") | source_s.str.contains("paysuite", na=False)
-        ps_df = df[ps_mask]
-        if not ps_df.empty:
-            ps_grouped = ps_df.groupby(["Campaign Name", "Code"], as_index=False).agg({
-                "Community Name": "first" if "Community Name" in ps_df.columns else lambda x: "N/A",
-                "Heading": "last",
-                "Sub-Heading": "last",
-                "Country": "last",
-                "Zakat Eligibility": "last",
-                "First Name": "last" if "First Name" in ps_df.columns else lambda x: "",
-                "Last Name": "last" if "Last Name" in ps_df.columns else lambda x: "",
-                "Email": "last" if "Email" in ps_df.columns else lambda x: ""
-            })
-            for _, r in ps_grouped.iterrows():
-                cname = str(r["Campaign Name"]).strip()
-                code = str(r.get("Code") or "Unassigned").strip()
-                if not cname or cname.lower() in ["nan", "none", "n/a", ""]:
-                    continue
-                comm = str(r.get("Community Name") or "N/A").strip()
-                heading = str(r.get("Heading") or "Unassigned").strip()
-                subheading = str(r.get("Sub-Heading") or "Unassigned").strip()
-                country = str(r.get("Country") or "Unassigned").strip()
-                zakat = str(r.get("Zakat Eligibility") or "Unassigned").strip()
                 fname = str(r.get("First Name") or "").strip()
                 lname = str(r.get("Last Name") or "").strip()
-                donor_name = f"{fname} {lname}".strip()
-                donor_email = str(r.get("Email") or "").strip()
+                d_name = f"{fname} {lname}".strip()
+                d_email = str(r.get("Email") or "").strip()
 
-                cursor.execute("""
-                    INSERT INTO paysuite_classifications (campaign_name, code, community_name, heading, sub_heading, country, zakat_eligibility, donor_name, donor_email)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    ON CONFLICT(campaign_name, code) DO UPDATE SET
-                        community_name = excluded.community_name,
-                        heading = CASE WHEN excluded.heading != 'Unassigned' THEN excluded.heading ELSE paysuite_classifications.heading END,
-                        sub_heading = CASE WHEN excluded.sub_heading != 'Unassigned' THEN excluded.sub_heading ELSE paysuite_classifications.sub_heading END,
-                        country = CASE WHEN excluded.country != 'Unassigned' THEN excluded.country ELSE paysuite_classifications.country END,
-                        zakat_eligibility = CASE WHEN excluded.zakat_eligibility != 'Unassigned' THEN excluded.zakat_eligibility ELSE paysuite_classifications.zakat_eligibility END,
-                        donor_name = COALESCE(NULLIF(excluded.donor_name, ''), paysuite_classifications.donor_name),
-                        donor_email = COALESCE(NULLIF(excluded.donor_email, ''), paysuite_classifications.donor_email)
-                """, (cname, code, comm, heading, subheading, country, zakat, donor_name, donor_email))
-                synced_total += 1
+                mapping_rows.append((plat_name, cname, code, comm, curl, d_name, d_email))
 
-        # 4. Sync Rethink Website Campaigns (Keyed by Campaign Name + Code)
-        ws_mask = platform_s.str.contains("rethink website|website", regex=True, na=False)
-        ws_df = df[ws_mask]
-        if not ws_df.empty:
-            ws_grouped = ws_df.groupby(["Campaign Name", "Code"], as_index=False).agg({
-                "Community Name": "first" if "Community Name" in ws_df.columns else lambda x: "N/A",
-                "Heading": "last",
-                "Sub-Heading": "last",
-                "Country": "last",
-                "Zakat Eligibility": "last"
-            })
-            for _, r in ws_grouped.iterrows():
-                cname = str(r["Campaign Name"]).strip()
-                code = str(r.get("Code") or "Unassigned").strip()
-                if not cname or cname.lower() in ["nan", "none", "n/a", ""]:
-                    continue
-                comm = str(r.get("Community Name") or "N/A").strip()
-                heading = str(r.get("Heading") or "Unassigned").strip()
-                subheading = str(r.get("Sub-Heading") or "Unassigned").strip()
-                country = str(r.get("Country") or "Unassigned").strip()
-                zakat = str(r.get("Zakat Eligibility") or "Unassigned").strip()
+            if master_rows:
+                cursor.executemany("""
+                    INSERT INTO master_project_codes (code, department, office, portfolio, country, zakat_eligibility)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(code) DO UPDATE SET
+                        department = CASE WHEN excluded.department != 'Unassigned' THEN excluded.department ELSE master_project_codes.department END,
+                        office = CASE WHEN excluded.office != 'Unassigned' THEN excluded.office ELSE master_project_codes.office END,
+                        portfolio = CASE WHEN excluded.portfolio != '' THEN excluded.portfolio ELSE master_project_codes.portfolio END,
+                        country = CASE WHEN excluded.country != 'Unassigned' THEN excluded.country ELSE master_project_codes.country END,
+                        zakat_eligibility = CASE WHEN excluded.zakat_eligibility != 'Unassigned' THEN excluded.zakat_eligibility ELSE master_project_codes.zakat_eligibility END;
+                """, master_rows)
 
-                cursor.execute("""
-                    INSERT INTO rethink_website_classifications (campaign_name, code, community_name, heading, sub_heading, country, zakat_eligibility)
+            if mapping_rows:
+                cursor.executemany("""
+                    INSERT INTO platform_campaign_mappings (platform, campaign_name, code, community_name, campaign_url, donor_name, donor_email)
                     VALUES (?, ?, ?, ?, ?, ?, ?)
-                    ON CONFLICT(campaign_name, code) DO UPDATE SET
-                        community_name = excluded.community_name,
-                        heading = CASE WHEN excluded.heading != 'Unassigned' THEN excluded.heading ELSE rethink_website_classifications.heading END,
-                        sub_heading = CASE WHEN excluded.sub_heading != 'Unassigned' THEN excluded.sub_heading ELSE rethink_website_classifications.sub_heading END,
-                        country = CASE WHEN excluded.country != 'Unassigned' THEN excluded.country ELSE rethink_website_classifications.country END,
-                        zakat_eligibility = CASE WHEN excluded.zakat_eligibility != 'Unassigned' THEN excluded.zakat_eligibility ELSE rethink_website_classifications.zakat_eligibility END
-                """, (cname, code, comm, heading, subheading, country, zakat))
-                synced_total += 1
+                    ON CONFLICT(platform, campaign_name, code) DO UPDATE SET
+                        community_name = COALESCE(NULLIF(excluded.community_name, 'N/A'), platform_campaign_mappings.community_name),
+                        campaign_url = COALESCE(NULLIF(excluded.campaign_url, ''), platform_campaign_mappings.campaign_url),
+                        donor_name = CASE WHEN excluded.donor_name != '' THEN excluded.donor_name ELSE platform_campaign_mappings.donor_name END,
+                        donor_email = CASE WHEN excluded.donor_email != '' THEN excluded.donor_email ELSE platform_campaign_mappings.donor_email END;
+                """, mapping_rows)
+                synced_total += len(mapping_rows)
 
         conn.commit()
     finally:
@@ -854,12 +759,24 @@ def sync_matrix_classifications_to_donors(matrix_df):
         if not c_mask.any():
             continue
 
+        dept_val = str(row.get("Department") or row.get("Heading", "Unassigned"))
+        off_val = str(row.get("Office") or row.get("Sub-Heading", "Unassigned"))
+        port_val = str(row.get("Portfolio") or "")
+
+        # Ensure columns exist in df_raw
+        for c, init_v in [("Department", dept_val), ("Office", off_val), ("Portfolio", port_val)]:
+            if c not in df_raw.columns:
+                df_raw[c] = init_v
+
         if len(rules_list) == 1:
             # Single-rule campaign: update ALL records for this campaign unconditionally
             row = rules_list[0]
             col_vals = {
-                "Heading": str(row.get("Heading", "Unassigned")),
-                "Sub-Heading": str(row.get("Sub-Heading", "Unassigned")),
+                "Department": dept_val,
+                "Office": off_val,
+                "Portfolio": port_val,
+                "Heading": dept_val,
+                "Sub-Heading": off_val,
                 "Country": str(row.get("Country", "Unassigned")),
                 "Code": str(row.get("Code", "Unassigned")),
                 "Zakat Eligibility": str(row.get("Zakat Eligibility", "Unassigned")),
@@ -883,17 +800,41 @@ def sync_matrix_classifications_to_donors(matrix_df):
                     continue
                 code_mask = c_mask & (code_series == code)
                 if code_mask.any():
-                    for col in ["Heading", "Sub-Heading", "Country", "Code", "Zakat Eligibility"]:
+                    r_dept = str(row.get("Department") or row.get("Heading", "Unassigned"))
+                    r_off = str(row.get("Office") or row.get("Sub-Heading", "Unassigned"))
+                    r_port = str(row.get("Portfolio") or "")
+                    for col, val in [
+                        ("Department", r_dept),
+                        ("Office", r_off),
+                        ("Portfolio", r_port),
+                        ("Heading", r_dept),
+                        ("Sub-Heading", r_off),
+                        ("Country", str(row.get("Country", "Unassigned"))),
+                        ("Code", str(row.get("Code", "Unassigned"))),
+                        ("Zakat Eligibility", str(row.get("Zakat Eligibility", "Unassigned")))
+                    ]:
                         if col in df_raw.columns:
-                            df_raw.loc[code_mask, col] = str(row.get(col, "Unassigned"))
+                            df_raw.loc[code_mask, col] = val
                     updated_count += int(code_mask.sum())
 
             # 2. Update any leftover or unassigned transactions of this campaign to the Primary variant
             leftover_mask = c_mask & (~code_series.isin(valid_codes))
             if leftover_mask.any():
-                for col in ["Heading", "Sub-Heading", "Country", "Code", "Zakat Eligibility"]:
+                p_dept = str(primary_row.get("Department") or primary_row.get("Heading", "Unassigned"))
+                p_off = str(primary_row.get("Office") or primary_row.get("Sub-Heading", "Unassigned"))
+                p_port = str(primary_row.get("Portfolio") or "")
+                for col, val in [
+                    ("Department", p_dept),
+                    ("Office", p_off),
+                    ("Portfolio", p_port),
+                    ("Heading", p_dept),
+                    ("Sub-Heading", p_off),
+                    ("Country", str(primary_row.get("Country", "Unassigned"))),
+                    ("Code", str(primary_row.get("Code", "Unassigned"))),
+                    ("Zakat Eligibility", str(primary_row.get("Zakat Eligibility", "Unassigned")))
+                ]:
                     if col in df_raw.columns:
-                        df_raw.loc[leftover_mask, col] = str(primary_row.get(col, "Unassigned"))
+                        df_raw.loc[leftover_mask, col] = val
                 updated_count += int(leftover_mask.sum())
 
     df_raw = sanitize_df_dtypes_for_parquet(df_raw)
@@ -958,44 +899,47 @@ def sync_matrix_classifications_to_donors(matrix_df):
     return updated_count
 
 
-def save_classification_matrix(matrix_df):
-    """Saves updated LaunchGood classification matrix with unique (Campaign Name, Code) granularity."""
+def save_platform_matrix_rules(platform: str, matrix_df: pd.DataFrame) -> int:
+    """
+    Saves platform classification matrix rules cleanly into two-tier architecture:
+    1. Upserts Code -> (department, office, portfolio, country, zakat_eligibility) into master_project_codes.
+    2. Synchronizes (platform, campaign_name, code) mappings into platform_campaign_mappings.
+    3. Synchronizes matching active donor records.
+    """
     init_classification_db()
     if matrix_df.empty:
         return 0
 
     clean_matrix = matrix_df.copy()
-    if "Campaign Name" not in clean_matrix.columns:
-        clean_matrix["Campaign Name"] = "Unassigned"
-    if "Code" not in clean_matrix.columns:
-        clean_matrix["Code"] = "Unassigned"
-    if "Community Name" not in clean_matrix.columns:
-        clean_matrix["Community Name"] = "N/A"
-
-    clean_matrix["Campaign Name"] = clean_matrix["Campaign Name"].astype(str).fillna("N/A").replace({'nan': 'N/A', '': 'N/A', 'None': 'N/A'})
-    clean_matrix["Code"] = clean_matrix["Code"].astype(str).fillna("Unassigned").replace({'nan': 'Unassigned', '': 'Unassigned', 'None': 'Unassigned'})
-    clean_matrix["Community Name"] = clean_matrix["Community Name"].astype(str).fillna("N/A").replace({'nan': 'N/A', '': 'N/A', 'None': 'N/A'})
-
     cname_to_codes = {}
-    insert_rows = []
+    master_code_rows = []
+    mapping_rows = []
+
     for _, row in clean_matrix.iterrows():
         cname = str(row.get("Campaign Name", "Unassigned")).strip().replace("’", "'").replace("‘", "'")
-        code = str(row.get("Code", "Unassigned")).strip()
+        code = str(row.get("Code", "Unassigned")).strip().upper()
         if not cname or cname.lower() in ["nan", "none", "n/a", "", "campaign_name", "campaign name"]:
             continue
         cname_to_codes.setdefault(cname.lower(), set()).add(code.lower())
 
-        insert_rows.append((
-            cname,
-            code,
-            str(row.get("Community Name", "N/A")),
-            str(row.get("Campaign URL", "") or ""),
-            str(row.get("Heading", "Unassigned")),
-            str(row.get("Sub-Heading", "Unassigned")),
-            str(row.get("Country", "Unassigned")),
-            str(row.get("Zakat Eligibility", "Unassigned")),
-            1 if row.get("is_primary") in [1, True, "1", "true", "True"] else 0
-        ))
+        dept = str(row.get("Department") or row.get("Heading", "Unassigned")).strip()
+        off = str(row.get("Office") or row.get("Sub-Heading", "Unassigned")).strip()
+        port = str(row.get("Portfolio", "")).strip()
+        country = str(row.get("Country", "Unassigned")).strip()
+        zakat = str(row.get("Zakat Eligibility", "Unassigned")).strip()
+        if zakat == "Unassigned":
+            zakat = "Zakat"
+
+        if code and code not in ["UNASSIGNED", "NAN", "NONE", "N/A", ""]:
+            master_code_rows.append((code, dept, off, port, country, zakat))
+
+        comm = str(row.get("Community Name", "N/A")).strip()
+        curl = str(row.get("Campaign URL", "") or "").strip()
+        is_prim = 1 if row.get("is_primary") in [1, True, "1", "true", "True"] else 0
+        d_name = str(row.get("Donor Name", "") or "").strip()
+        d_email = str(row.get("Donor Email", "") or "").strip()
+
+        mapping_rows.append((platform.lower(), cname, code, comm, curl, is_prim, d_name, d_email))
 
     import time
     for attempt in range(5):
@@ -1003,22 +947,34 @@ def save_classification_matrix(matrix_df):
             with _DB_LOCK:
                 conn = get_db_connection(timeout=60.0)
                 with conn:
+                    # 1. Upsert master project codes
+                    if master_code_rows:
+                        conn.executemany("""
+                            INSERT INTO master_project_codes (code, department, office, portfolio, country, zakat_eligibility)
+                            VALUES (?, ?, ?, ?, ?, ?)
+                            ON CONFLICT(code) DO UPDATE SET
+                                department = CASE WHEN excluded.department != 'Unassigned' THEN excluded.department ELSE master_project_codes.department END,
+                                office = CASE WHEN excluded.office != 'Unassigned' THEN excluded.office ELSE master_project_codes.office END,
+                                portfolio = CASE WHEN excluded.portfolio != '' THEN excluded.portfolio ELSE master_project_codes.portfolio END,
+                                country = CASE WHEN excluded.country != 'Unassigned' THEN excluded.country ELSE master_project_codes.country END,
+                                zakat_eligibility = CASE WHEN excluded.zakat_eligibility != 'Unassigned' THEN excluded.zakat_eligibility ELSE master_project_codes.zakat_eligibility END;
+                        """, master_code_rows)
+
+                    # 2. Synchronize platform_campaign_mappings
                     for cname_lower, codes in cname_to_codes.items():
                         placeholders = ','.join(['?'] * len(codes))
-                        conn.execute(f"DELETE FROM campaign_classifications WHERE LOWER(campaign_name) = ? AND LOWER(code) NOT IN ({placeholders})", [cname_lower] + list(codes))
+                        conn.execute(f"DELETE FROM platform_campaign_mappings WHERE platform = ? AND LOWER(campaign_name) = ? AND LOWER(code) NOT IN ({placeholders})", [platform.lower(), cname_lower] + list(codes))
 
                     conn.executemany("""
-                        INSERT INTO campaign_classifications (campaign_name, code, community_name, campaign_url, heading, sub_heading, country, zakat_eligibility, is_primary)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                        ON CONFLICT(campaign_name, code) DO UPDATE SET
-                            community_name = excluded.community_name,
-                            campaign_url = excluded.campaign_url,
-                            heading = excluded.heading,
-                            sub_heading = excluded.sub_heading,
-                            country = excluded.country,
-                            zakat_eligibility = excluded.zakat_eligibility,
-                            is_primary = excluded.is_primary
-                    """, insert_rows)
+                        INSERT INTO platform_campaign_mappings (platform, campaign_name, code, community_name, campaign_url, is_primary, donor_name, donor_email)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                        ON CONFLICT(platform, campaign_name, code) DO UPDATE SET
+                            community_name = COALESCE(NULLIF(excluded.community_name, 'N/A'), platform_campaign_mappings.community_name),
+                            campaign_url = COALESCE(NULLIF(excluded.campaign_url, ''), platform_campaign_mappings.campaign_url),
+                            is_primary = excluded.is_primary,
+                            donor_name = CASE WHEN excluded.donor_name != '' THEN excluded.donor_name ELSE platform_campaign_mappings.donor_name END,
+                            donor_email = CASE WHEN excluded.donor_email != '' THEN excluded.donor_email ELSE platform_campaign_mappings.donor_email END;
+                    """, mapping_rows)
                 conn.close()
             break
         except sqlite3.OperationalError as e:
@@ -1027,17 +983,14 @@ def save_classification_matrix(matrix_df):
                 continue
             raise
 
-    # Save to JSON config as well
-    try:
-        json_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "config", "campaign_classifications_launchgood.json")
-        json_df = clean_matrix.drop_duplicates(subset=["Campaign Name", "Code"])
-        with open(json_path, "w", encoding="utf-8") as f:
-            import json
-            json.dump(json_df.to_dict(orient="records"), f, indent=2)
-    except Exception as e:
-        print(f"Error saving JSON classifications: {e}")
-
+    # 3. Synchronize to active donor records
+    sync_matrix_classifications_to_donors(clean_matrix)
     return len(clean_matrix)
+
+
+def save_classification_matrix(matrix_df):
+    """Saves updated LaunchGood classification matrix into two-tier architecture."""
+    return save_platform_matrix_rules("launchgood", matrix_df)
 
 
 def get_paysuite_classification_matrix(df_raw=None):
@@ -1100,67 +1053,8 @@ def get_paysuite_classification_matrix(df_raw=None):
 
 
 def save_paysuite_classification_matrix(matrix_df):
-    """Saves updated Paysuite classification matrix to SQLite with (campaign_name, code) primary key."""
-    init_classification_db()
-    if matrix_df.empty:
-        return 0
-    cname_to_codes = {}
-    insert_rows = []
-    for _, row in matrix_df.iterrows():
-        cname = str(row.get("Campaign Name", "Unassigned")).strip().replace("’", "'").replace("‘", "'")
-        code = str(row.get("Code", "Unassigned")).strip()
-        if not cname or cname.lower() in ["nan", "none", "n/a", "", "campaign_name", "campaign name"]:
-            continue
-        cname_to_codes.setdefault(cname.lower(), set()).add(code.lower())
-
-        d_name = str(row.get("Donor Name") or "").strip()
-        d_email = str(row.get("Donor Email") or "").strip()
-
-        insert_rows.append((
-            cname,
-            code,
-            str(row.get("Community Name", "N/A")),
-            str(row.get("Heading", "Unassigned")),
-            str(row.get("Sub-Heading", "Unassigned")),
-            str(row.get("Country", "Unassigned")),
-            str(row.get("Zakat Eligibility", "Unassigned")),
-            d_name,
-            d_email,
-            1 if row.get("is_primary") in [1, True, "1", "true", "True"] else 0
-        ))
-
-    import time
-    for attempt in range(5):
-        try:
-            with _DB_LOCK:
-                conn = get_db_connection(timeout=60.0)
-                with conn:
-                    for cname_lower, codes in cname_to_codes.items():
-                        placeholders = ','.join(['?'] * len(codes))
-                        conn.execute(f"DELETE FROM paysuite_classifications WHERE LOWER(campaign_name) = ? AND LOWER(code) NOT IN ({placeholders})", [cname_lower] + list(codes))
-
-                    conn.executemany("""
-                        INSERT INTO paysuite_classifications (campaign_name, code, community_name, heading, sub_heading, country, zakat_eligibility, donor_name, donor_email, is_primary)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                        ON CONFLICT(campaign_name, code) DO UPDATE SET
-                            community_name = excluded.community_name,
-                            heading = excluded.heading,
-                            sub_heading = excluded.sub_heading,
-                            country = excluded.country,
-                            zakat_eligibility = excluded.zakat_eligibility,
-                            donor_name = CASE WHEN excluded.donor_name != '' AND excluded.donor_name != 'N/A' THEN excluded.donor_name ELSE paysuite_classifications.donor_name END,
-                            donor_email = CASE WHEN excluded.donor_email != '' AND excluded.donor_email != 'N/A' THEN excluded.donor_email ELSE paysuite_classifications.donor_email END,
-                            is_primary = excluded.is_primary
-                    """, insert_rows)
-                conn.close()
-            break
-        except sqlite3.OperationalError as e:
-            if "locked" in str(e).lower() and attempt < 4:
-                time.sleep(0.3 * (attempt + 1))
-                continue
-            raise
-
-    return len(matrix_df)
+    """Saves updated Paysuite classification matrix into two-tier architecture."""
+    return save_platform_matrix_rules("paysuite", matrix_df)
 
 
 def get_rethink_website_classification_matrix(df_raw=None):
@@ -1220,54 +1114,8 @@ def get_rethink_website_classification_matrix(df_raw=None):
 
 
 def save_rethink_website_classification_matrix(matrix_df):
-    """Saves updated Rethink Website classification matrix to SQLite with (campaign_name, code) primary key."""
-    init_classification_db()
-    if matrix_df.empty:
-        return 0
-
-    insert_rows = []
-    for _, row in matrix_df.iterrows():
-        cname = str(row.get("Campaign Name", "Unassigned")).strip().replace("’", "'").replace("‘", "'")
-        code = str(row.get("Code", "Unassigned")).strip()
-        if not cname or cname.lower() in ["nan", "none", "n/a", "", "campaign_name", "campaign name"]:
-            continue
-        insert_rows.append((
-            cname,
-            code,
-            str(row.get("Community Name", "N/A")),
-            str(row.get("Heading", "Unassigned")),
-            str(row.get("Sub-Heading", "Unassigned")),
-            str(row.get("Country", "Unassigned")),
-            str(row.get("Zakat Eligibility", "Unassigned")),
-            1 if row.get("is_primary") in [1, True, "1", "true", "True"] else 0
-        ))
-
-    import time
-    for attempt in range(5):
-        try:
-            with _DB_LOCK:
-                conn = get_db_connection(timeout=60.0)
-                with conn:
-                    conn.executemany("""
-                        INSERT INTO rethink_website_classifications (campaign_name, code, community_name, heading, sub_heading, country, zakat_eligibility, is_primary)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                        ON CONFLICT(campaign_name, code) DO UPDATE SET
-                            community_name = excluded.community_name,
-                            heading = excluded.heading,
-                            sub_heading = excluded.sub_heading,
-                            country = excluded.country,
-                            zakat_eligibility = excluded.zakat_eligibility,
-                            is_primary = excluded.is_primary
-                    """, insert_rows)
-                conn.close()
-            break
-        except sqlite3.OperationalError as e:
-            if "locked" in str(e).lower() and attempt < 4:
-                time.sleep(0.3 * (attempt + 1))
-                continue
-            raise
-
-    return len(matrix_df)
+    """Saves updated Rethink Website classification matrix into two-tier architecture."""
+    return save_platform_matrix_rules("website", matrix_df)
 
 
 def _enrich_dataframe(df, platform="auto"):
@@ -2382,6 +2230,29 @@ def purge_payout_data():
     return deleted_count
 
 
+def _ensure_two_tier_columns(df: pd.DataFrame) -> pd.DataFrame:
+    """Ensures Department, Office, Portfolio, Heading, Sub-Heading, Programme Fund, Fund Code, and Old Code columns exist and mirror each other."""
+    if df is None or df.empty:
+        return df
+    if "Heading" in df.columns and "Department" not in df.columns:
+        df["Department"] = df["Heading"]
+    if "Sub-Heading" in df.columns and "Office" not in df.columns:
+        df["Office"] = df["Sub-Heading"]
+    if "Portfolio" not in df.columns:
+        df["Portfolio"] = ""
+    if "Programme Fund" not in df.columns:
+        df["Programme Fund"] = ""
+    if "Fund Code" not in df.columns:
+        df["Fund Code"] = ""
+    if "Old Code" not in df.columns:
+        df["Old Code"] = ""
+    if "Department" in df.columns and "Heading" not in df.columns:
+        df["Heading"] = df["Department"]
+    if "Office" in df.columns and "Sub-Heading" not in df.columns:
+        df["Sub-Heading"] = df["Office"]
+    return df
+
+
 def load_data(force_reload: bool = False) -> pd.DataFrame:
     """
     High-Performance Dataset Loader with In-Memory Singleton Caching.
@@ -2414,6 +2285,7 @@ def load_data(force_reload: bool = False) -> pd.DataFrame:
             try:
                 df = pd.read_parquet(PARQUET_PATH)
                 if not df.empty:
+                    df = _ensure_two_tier_columns(df)
                     _CACHED_DF = df
                     _CACHE_MTIME = current_mtime
                     return _CACHED_DF
@@ -2426,6 +2298,7 @@ def load_data(force_reload: bool = False) -> pd.DataFrame:
             df = pd.read_sql_query("SELECT * FROM donations", conn)
             conn.close()
             if not df.empty:
+                df = _ensure_two_tier_columns(df)
                 try:
                     df.to_parquet(PARQUET_PATH, index=False)
                     if os.path.exists(PARQUET_PATH):
@@ -2670,64 +2543,8 @@ def get_givebright_classification_matrix(df_raw=None):
 
 
 def save_givebright_classification_matrix(matrix_df):
-    """Saves updated GiveBright classification matrix to SQLite and synchronizes to active donation records."""
-    if matrix_df.empty:
-        return 0
-
-    cname_to_codes = {}
-    insert_rows = []
-    for _, row in matrix_df.iterrows():
-        cname = str(row.get("Campaign Name", "Unassigned")).strip().replace("’", "'").replace("‘", "'")
-        code = str(row.get("Code", "Unassigned")).strip()
-        curl = str(row.get("Campaign URL") or row.get("campaign_url") or "")
-        if not cname or cname.lower() in ["nan", "none", "n/a", "", "campaign_name", "campaign name"]:
-            continue
-        cname_to_codes.setdefault(cname.lower(), set()).add(code.lower())
-
-        insert_rows.append((
-            cname,
-            code,
-            curl,
-            str(row.get("Heading", "Unassigned")),
-            str(row.get("Sub-Heading", "Unassigned")),
-            str(row.get("Country", "Unassigned")),
-            str(row.get("Zakat Eligibility", "Unassigned")),
-            1 if row.get("is_primary") in [1, True, "1", "true", "True"] else 0
-        ))
-
-    import time
-    for attempt in range(5):
-        try:
-            with _DB_LOCK:
-                conn = get_db_connection(timeout=60.0)
-                with conn:
-                    for cname_lower, codes in cname_to_codes.items():
-                        placeholders = ','.join(['?'] * len(codes))
-                        conn.execute(f"DELETE FROM givebright_classifications WHERE LOWER(campaign_name) = ? AND LOWER(code) NOT IN ({placeholders})", [cname_lower] + list(codes))
-
-                    conn.executemany("""
-                        INSERT INTO givebright_classifications (campaign_name, code, campaign_url, heading, sub_heading, country, zakat_eligibility, is_primary)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                        ON CONFLICT(campaign_name, code) DO UPDATE SET
-                            campaign_url = excluded.campaign_url,
-                            heading = excluded.heading,
-                            sub_heading = excluded.sub_heading,
-                            country = excluded.country,
-                            zakat_eligibility = excluded.zakat_eligibility,
-                            is_primary = excluded.is_primary
-                    """, insert_rows)
-                conn.close()
-            break
-        except sqlite3.OperationalError as e:
-            if "locked" in str(e).lower() and attempt < 4:
-                time.sleep(0.3 * (attempt + 1))
-                continue
-            raise
-
-    # Re-apply to active dataset in Parquet and SQLite using sync_matrix_classifications_to_donors
-    sync_matrix_classifications_to_donors(matrix_df)
-
-    return len(matrix_df)
+    """Saves updated GiveBright classification matrix into two-tier architecture."""
+    return save_platform_matrix_rules("givebright", matrix_df)
 
 
 def normalize_classification_import_df(raw_df):

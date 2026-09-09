@@ -10,10 +10,15 @@ const DEFAULT_EXPLORER_COLUMNS = [
   'Lifetime Donor Classification',
   'Total LTV',
   'Payment Frequency',
+  'Programme Fund',
+  'Department',
+  'Office',
+  'Portfolio',
   'Heading',
   'Sub-Heading',
   'Country',
   'Code',
+  'Old Code',
   'Zakat Eligibility'
 ];
 
@@ -33,7 +38,23 @@ const COLUMN_ALIASES = {
   'fundraiser_url': 'Fundraiser URL',
   'Fundraiser URL': 'Fundraiser URL',
   'Campaign URL': 'Campaign URL',
-  'campaign_url': 'Campaign URL'
+  'campaign_url': 'Campaign URL',
+  'Heading': 'Department',
+  'Sub-Heading': 'Office',
+  'heading': 'Department',
+  'sub_heading': 'Office',
+  'Department': 'Department',
+  'Office': 'Office',
+  'Portfolio': 'Portfolio',
+  'department': 'Department',
+  'office': 'Office',
+  'portfolio': 'Portfolio',
+  'Programme Fund': 'Programme Fund',
+  'programme_fund': 'Programme Fund',
+  'Fund Code': 'Fund Code',
+  'fund_code': 'Fund Code',
+  'Old Code': 'Old Code',
+  'old_code': 'Old Code'
 };
 
 const getFundraiserColumn = (cols = []) => {
@@ -141,6 +162,7 @@ export default function ExplorerView({ user, filters, onSelectDonor }) {
       if (filters.payment_type) params.append('payment_type', filters.payment_type);
       if (filters.tier) params.append('tier', filters.tier);
       if (filters.source) params.append('source', filters.source);
+      if (filters.programme_fund) params.append('programme_fund', filters.programme_fund);
       if (filters.heading) params.append('heading', filters.heading);
       if (filters.subheading) params.append('subheading', filters.subheading);
       if (filters.country) params.append('country', filters.country);
@@ -414,6 +436,7 @@ export default function ExplorerView({ user, filters, onSelectDonor }) {
         filter_payment_type: filters?.payment_type,
         filter_tier: filters?.tier,
         filter_source: filters?.source,
+        filter_programme_fund: filters?.programme_fund,
         filter_heading: filters?.heading,
         filter_subheading: filters?.subheading,
         filter_country: filters?.country,
@@ -470,6 +493,7 @@ export default function ExplorerView({ user, filters, onSelectDonor }) {
       if (filters.payment_type) params.append('payment_type', filters.payment_type);
       if (filters.tier) params.append('tier', filters.tier);
       if (filters.source) params.append('source', filters.source);
+      if (filters.programme_fund) params.append('programme_fund', filters.programme_fund);
       if (filters.heading) params.append('heading', filters.heading);
       if (filters.subheading) params.append('subheading', filters.subheading);
       if (filters.country) params.append('country', filters.country);
@@ -842,10 +866,15 @@ export default function ExplorerView({ user, filters, onSelectDonor }) {
                                 fields: {
                                   ...prev.fields,
                                   'Code': v.code,
-                                  'Heading': v.heading,
-                                  'Sub-Heading': v.sub_heading,
-                                  'Country': v.country,
-                                  'Zakat Eligibility': v.zakat_eligibility
+                                  'Programme Fund': v.programme_fund || '',
+                                  'Fund Code': v.fund_code || '',
+                                  'Department': v.department || v.heading || 'Unassigned',
+                                  'Office': v.office || v.sub_heading || 'Unassigned',
+                                  'Portfolio': v.portfolio || '',
+                                  'Heading': v.heading || v.department || 'Unassigned',
+                                  'Sub-Heading': v.sub_heading || v.office || 'Unassigned',
+                                  'Country': v.country || 'Unassigned',
+                                  'Zakat Eligibility': v.zakat_eligibility || 'Unassigned'
                                 }
                               }));
                             }}
@@ -857,7 +886,7 @@ export default function ExplorerView({ user, filters, onSelectDonor }) {
                           >
                             <span>{v.code}</span>
                             {v.is_primary && <span className="text-[10px] text-emerald-400 font-sans">⭐ Primary</span>}
-                            <span className="text-[10px] opacity-70 font-sans font-normal">({v.heading} • {v.country})</span>
+                            <span className="text-[10px] opacity-70 font-sans font-normal">({v.department || v.heading} • {v.country})</span>
                           </button>
                         );
                       })}
@@ -889,8 +918,22 @@ export default function ExplorerView({ user, filters, onSelectDonor }) {
                             const codeKey = (val || '').trim().toLowerCase();
                             if (codeMap[codeKey]) {
                               const cInfo = codeMap[codeKey];
-                              if (cInfo.Heading && cInfo.Heading !== 'Unassigned') updatedFields['Heading'] = cInfo.Heading;
-                              if (cInfo['Sub-Heading'] && cInfo['Sub-Heading'] !== 'Unassigned') updatedFields['Sub-Heading'] = cInfo['Sub-Heading'];
+                              const dept = cInfo.Department || cInfo.Heading;
+                              const off = cInfo.Office || cInfo['Sub-Heading'];
+                              if (dept && dept !== 'Unassigned') {
+                                updatedFields['Department'] = dept;
+                                updatedFields['Heading'] = dept;
+                              }
+                              if (off && off !== 'Unassigned') {
+                                updatedFields['Office'] = off;
+                                updatedFields['Sub-Heading'] = off;
+                              }
+                              if (cInfo.Portfolio !== undefined) {
+                                updatedFields['Portfolio'] = cInfo.Portfolio;
+                              }
+                              if (cInfo['Programme Fund'] !== undefined) updatedFields['Programme Fund'] = cInfo['Programme Fund'];
+                              if (cInfo['Fund Code'] !== undefined) updatedFields['Fund Code'] = cInfo['Fund Code'];
+                              if (cInfo['Old Code'] !== undefined) updatedFields['Old Code'] = cInfo['Old Code'];
                               if (cInfo.Country && cInfo.Country !== 'Unassigned') updatedFields['Country'] = cInfo.Country;
                               if (cInfo['Zakat Eligibility'] && cInfo['Zakat Eligibility'] !== 'Unassigned') updatedFields['Zakat Eligibility'] = cInfo['Zakat Eligibility'];
                             }
@@ -1053,10 +1096,14 @@ export default function ExplorerView({ user, filters, onSelectDonor }) {
                                   'Email': row['Email'] || '',
                                   'fundraiser_name': row['fundraiser_name'] || row['Fundraiser Name'] || '',
                                   'Campaign Name': row['Campaign Name'] || '',
-                                  'Heading': row['Heading'] || '',
-                                  'Sub-Heading': row['Sub-Heading'] || '',
+                                  'Programme Fund': row['Programme Fund'] || '',
+                                  'Fund Code': row['Fund Code'] || '',
+                                  'Department': row['Department'] || row['Heading'] || '',
+                                  'Office': row['Office'] || row['Sub-Heading'] || '',
+                                  'Portfolio': row['Portfolio'] || '',
                                   'Country': row['Country'] || '',
                                   'Code': row['Code'] || '',
+                                  'Old Code': row['Old Code'] || '',
                                   'Zakat Eligibility': row['Zakat Eligibility'] || ''
                                 }
                               })}
@@ -1141,6 +1188,45 @@ export default function ExplorerView({ user, filters, onSelectDonor }) {
                               className="text-slate-400 text-xs font-mono whitespace-nowrap"
                             >
                               {formatDate(val)}
+                            </td>
+                          );
+                        }
+                        if (c === 'Programme Fund') {
+                          return (
+                            <td key={c} className="whitespace-nowrap">
+                              {val && String(val).trim() && !['nan', 'none', 'unassigned', ''].includes(String(val).trim().toLowerCase()) ? (
+                                <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold bg-purple-500/15 text-purple-300 border border-purple-500/30">
+                                  {val}
+                                </span>
+                              ) : (
+                                <span className="text-slate-500 italic text-xs">Unassigned</span>
+                              )}
+                            </td>
+                          );
+                        }
+                        if (c === 'Code') {
+                          return (
+                            <td key={c} className="whitespace-nowrap">
+                              {val && String(val).trim() && !['nan', 'none', 'unassigned', ''].includes(String(val).trim().toLowerCase()) ? (
+                                <span className="font-mono text-cyan-400 font-bold text-xs bg-cyan-500/10 border border-cyan-500/20 px-2 py-0.5 rounded">
+                                  {val}
+                                </span>
+                              ) : (
+                                <span className="text-slate-500 italic text-xs">Unassigned</span>
+                              )}
+                            </td>
+                          );
+                        }
+                        if (c === 'Old Code') {
+                          return (
+                            <td key={c} className="whitespace-nowrap">
+                              {val && String(val).trim() && !['nan', 'none', 'unassigned', ''].includes(String(val).trim().toLowerCase()) ? (
+                                <span className="font-mono text-slate-400 text-xs bg-slate-800/60 border border-slate-700/40 px-2 py-0.5 rounded" title="Legacy Allocation Code">
+                                  {val}
+                                </span>
+                              ) : (
+                                <span className="text-slate-600 text-xs">—</span>
+                              )}
                             </td>
                           );
                         }

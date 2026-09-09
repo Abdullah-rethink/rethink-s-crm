@@ -22,7 +22,8 @@ import {
   ChevronsLeft,
   ChevronsRight,
   Filter,
-  Plus
+  Plus,
+  Edit3
 } from 'lucide-react';
 import { API_BASE_URL } from '../config';
 
@@ -116,9 +117,195 @@ export default function ClassificationView({ user }) {
       .catch(err => console.error('Error fetching code map:', err));
   }, []);
 
+  // Master Code Modal State
+  const [masterCodeModal, setMasterCodeModal] = useState(null); // { isEdit: bool, data: { code, department, office, portfolio, country, zakat_eligibility, description, is_active } }
+  const [savingMasterCode, setSavingMasterCode] = useState(false);
+  const [masterCodeModalMsg, setMasterCodeModalMsg] = useState('');
+
+  const handleOpenAddMasterCode = () => {
+    setMasterCodeModal({
+      isEdit: false,
+      data: {
+        code: '',
+        programme_fund: '',
+        fund_code: '',
+        department: '',
+        office: '',
+        portfolio: '',
+        country: '',
+        zakat_eligibility: 'Zakat',
+        legacy_non_zakat_code: '',
+        legacy_zakat_code: '',
+        old_codes: '',
+        description: '',
+        is_active: 1
+      }
+    });
+    setMasterCodeModalMsg('');
+  };
+
+  const handleOpenEditMasterCode = (rule) => {
+    setMasterCodeModal({
+      isEdit: true,
+      data: {
+        code: rule.code || rule['Code'],
+        programme_fund: rule.programme_fund || rule['Programme Fund'] || '',
+        fund_code: rule.fund_code || rule['Fund Code'] || '',
+        department: rule.department || rule['Department'] || rule['Heading'] || '',
+        office: rule.office || rule['Office'] || rule['Sub-Heading'] || '',
+        portfolio: rule.portfolio || rule['Portfolio'] || '',
+        country: rule.country || rule['Country'] || '',
+        zakat_eligibility: rule.zakat_eligibility || rule['Zakat Eligibility'] || 'Zakat',
+        legacy_non_zakat_code: rule.legacy_non_zakat_code || rule['Legacy Non-Zakat GL Code'] || '',
+        legacy_zakat_code: rule.legacy_zakat_code || rule['Legacy Zakat GL Code'] || '',
+        old_codes: rule.old_codes || rule['Old Code(s)'] || '',
+        description: rule.description || rule['Description'] || '',
+        is_active: rule.is_active !== undefined ? rule.is_active : 1
+      }
+    });
+    setMasterCodeModalMsg('');
+  };
+
+  const handleSaveMasterCodeSubmit = async (e) => {
+    e.preventDefault();
+    if (!isSuperAdmin || !masterCodeModal) return;
+    setSavingMasterCode(true);
+    setMasterCodeModalMsg('');
+
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/classifications/master-codes`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_role: user?.role,
+          code: masterCodeModal.data.code,
+          programme_fund: masterCodeModal.data.programme_fund || '',
+          fund_code: masterCodeModal.data.fund_code || '',
+          department: masterCodeModal.data.department,
+          office: masterCodeModal.data.office,
+          portfolio: masterCodeModal.data.portfolio || '',
+          country: masterCodeModal.data.country,
+          zakat_eligibility: masterCodeModal.data.zakat_eligibility || 'Zakat',
+          legacy_non_zakat_code: masterCodeModal.data.legacy_non_zakat_code || '',
+          legacy_zakat_code: masterCodeModal.data.legacy_zakat_code || '',
+          old_codes: masterCodeModal.data.old_codes || '',
+          description: masterCodeModal.data.description || '',
+          is_active: masterCodeModal.data.is_active || 1
+        })
+      });
+
+      const data = await res.json();
+      setSavingMasterCode(false);
+
+      if (res.ok && data?.status === 'success') {
+        setMasterCodeModalMsg(`✅ ${data.message || 'Saved successfully!'}`);
+        setSaveNotification({
+          type: 'success',
+          title: 'Master Code Saved & Synced',
+          message: data.message || `Master project code '${masterCodeModal.data.code}' saved & cascaded to matching donations.`,
+          timestamp: new Date().toLocaleTimeString()
+        });
+        fetch(`${API_BASE_URL}/api/classifications/code-map`)
+          .then(r => r.json())
+          .then(cm => { if (cm) setCodeMap(cm); });
+        setTimeout(() => {
+          setMasterCodeModal(null);
+          loadMatrixData();
+        }, 800);
+      } else {
+        setMasterCodeModalMsg(`❌ ${data?.detail || 'Failed to save master code.'}`);
+      }
+    } catch (err) {
+      setSavingMasterCode(false);
+      setMasterCodeModalMsg(`❌ Error: ${err.message}`);
+    }
+  };
+
+  const handleDeleteMasterCode = async (rule) => {
+    if (!isSuperAdmin) return;
+    const cCode = rule.code || rule['Code'];
+    if (!window.confirm(`Are you sure you want to delete Master Project Code "${cCode}"?\n\nThis will remove it from the canonical codes registry.`)) {
+      return;
+    }
+
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/classifications/master-codes/${encodeURIComponent(cCode)}?user_role=${encodeURIComponent(user?.role)}`, {
+        method: 'DELETE'
+      });
+      const data = await res.json();
+      if (res.ok && data?.status === 'success') {
+        setSaveNotification({
+          type: 'success',
+          title: 'Master Code Deleted',
+          message: data.message || `Successfully deleted master code ${cCode}.`,
+          timestamp: new Date().toLocaleTimeString()
+        });
+        loadMatrixData();
+        fetch(`${API_BASE_URL}/api/classifications/code-map`)
+          .then(r => r.json())
+          .then(cm => { if (cm) setCodeMap(cm); });
+      } else {
+        setSaveNotification({
+          type: 'error',
+          title: 'Delete Failed',
+          message: data?.detail || 'Failed to delete master code.',
+          timestamp: new Date().toLocaleTimeString()
+        });
+      }
+    } catch (err) {
+      setSaveNotification({
+        type: 'error',
+        title: 'Delete Error',
+        message: err.message,
+        timestamp: new Date().toLocaleTimeString()
+      });
+    }
+  };
+
   // Race-Condition-Free Data Loading with Cancellation Cleanup
   const loadMatrixData = () => {
     setLoading(true);
+
+    if (platform === 'master') {
+      fetch(`${API_BASE_URL}/api/classifications/master-codes`)
+        .then(res => res.json())
+        .then(data => {
+          let rules = (data.codes || []).map((r, i) => ({
+            ...r,
+            _row_id: `master__${r.code}__${i}`,
+            'Code': cleanText(r.code),
+            'Programme Fund': cleanText(r.programme_fund || ''),
+            'Fund Code': cleanText(r.fund_code || ''),
+            'Department': cleanText(r.department),
+            'Office': cleanText(r.office),
+            'Portfolio': cleanText(r.portfolio || ''),
+            'Heading': cleanText(r.department),
+            'Sub-Heading': cleanText(r.office),
+            'Country': cleanText(r.country),
+            'Zakat Eligibility': cleanText(r.zakat_eligibility),
+            'Legacy Non-Zakat GL Code': cleanText(r.legacy_non_zakat_code || ''),
+            'Legacy Zakat GL Code': cleanText(r.legacy_zakat_code || ''),
+            'Old Code(s)': cleanText(r.old_codes || ''),
+            'Description': cleanText(r.description || ''),
+            'Campaign Count': r.campaign_count || 0,
+            'Total Raised': r.total_raised || 0,
+            'is_active': r.is_active
+          }));
+
+          setMatrixData({
+            total_campaigns: rules.length,
+            classified_campaigns: rules.filter(r => r['Department'] && r['Department'] !== 'Unassigned').length,
+            unassigned_campaigns: rules.filter(r => !r['Department'] || r['Department'] === 'Unassigned').length,
+            rules: rules
+          });
+          setLoading(false);
+        })
+        .catch(err => {
+          console.error('Error loading master codes:', err);
+          setLoading(false);
+        });
+      return;
+    }
 
     fetch(`${API_BASE_URL}/api/classifications/${platform}`)
       .then(res => res.json())
@@ -130,8 +317,11 @@ export default function ClassificationView({ user }) {
           'Community Name': cleanText(r['Community Name']),
           'Donor Name': cleanText(r['Donor Name'] || r['donor_name'] || ''),
           'Donor Email': cleanText(r['Donor Email'] || r['donor_email'] || ''),
-          'Heading': cleanText(r['Heading']),
-          'Sub-Heading': cleanText(r['Sub-Heading']),
+          'Department': cleanText(r['Department'] || r['Heading']),
+          'Office': cleanText(r['Office'] || r['Sub-Heading']),
+          'Portfolio': cleanText(r['Portfolio'] || ''),
+          'Heading': cleanText(r['Department'] || r['Heading']),
+          'Sub-Heading': cleanText(r['Office'] || r['Sub-Heading']),
           'Country': cleanText(r['Country']),
           'Code': cleanText(r['Code']),
           'Zakat Eligibility': cleanText(r['Zakat Eligibility']),
@@ -141,8 +331,8 @@ export default function ClassificationView({ user }) {
         setMatrixData({
           ...data,
           total_campaigns: rules.length,
-          classified_campaigns: rules.filter(r => r['Heading'] && r['Heading'] !== 'Unassigned').length,
-          unassigned_campaigns: rules.filter(r => !r['Heading'] || r['Heading'] === 'Unassigned').length,
+          classified_campaigns: rules.filter(r => (r['Department'] || r['Heading']) && (r['Department'] || r['Heading']) !== 'Unassigned').length,
+          unassigned_campaigns: rules.filter(r => !(r['Department'] || r['Heading']) || (r['Department'] || r['Heading']) === 'Unassigned').length,
           rules: rules
         });
         setLoading(false);
@@ -191,12 +381,18 @@ export default function ClassificationView({ user }) {
       if (!existingInfo || Object.values(existingInfo).every(v => !v || v === 'Unassigned')) {
         const matchingRule = (matrixData.rules || []).find(r => {
           const cd = (r['Code'] || r['code'] || '').trim().toLowerCase();
-          return cd === newCodeLower && r['Heading'] && r['Heading'] !== 'Unassigned';
+          const dept = r['Department'] || r['Heading'];
+          return cd === newCodeLower && dept && dept !== 'Unassigned';
         });
         if (matchingRule) {
+          const dept = matchingRule['Department'] || matchingRule['Heading'] || 'Unassigned';
+          const off = matchingRule['Office'] || matchingRule['Sub-Heading'] || 'Unassigned';
           existingInfo = {
-            Heading: matchingRule['Heading'] || 'Unassigned',
-            'Sub-Heading': matchingRule['Sub-Heading'] || 'Unassigned',
+            Department: dept,
+            Office: off,
+            Portfolio: matchingRule['Portfolio'] || '',
+            Heading: dept,
+            'Sub-Heading': off,
             Country: matchingRule['Country'] || 'Unassigned',
             'Zakat Eligibility': matchingRule['Zakat Eligibility'] || 'Unassigned'
           };
@@ -208,8 +404,19 @@ export default function ClassificationView({ user }) {
           if (r._row_id === rowId) {
             const currentRow = { ...r, Code: newCodeClean };
             if (existingInfo) {
-              if (existingInfo.Heading && existingInfo.Heading !== 'Unassigned') currentRow['Heading'] = existingInfo.Heading;
-              if (existingInfo['Sub-Heading'] && existingInfo['Sub-Heading'] !== 'Unassigned') currentRow['Sub-Heading'] = existingInfo['Sub-Heading'];
+              const dept = existingInfo.Department || existingInfo.Heading;
+              const off = existingInfo.Office || existingInfo['Sub-Heading'];
+              if (dept && dept !== 'Unassigned') {
+                currentRow['Department'] = dept;
+                currentRow['Heading'] = dept;
+              }
+              if (off && off !== 'Unassigned') {
+                currentRow['Office'] = off;
+                currentRow['Sub-Heading'] = off;
+              }
+              if (existingInfo.Portfolio !== undefined) {
+                currentRow['Portfolio'] = existingInfo.Portfolio;
+              }
               if (existingInfo.Country && existingInfo.Country !== 'Unassigned') currentRow['Country'] = existingInfo.Country;
               if (existingInfo['Zakat Eligibility'] && existingInfo['Zakat Eligibility'] !== 'Unassigned') currentRow['Zakat Eligibility'] = existingInfo['Zakat Eligibility'];
             }
@@ -220,16 +427,16 @@ export default function ClassificationView({ user }) {
 
         return {
           ...prev,
-          classified_campaigns: updatedRules.filter(r => r['Heading'] && r['Heading'] !== 'Unassigned').length,
-          unassigned_campaigns: updatedRules.filter(r => !r['Heading'] || r['Heading'] === 'Unassigned').length,
+          classified_campaigns: updatedRules.filter(r => (r['Department'] || r['Heading']) && (r['Department'] || r['Heading']) !== 'Unassigned').length,
+          unassigned_campaigns: updatedRules.filter(r => !(r['Department'] || r['Heading']) || (r['Department'] || r['Heading']) === 'Unassigned').length,
           rules: updatedRules
         };
       });
       return;
     }
 
-    // 2. If user is changing Heading, Sub-Heading, Country, or Zakat Eligibility on a row:
-    const classificationFields = ['Heading', 'Sub-Heading', 'Country', 'Zakat Eligibility'];
+    // 2. If user is changing Department, Office, Portfolio, Heading, Sub-Heading, Country, or Zakat Eligibility on a row:
+    const classificationFields = ['Department', 'Office', 'Portfolio', 'Heading', 'Sub-Heading', 'Country', 'Zakat Eligibility'];
     if (classificationFields.includes(field)) {
       const targetRow = (matrixData.rules || []).find(r => r._row_id === rowId);
       const codeKey = targetRow?.Code || targetRow?.code || '';
@@ -237,10 +444,20 @@ export default function ClassificationView({ user }) {
       const codeLower = (codeKey || '').trim().toLowerCase();
       const isValidCode = codeUpper && !['UNASSIGNED', 'N/A', 'NONE', 'NAN', ''].includes(codeUpper);
 
+      // Keep dual aliases in sync
+      const extraUpdates = {};
+      if (field === 'Department') extraUpdates['Heading'] = valClean;
+      if (field === 'Heading') extraUpdates['Department'] = valClean;
+      if (field === 'Office') extraUpdates['Sub-Heading'] = valClean;
+      if (field === 'Sub-Heading') extraUpdates['Office'] = valClean;
+
       // Update central codeMap dictionary if code is valid
       if (isValidCode && valClean && valClean !== 'Unassigned') {
         setCodeMap(prevMap => {
           const currentEntry = prevMap[codeLower] || {
+            Department: 'Unassigned',
+            Office: 'Unassigned',
+            Portfolio: '',
             Heading: 'Unassigned',
             'Sub-Heading': 'Unassigned',
             Country: 'Unassigned',
@@ -250,7 +467,8 @@ export default function ClassificationView({ user }) {
             ...prevMap,
             [codeLower]: {
               ...currentEntry,
-              [field]: valClean
+              [field]: valClean,
+              ...extraUpdates
             }
           };
         });
@@ -259,19 +477,19 @@ export default function ClassificationView({ user }) {
       setMatrixData(prev => {
         const updatedRules = prev.rules.map(r => {
           if (r._row_id === rowId) {
-            return { ...r, [field]: valClean };
+            return { ...r, [field]: valClean, ...extraUpdates };
           }
           // AUTO-PROPAGATE to any other row that shares the SAME valid Code:
           if (isValidCode && (r.Code || r.code || '').trim().toUpperCase() === codeUpper) {
-            return { ...r, [field]: valClean };
+            return { ...r, [field]: valClean, ...extraUpdates };
           }
           return r;
         });
 
         return {
           ...prev,
-          classified_campaigns: updatedRules.filter(r => r['Heading'] && r['Heading'] !== 'Unassigned').length,
-          unassigned_campaigns: updatedRules.filter(r => !r['Heading'] || r['Heading'] === 'Unassigned').length,
+          classified_campaigns: updatedRules.filter(r => (r['Department'] || r['Heading']) && (r['Department'] || r['Heading']) !== 'Unassigned').length,
+          unassigned_campaigns: updatedRules.filter(r => !(r['Department'] || r['Heading']) || (r['Department'] || r['Heading']) === 'Unassigned').length,
           rules: updatedRules
         };
       });
@@ -293,6 +511,9 @@ export default function ClassificationView({ user }) {
       ...rule,
       _row_id: `${cName}__new__${Date.now()}`,
       Code: '',
+      Department: 'Unassigned',
+      Office: 'Unassigned',
+      Portfolio: '',
       Heading: 'Unassigned',
       'Sub-Heading': 'Unassigned',
       Country: 'Unassigned',
@@ -384,10 +605,18 @@ export default function ClassificationView({ user }) {
           (r['Campaign Name'] && String(r['Campaign Name']).toLowerCase().includes(q)) ||
           (r['Community Name'] && String(r['Community Name']).toLowerCase().includes(q)) ||
           (r['Code'] && String(r['Code']).toLowerCase().includes(q)) ||
+          (r['Programme Fund'] && String(r['Programme Fund']).toLowerCase().includes(q)) ||
+          (r['Fund Code'] && String(r['Fund Code']).toLowerCase().includes(q)) ||
+          (r['Department'] && String(r['Department']).toLowerCase().includes(q)) ||
+          (r['Office'] && String(r['Office']).toLowerCase().includes(q)) ||
+          (r['Portfolio'] && String(r['Portfolio']).toLowerCase().includes(q)) ||
           (r['Heading'] && String(r['Heading']).toLowerCase().includes(q)) ||
           (r['Sub-Heading'] && String(r['Sub-Heading']).toLowerCase().includes(q)) ||
           (r['Country'] && String(r['Country']).toLowerCase().includes(q)) ||
           (r['Zakat Eligibility'] && String(r['Zakat Eligibility']).toLowerCase().includes(q)) ||
+          (r['Old Code(s)'] && String(r['Old Code(s)']).toLowerCase().includes(q)) ||
+          (r['Legacy Non-Zakat GL Code'] && String(r['Legacy Non-Zakat GL Code']).toLowerCase().includes(q)) ||
+          (r['Legacy Zakat GL Code'] && String(r['Legacy Zakat GL Code']).toLowerCase().includes(q)) ||
           (r['Campaign URL'] && String(r['Campaign URL']).toLowerCase().includes(q))
         );
       });
@@ -592,6 +821,14 @@ export default function ClassificationView({ user }) {
 
   // Visual Theme Badges per platform
   const bannerStyles = {
+    master: {
+      container: 'bg-gradient-to-r from-emerald-500/15 via-teal-500/10 to-transparent border-emerald-500/30 text-emerald-900 dark:text-emerald-200',
+      iconBg: 'bg-emerald-600 text-white',
+      title: 'text-emerald-700 dark:text-emerald-300 font-extrabold',
+      subtitle: 'text-slate-600 dark:text-slate-400 font-medium',
+      activePill: 'bg-emerald-600 text-white shadow-emerald-500/30',
+      countPill: 'border-emerald-500/40 text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40'
+    },
     launchgood: {
       container: 'bg-gradient-to-r from-teal-500/15 via-cyan-500/10 to-transparent border-teal-500/30 text-teal-900 dark:text-teal-200',
       iconBg: 'bg-teal-500 text-white',
@@ -762,26 +999,37 @@ export default function ClassificationView({ user }) {
 
         {/* Global Action Buttons */}
         <div className="flex flex-wrap items-center gap-2">
-          {/* Save & Sync Matrix Button */}
+          {/* Master Codes Add Button OR Save & Sync Matrix Button */}
           {isSuperAdmin && (
-            <button
-              onClick={handleSave}
-              disabled={saving}
-              className="px-4 py-2 text-xs font-extrabold rounded-xl text-white bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 shadow-md shadow-emerald-500/20 transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
-              title="Save matrix edits and sync classification rules across all donor records"
-            >
-              {saving ? (
-                <>
-                  <RefreshCw className="w-3.5 h-3.5 animate-spin text-white" />
-                  <span>Saving & Syncing...</span>
-                </>
-              ) : (
-                <>
-                  <Save className="w-3.5 h-3.5 text-white" />
-                  <span>Save Matrix & Sync</span>
-                </>
-              )}
-            </button>
+            platform === 'master' ? (
+              <button
+                onClick={handleOpenAddMasterCode}
+                className="px-4 py-2 text-xs font-extrabold rounded-xl text-white bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 shadow-md shadow-emerald-500/20 transition-all flex items-center gap-2 cursor-pointer"
+                title="Create a new Master Project Code in the canonical registry"
+              >
+                <Plus className="w-3.5 h-3.5 text-white" />
+                <span>Add Master Code</span>
+              </button>
+            ) : (
+              <button
+                onClick={handleSave}
+                disabled={saving}
+                className="px-4 py-2 text-xs font-extrabold rounded-xl text-white bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 shadow-md shadow-emerald-500/20 transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                title="Save matrix edits and sync classification rules across all donor records"
+              >
+                {saving ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin text-white" />
+                    <span>Saving & Syncing...</span>
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-3.5 h-3.5 text-white" />
+                    <span>Save Matrix & Sync</span>
+                  </>
+                )}
+              </button>
+            )
           )}
 
           {/* Export Dropdown */}
@@ -789,7 +1037,7 @@ export default function ClassificationView({ user }) {
             <button 
               onClick={() => handleExport('csv')}
               className="px-3 py-2 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors flex items-center gap-1.5 cursor-pointer"
-              title="Download Classification Rules as CSV"
+              title="Download Rules as CSV"
             >
               <Download className="w-3.5 h-3.5 text-cyan-600 dark:text-cyan-400" />
               <span>CSV</span>
@@ -798,7 +1046,7 @@ export default function ClassificationView({ user }) {
             <button 
               onClick={() => handleExport('xlsx')}
               className="px-3 py-2 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors flex items-center gap-1.5 cursor-pointer"
-              title="Download Classification Rules as Excel Spreadsheet"
+              title="Download Rules as Excel Spreadsheet"
             >
               <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
               <span>Excel</span>
@@ -809,6 +1057,25 @@ export default function ClassificationView({ user }) {
 
       {/* 🚀 Platform Selector Pill Buttons */}
       <div className="flex flex-wrap items-center gap-3">
+        {/* Master Project Codes Tab */}
+        <button 
+          onClick={() => handleSelectPlatform('master')}
+          className={`relative px-5 py-3 rounded-xl font-bold text-xs flex items-center gap-2.5 transition-all cursor-pointer ${
+            platform === 'master'
+              ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md shadow-emerald-500/30 border border-emerald-400 ring-2 ring-emerald-400/40'
+              : 'bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-900/60 dark:hover:bg-slate-800/80 dark:text-slate-300 border border-slate-300 dark:border-white/5'
+          }`}
+        >
+          <Shield className={`w-4 h-4 ${platform === 'master' ? 'text-white' : 'text-emerald-600 dark:text-emerald-400'}`} />
+          <span className="font-bold">🏷️ Master Project Codes</span>
+          {platform === 'master' && (
+            <span className="flex h-2.5 w-2.5 relative ml-1">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-white"></span>
+            </span>
+          )}
+        </button>
+
         {/* LaunchGood Tab */}
         <button 
           onClick={() => handleSelectPlatform('launchgood')}
@@ -890,7 +1157,8 @@ export default function ClassificationView({ user }) {
       <div className={`p-4 rounded-2xl border flex flex-wrap items-center justify-between gap-4 transition-all ${bStyles.container}`}>
         <div className="flex items-center gap-3.5">
           <span className={`p-2.5 rounded-xl shadow-sm ${bStyles.iconBg}`}>
-            {platform === 'launchgood' ? <Zap className="w-5 h-5" /> :
+            {platform === 'master' ? <Shield className="w-5 h-5" /> :
+             platform === 'launchgood' ? <Zap className="w-5 h-5" /> :
              platform === 'givebright' ? <Gift className="w-5 h-5" /> :
              platform === 'paysuite' ? <CreditCard className="w-5 h-5" /> :
              <Globe className="w-5 h-5" />}
@@ -898,52 +1166,91 @@ export default function ClassificationView({ user }) {
           <div>
             <div className="text-xs uppercase tracking-wider flex items-center gap-2.5">
               <span className={bStyles.title}>
-                ACTIVE MATRIX: {platform === 'launchgood' ? 'LaunchGood Campaign Master' : platform === 'givebright' ? 'GiveBright Campaign & URL Master' : platform === 'paysuite' ? 'Paysuite Direct Debit Master' : 'Rethink Website Project Master'}
+                ACTIVE {platform === 'master' ? 'CATALOG' : 'MATRIX'}: {
+                  platform === 'master' ? 'Canonical Master Project Codes (Single Source of Truth)' :
+                  platform === 'launchgood' ? 'LaunchGood Campaign Master' :
+                  platform === 'givebright' ? 'GiveBright Campaign & URL Master' :
+                  platform === 'paysuite' ? 'Paysuite Direct Debit Master' :
+                  'Rethink Website Project Master'
+                }
               </span>
               <span className={`text-[10px] px-2.5 py-0.5 rounded-full font-extrabold uppercase shadow-sm ${bStyles.activePill}`}>
                 ACTIVE
               </span>
             </div>
             <div className={`text-xs mt-0.5 ${bStyles.subtitle}`}>
-              {platform === 'givebright'
-                ? 'Hierarchy: Campaign Name & URL ➔ Code ➔ (Heading, Sub-Heading, Country, Zakat Eligibility)'
+              {platform === 'master'
+                ? 'Single Source of Truth: Canonical Project Codes ➔ Department, Office, Portfolio, Country, Zakat Eligibility'
+                : platform === 'givebright'
+                ? 'Hierarchy: Campaign Name & URL ➔ Code ➔ (Department, Office, Portfolio, Country, Zakat Eligibility)'
                 : platform === 'paysuite'
-                ? 'Hierarchy: Direct Debit Ref (Bank Ref) ➔ Code ➔ (Heading, Sub-Heading, Country, Zakat Eligibility)'
+                ? 'Hierarchy: Direct Debit Ref (Bank Ref) ➔ Code ➔ (Department, Office, Portfolio, Country, Zakat Eligibility)'
                 : platform === 'website'
                 ? 'Hierarchy: Project Name (Campaign) ➔ Appeal Name (Community) ➔ Location (Country)'
-                : 'Hierarchy: Campaign Name ➔ Code ➔ (Heading, Sub-Heading, Country, Zakat Eligibility)'}
+                : 'Hierarchy: Campaign Name ➔ Code ➔ (Department, Office, Portfolio, Country, Zakat Eligibility)'}
             </div>
           </div>
         </div>
 
         <div className="flex items-center gap-2">
           <span className={`text-xs font-mono font-extrabold px-3.5 py-1.5 rounded-xl border shadow-sm ${bStyles.countPill}`}>
-            {matrixData.total_campaigns?.toLocaleString()} Rules Active
+            {platform === 'master' 
+              ? `${matrixData.rules?.length?.toLocaleString() || 0} Project Codes`
+              : `${matrixData.total_campaigns?.toLocaleString()} Rules Active`}
           </span>
         </div>
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className={`glass-panel p-4 border-l-4 ${platform === 'launchgood' ? 'border-teal-500 dark:border-cyan-400' : platform === 'givebright' ? 'border-purple-500 dark:border-purple-400' : platform === 'paysuite' ? 'border-amber-500 dark:border-amber-400' : 'border-blue-500 dark:border-blue-400'}`}>
-          <div className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase">
-            {platform === 'paysuite' ? 'Total Tracked Direct Debits' : 'Unique Tracked Campaigns'}
+      {platform === 'master' ? (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="glass-panel p-4 border-l-4 border-emerald-500 dark:border-emerald-400">
+            <div className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase">
+              Total Master Project Codes
+            </div>
+            <div className="text-2xl font-black text-slate-900 dark:text-white mt-1">
+              {matrixData.rules?.length?.toLocaleString() || 0}
+            </div>
           </div>
-          <div className="text-2xl font-black text-slate-900 dark:text-white mt-1">{matrixData.total_campaigns?.toLocaleString()}</div>
-        </div>
-        <div className="glass-panel p-4 border-l-4 border-emerald-500 dark:border-emerald-400">
-          <div className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase">
-            {platform === 'paysuite' ? 'Fully Classified Debits' : 'Fully Classified Campaigns'}
+          <div className="glass-panel p-4 border-l-4 border-teal-500 dark:border-teal-400">
+            <div className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase">
+              Total Linked Campaigns
+            </div>
+            <div className="text-2xl font-black text-teal-600 dark:text-teal-400 mt-1">
+              {(matrixData.rules || []).reduce((acc, r) => acc + (r.campaign_count || r['Campaign Count'] || 0), 0).toLocaleString()}
+            </div>
           </div>
-          <div className="text-2xl font-black text-emerald-600 dark:text-emerald-400 mt-1">{matrixData.classified_campaigns?.toLocaleString()}</div>
-        </div>
-        <div className="glass-panel p-4 border-l-4 border-amber-500 dark:border-amber-400">
-          <div className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase">
-            {platform === 'paysuite' ? 'Unassigned Debits' : 'Unassigned Campaigns'}
+          <div className="glass-panel p-4 border-l-4 border-cyan-500 dark:border-cyan-400">
+            <div className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase">
+              Total Gross Raised Across Codes
+            </div>
+            <div className="text-2xl font-black text-cyan-600 dark:text-cyan-400 mt-1 font-mono">
+              £{(matrixData.rules || []).reduce((acc, r) => acc + (r.total_raised || r['Total Raised'] || 0), 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </div>
           </div>
-          <div className="text-2xl font-black text-amber-600 dark:text-amber-400 mt-1">{matrixData.unassigned_campaigns?.toLocaleString()}</div>
         </div>
-      </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className={`glass-panel p-4 border-l-4 ${platform === 'launchgood' ? 'border-teal-500 dark:border-cyan-400' : platform === 'givebright' ? 'border-purple-500 dark:border-purple-400' : platform === 'paysuite' ? 'border-amber-500 dark:border-amber-400' : 'border-blue-500 dark:border-blue-400'}`}>
+            <div className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase">
+              {platform === 'paysuite' ? 'Total Tracked Direct Debits' : 'Unique Tracked Campaigns'}
+            </div>
+            <div className="text-2xl font-black text-slate-900 dark:text-white mt-1">{matrixData.total_campaigns?.toLocaleString()}</div>
+          </div>
+          <div className="glass-panel p-4 border-l-4 border-emerald-500 dark:border-emerald-400">
+            <div className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase">
+              {platform === 'paysuite' ? 'Fully Classified Debits' : 'Fully Classified Campaigns'}
+            </div>
+            <div className="text-2xl font-black text-emerald-600 dark:text-emerald-400 mt-1">{matrixData.classified_campaigns?.toLocaleString()}</div>
+          </div>
+          <div className="glass-panel p-4 border-l-4 border-amber-500 dark:border-amber-400">
+            <div className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase">
+              {platform === 'paysuite' ? 'Unassigned Debits' : 'Unassigned Campaigns'}
+            </div>
+            <div className="text-2xl font-black text-amber-600 dark:text-amber-400 mt-1">{matrixData.unassigned_campaigns?.toLocaleString()}</div>
+          </div>
+        </div>
+      )}
 
       {/* 🚀 Search, Filter & Quick Pagination Controls Bar */}
       <div className="glass-panel p-3.5 rounded-2xl border flex flex-wrap items-center justify-between gap-3 shadow-sm" style={{ borderColor: 'var(--border-glass)' }}>
@@ -1046,209 +1353,122 @@ export default function ClassificationView({ user }) {
               {knownCodes.map((c, i) => <option key={i} value={c} />)}
             </datalist>
 
-            <table className="crm-table w-full">
-              <thead>
-                <tr>
-                  <th className="min-w-[220px] text-left">{platform === 'paysuite' ? 'Direct Debit Ref (Bank Ref)' : 'Campaign Name'}</th>
-                  
-                  {/* Paysuite: Donor Name and Email columns */}
-                  {platform === 'paysuite' && (
-                    <>
-                      <th className="min-w-[120px] text-left">Donor Name</th>
-                      <th className="min-w-[150px] text-left">Donor Email</th>
-                    </>
-                  )}
-
-                  {/* LaunchGood & GiveBright: Campaign URL Column */}
-                  {platform !== 'paysuite' && (
-                    <th className="w-28 text-center">Campaign URL</th>
-                  )}
-
-                  {/* LaunchGood & Paysuite: Community Name column */}
-                  {platform !== 'givebright' && (
-                    <th className="min-w-[160px] text-left">{platform === 'paysuite' ? 'Platform Source' : 'Community Name'}</th>
-                  )}
-                  
-                  <th className="w-36 text-left">Code (Master Link)</th>
-                  <th className="min-w-[170px] text-left">Heading</th>
-                  <th className="min-w-[190px] text-left">Sub-Heading</th>
-                  <th className="min-w-[150px] text-left">Country</th>
-                  <th className="w-40 text-left">Zakat Eligibility</th>
-                  {isSuperAdmin && <th className="text-center w-24">Action</th>}
-                </tr>
-              </thead>
-              <tbody>
-                {paginatedRules.length === 0 ? (
+            {platform === 'master' ? (
+              <table className="crm-table w-full">
+                <thead>
                   <tr>
-                    <td colSpan={platform === 'paysuite' ? 7 : 8} className="py-12 text-center text-slate-500 dark:text-slate-400 text-xs font-bold">
-                      No classification rules match the active search or status filter.
-                    </td>
+                    <th className="w-36 text-left">Code (Master Link)</th>
+                    <th className="min-w-[130px] text-left">Programme Fund</th>
+                    <th className="min-w-[110px] text-left">Fund Code</th>
+                    <th className="min-w-[150px] text-left">Department</th>
+                    <th className="min-w-[160px] text-left">Office</th>
+                    <th className="min-w-[130px] text-left">Portfolio</th>
+                    <th className="min-w-[120px] text-left">Country</th>
+                    <th className="w-32 text-left">Zakat Status</th>
+                    <th className="min-w-[150px] text-left">Legacy GL (Non-Z / Z)</th>
+                    <th className="min-w-[140px] text-left">Old Code(s)</th>
+                    <th className="w-28 text-center">Campaigns</th>
+                    <th className="w-32 text-right pr-4">Total Raised</th>
+                    {isSuperAdmin && <th className="text-center w-24">Action</th>}
                   </tr>
-                ) : (
-                  paginatedRules.map((r, idx) => {
-                    const rowUniqueKey = r._row_id || `${r['Campaign Name'] || r['campaign_name']}__${idx}`;
-                    const isMulti = r.variants_count > 1 || r.status === 'multi_code';
-                    return (
-                      <tr key={rowUniqueKey} className="hover:bg-slate-50 dark:hover:bg-cyan-500/5 transition-colors border-b border-slate-200 dark:border-white/5">
-                        {/* Campaign Name */}
-                        <td className="font-bold text-slate-800 dark:text-slate-100 text-xs py-2.5 px-3 min-w-[220px] max-w-[300px]" title={r['Campaign Name']}>
-                          <div className="truncate font-bold text-slate-900 dark:text-slate-100">{r['Campaign Name']}</div>
-                          {isMulti && (
-                            <div className="flex items-center gap-1.5 mt-1">
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-100 text-amber-900 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-400/40 shadow-xs">
-                                🟡 {r.variants_count} Code Variants
-                              </span>
-                              {r.is_primary && (
-                                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[9px] font-extrabold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-400/40">
-                                  ⭐ Primary
-                                </span>
-                              )}
-                            </div>
+                </thead>
+                <tbody>
+                  {paginatedRules.length === 0 ? (
+                    <tr>
+                      <td colSpan={13} className="py-12 text-center text-slate-500 dark:text-slate-400 text-xs font-bold">
+                        No master project codes match the active search.
+                      </td>
+                    </tr>
+                  ) : (
+                    paginatedRules.map((r, idx) => (
+                      <tr key={r._row_id || idx} className="hover:bg-slate-50 dark:hover:bg-emerald-500/5 transition-colors border-b border-slate-200 dark:border-white/5">
+                        <td className="py-3 px-3 w-36">
+                          <span className="font-mono font-black text-xs text-emerald-700 dark:text-emerald-400 px-2.5 py-1 bg-emerald-100/60 dark:bg-emerald-950/60 rounded-lg border border-emerald-400/40 shadow-xs">
+                            {r['Code']}
+                          </span>
+                        </td>
+                        <td className="py-3 px-3 min-w-[130px] text-xs">
+                          {r['Programme Fund'] ? (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-md font-bold text-[11px] bg-purple-100 text-purple-800 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-400/30">
+                              {r['Programme Fund']}
+                            </span>
+                          ) : (
+                            <span className="text-slate-400 italic text-[11px]">—</span>
                           )}
                         </td>
-
-                        {/* Paysuite: Donor Name and Email */}
-                        {platform === 'paysuite' && (
-                          <>
-                            <td className="text-slate-600 dark:text-slate-400 text-xs py-2.5 px-3 min-w-[120px] max-w-[150px]" title={r['Donor Name']}>
-                              <div className="truncate font-medium">{r['Donor Name'] || 'N/A'}</div>
-                            </td>
-                            <td className="text-slate-600 dark:text-slate-400 text-xs py-2.5 px-3 min-w-[150px] max-w-[200px]" title={r['Donor Email']}>
-                              <div className="truncate font-medium">{r['Donor Email'] || 'N/A'}</div>
-                            </td>
-                          </>
-                        )}
-
-                        {/* LaunchGood & GiveBright: Clickable Campaign URL Cell */}
-                        {platform !== 'paysuite' && (
-                          <td className="py-2 px-2 text-center w-28">
-                            {r['Campaign URL'] && r['Campaign URL'] !== '' && r['Campaign URL'] !== 'Unassigned' && r['Campaign URL'] !== 'None' ? (
-                              <a 
-                                href={r['Campaign URL'].startsWith('http') ? r['Campaign URL'] : `https://${r['Campaign URL']}`} 
-                                target="_blank" 
-                                rel="noreferrer" 
-                                className="inline-flex items-center gap-1 px-2.5 py-1 bg-cyan-100 text-cyan-800 dark:bg-cyan-500/10 dark:text-cyan-400 hover:bg-cyan-200 dark:hover:bg-cyan-500/20 border border-cyan-300 dark:border-cyan-500/30 rounded-lg text-[11px] font-bold transition-all max-w-[110px] truncate shadow-sm"
-                                title={r['Campaign URL']}
-                              >
-                                <ExternalLink className="w-3 h-3 shrink-0" />
-                                <span className="truncate">Open Link</span>
-                              </a>
-                            ) : (
-                              <input
-                                type="text"
-                                disabled={!isSuperAdmin}
-                                value={r['Campaign URL'] || ''}
-                                onChange={e => handleCellChange(r._row_id, 'Campaign URL', e.target.value)}
-                                placeholder="Paste URL..."
-                                className="bg-white dark:bg-slate-900/90 border border-slate-300 dark:border-white/10 rounded-lg px-2 py-1 text-[11px] text-slate-800 dark:text-slate-300 w-24 focus:outline-none focus:border-cyan-500 disabled:opacity-60 font-mono"
-                                title="Paste or edit campaign URL"
-                              />
-                            )}
-                          </td>
-                        )}
-
-                        {/* LaunchGood & Paysuite: Community Name Cell */}
-                        {platform !== 'givebright' && (
-                          <td className="text-slate-600 dark:text-slate-400 text-xs py-2.5 px-3 min-w-[160px] max-w-[220px]" title={r['Community Name']}>
-                            <div className="truncate font-medium">{r['Community Name']}</div>
-                          </td>
-                        )}
-
-                        {/* Editable Code with Datalist & Instant Auto-Fill */}
-                        <td className="py-2 px-2 w-36">
-                          <input 
-                            type="text" 
-                            list="known-codes-list"
-                            disabled={!isSuperAdmin}
-                            value={r['Code'] || ''} 
-                            onChange={e => handleCellChange(r._row_id, 'Code', e.target.value)}
-                            placeholder="Type Code..."
-                            className="bg-white dark:bg-slate-900/90 border border-cyan-400 dark:border-cyan-500/40 rounded-lg px-2.5 py-1.5 text-xs font-mono text-cyan-800 dark:text-cyan-300 font-extrabold w-full focus:outline-none focus:border-cyan-500 disabled:opacity-60 uppercase shadow-sm"
-                            title="Changing Code automatically auto-fills Heading, Sub-Heading, Country, and Zakat!"
-                          />
+                        <td className="py-3 px-3 min-w-[110px] text-xs font-mono text-slate-600 dark:text-slate-300">
+                          {r['Fund Code'] || '—'}
                         </td>
-
-                        {/* Editable Heading */}
-                        <td className="py-2 px-2 min-w-[170px]">
-                          <input 
-                            type="text" 
-                            disabled={!isSuperAdmin}
-                            value={r['Heading'] || ''} 
-                            onChange={e => handleCellChange(r._row_id, 'Heading', e.target.value)}
-                            className="bg-white dark:bg-slate-900/90 border border-slate-300 dark:border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-slate-800 dark:text-slate-200 font-semibold w-full focus:outline-none focus:border-teal-500 dark:focus:border-cyan-400 disabled:opacity-60 shadow-sm"
-                            title={r['Heading']}
-                          />
+                        <td className="py-3 px-3 min-w-[150px] font-bold text-xs text-slate-900 dark:text-slate-100">
+                          {r['Department'] || 'Unassigned'}
                         </td>
-
-                        {/* Editable Sub-Heading */}
-                        <td className="py-2 px-2 min-w-[190px]">
-                          <input 
-                            type="text" 
-                            disabled={!isSuperAdmin}
-                            value={r['Sub-Heading'] || ''} 
-                            onChange={e => handleCellChange(r._row_id, 'Sub-Heading', e.target.value)}
-                            className="bg-white dark:bg-slate-900/90 border border-slate-300 dark:border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-purple-800 dark:text-purple-300 font-semibold w-full focus:outline-none focus:border-purple-500 dark:focus:border-purple-400 disabled:opacity-60 shadow-sm"
-                            title={r['Sub-Heading']}
-                          />
+                        <td className="py-3 px-3 min-w-[160px] font-semibold text-xs text-purple-700 dark:text-purple-300">
+                          {r['Office'] || 'Unassigned'}
                         </td>
-
-                        {/* Editable Country */}
-                        <td className="py-2 px-2 min-w-[150px]">
-                          <input 
-                            type="text" 
-                            disabled={!isSuperAdmin}
-                            value={r['Country'] || ''} 
-                            onChange={e => handleCellChange(r._row_id, 'Country', e.target.value)}
-                            className="bg-white dark:bg-slate-900/90 border border-slate-300 dark:border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-emerald-800 dark:text-emerald-300 font-semibold w-full focus:outline-none focus:border-emerald-500 dark:focus:border-emerald-400 disabled:opacity-60 shadow-sm"
-                            title={r['Country']}
-                          />
+                        <td className="py-3 px-3 min-w-[130px] text-xs text-slate-600 dark:text-slate-300">
+                          {r['Portfolio'] ? (
+                            <span className="font-semibold text-amber-700 dark:text-amber-300 px-2 py-0.5 rounded-md bg-amber-50 dark:bg-amber-950/40 border border-amber-400/30">
+                              {r['Portfolio']}
+                            </span>
+                          ) : (
+                            <span className="text-slate-400 italic text-[11px]">—</span>
+                          )}
                         </td>
-
-                        {/* Editable Zakat Eligibility */}
-                        <td className="py-2 px-2 w-40">
-                          <select 
-                            disabled={!isSuperAdmin}
-                            value={r['Zakat Eligibility'] || 'Unassigned'} 
-                            onChange={e => handleCellChange(r._row_id, 'Zakat Eligibility', e.target.value)}
-                            className="bg-white dark:bg-slate-900/90 border border-slate-300 dark:border-white/10 rounded-lg px-2 py-1.5 text-xs font-bold text-slate-800 dark:text-slate-200 w-full focus:outline-none focus:border-teal-500 dark:focus:border-cyan-400 disabled:opacity-60 cursor-pointer shadow-sm"
-                          >
-                            <option value="Unassigned">Unassigned</option>
-                            <option value="Zakat">Zakat</option>
-                            <option value="Non-Zakat">Non-Zakat</option>
-                          </select>
+                        <td className="py-3 px-3 min-w-[120px] font-medium text-xs text-emerald-700 dark:text-emerald-300">
+                          {r['Country'] || 'Unassigned'}
                         </td>
-
-                        {/* Super Admin Actions: Primary Toggle, Add Code Variant & Delete */}
+                        <td className="py-3 px-3 w-32 text-xs">
+                          <span className={`px-2 py-0.5 rounded-md font-bold text-[10px] uppercase ${
+                            r['Zakat Eligibility'] === 'Zakat'
+                              ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-400/40'
+                              : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border border-slate-300 dark:border-white/10'
+                          }`}>
+                            {r['Zakat Eligibility'] || 'Unassigned'}
+                          </span>
+                        </td>
+                        <td className="py-3 px-3 min-w-[150px] text-xs font-mono">
+                          <div className="flex flex-col gap-0.5">
+                            <span className="text-[10px] text-slate-500 dark:text-slate-400">
+                              NZ: <strong className="text-slate-700 dark:text-slate-200">{r['Legacy Non-Zakat GL Code'] || '—'}</strong>
+                            </span>
+                            <span className="text-[10px] text-emerald-600 dark:text-emerald-400">
+                              Z: <strong>{r['Legacy Zakat GL Code'] || '—'}</strong>
+                            </span>
+                          </div>
+                        </td>
+                        <td className="py-3 px-3 min-w-[140px] text-xs font-mono text-slate-500 dark:text-slate-400">
+                          {r['Old Code(s)'] ? (
+                            <span className="bg-slate-100 dark:bg-slate-800/80 px-2 py-0.5 rounded border border-slate-200 dark:border-white/10 text-[11px]">
+                              {r['Old Code(s)']}
+                            </span>
+                          ) : (
+                            <span className="text-slate-400 italic text-[11px]">—</span>
+                          )}
+                        </td>
+                        <td className="py-3 px-3 w-28 text-center">
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-teal-50 text-teal-800 dark:bg-teal-950/60 dark:text-teal-300 border border-teal-400/30 shadow-xs">
+                            🔗 {r['Campaign Count'] || 0}
+                          </span>
+                        </td>
+                        <td className="py-3 px-3 w-32 text-right pr-4 font-mono font-bold text-xs text-cyan-600 dark:text-cyan-400">
+                          £{(r['Total Raised'] || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </td>
                         {isSuperAdmin && (
-                          <td className="text-center py-2 px-2 w-24">
-                            <div className="flex items-center justify-center gap-1">
-                              {isMulti && (
-                                <button
-                                  type="button"
-                                  onClick={() => handleTogglePrimary(r)}
-                                  className={`p-1.5 rounded-lg transition-all cursor-pointer ${
-                                    r.is_primary 
-                                      ? 'text-amber-500 bg-amber-500/20 border border-amber-400' 
-                                      : 'text-slate-400 hover:text-amber-400 hover:bg-slate-100 dark:hover:bg-slate-800'
-                                  }`}
-                                  title={r.is_primary ? 'Current Primary Code for this Campaign' : 'Click to make this the Primary Code for this Campaign'}
-                                >
-                                  <span className="text-xs font-bold">{r.is_primary ? '⭐' : '☆'}</span>
-                                </button>
-                              )}
+                          <td className="text-center py-3 px-3 w-24">
+                            <div className="flex items-center justify-center gap-1.5">
                               <button
                                 type="button"
-                                onClick={() => handleDuplicateRule(r)}
+                                onClick={() => handleOpenEditMasterCode(r)}
                                 className="p-1.5 text-cyan-600 dark:text-cyan-400 hover:text-cyan-800 dark:hover:text-cyan-200 hover:bg-cyan-500/10 rounded-lg transition-colors cursor-pointer"
-                                title="Add another Code variant rule for this campaign"
+                                title="Edit Master Project Code"
                               >
-                                <Plus className="w-4 h-4" />
+                                <Edit3 className="w-4 h-4" />
                               </button>
                               <button 
                                 type="button"
-                                onClick={() => handleDeleteRule(r)}
+                                onClick={() => handleDeleteMasterCode(r)}
                                 className="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-500/10 rounded-lg transition-colors cursor-pointer"
-                                title="Delete this classification rule"
+                                title="Delete Master Project Code"
                               >
                                 <Trash2 className="w-4 h-4" />
                               </button>
@@ -1256,11 +1476,241 @@ export default function ClassificationView({ user }) {
                           </td>
                         )}
                       </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            ) : (
+              <table className="crm-table w-full">
+                <thead>
+                  <tr>
+                    <th className="min-w-[220px] text-left">{platform === 'paysuite' ? 'Direct Debit Ref (Bank Ref)' : 'Campaign Name'}</th>
+                    
+                    {/* Paysuite: Donor Name and Email columns */}
+                    {platform === 'paysuite' && (
+                      <>
+                        <th className="min-w-[120px] text-left">Donor Name</th>
+                        <th className="min-w-[150px] text-left">Donor Email</th>
+                      </>
+                    )}
+
+                    {/* LaunchGood & GiveBright: Campaign URL Column */}
+                    {platform !== 'paysuite' && (
+                      <th className="w-28 text-center">Campaign URL</th>
+                    )}
+
+                    {/* LaunchGood & Paysuite: Community Name column */}
+                    {platform !== 'givebright' && (
+                      <th className="min-w-[160px] text-left">{platform === 'paysuite' ? 'Platform Source' : 'Community Name'}</th>
+                    )}
+                    
+                    <th className="w-36 text-left">Code (Master Link)</th>
+                    <th className="min-w-[170px] text-left">Department</th>
+                    <th className="min-w-[190px] text-left">Office</th>
+                    <th className="min-w-[150px] text-left">Portfolio</th>
+                    <th className="min-w-[150px] text-left">Country</th>
+                    <th className="w-40 text-left">Zakat Eligibility</th>
+                    {isSuperAdmin && <th className="text-center w-24">Action</th>}
+                  </tr>
+                </thead>
+                <tbody>
+                  {paginatedRules.length === 0 ? (
+                    <tr>
+                      <td colSpan={platform === 'paysuite' ? 8 : 9} className="py-12 text-center text-slate-500 dark:text-slate-400 text-xs font-bold">
+                        No classification rules match the active search or status filter.
+                      </td>
+                    </tr>
+                  ) : (
+                    paginatedRules.map((r, idx) => {
+                      const rowUniqueKey = r._row_id || `${r['Campaign Name'] || r['campaign_name']}__${idx}`;
+                      const isMulti = r.variants_count > 1 || r.status === 'multi_code';
+                      return (
+                        <tr key={rowUniqueKey} className="hover:bg-slate-50 dark:hover:bg-cyan-500/5 transition-colors border-b border-slate-200 dark:border-white/5">
+                          {/* Campaign Name */}
+                          <td className="font-bold text-slate-800 dark:text-slate-100 text-xs py-2.5 px-3 min-w-[220px] max-w-[300px]" title={r['Campaign Name']}>
+                            <div className="truncate font-bold text-slate-900 dark:text-slate-100">{r['Campaign Name']}</div>
+                            {isMulti && (
+                              <div className="flex items-center gap-1.5 mt-1">
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-100 text-amber-900 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-400/40 shadow-xs">
+                                  🟡 {r.variants_count} Code Variants
+                                </span>
+                                {r.is_primary && (
+                                  <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[9px] font-extrabold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-400/40">
+                                    ⭐ Primary
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                          </td>
+
+                          {/* Paysuite: Donor Name and Email */}
+                          {platform === 'paysuite' && (
+                            <>
+                              <td className="text-slate-600 dark:text-slate-400 text-xs py-2.5 px-3 min-w-[120px] max-w-[150px]" title={r['Donor Name']}>
+                                <div className="truncate font-medium">{r['Donor Name'] || 'N/A'}</div>
+                              </td>
+                              <td className="text-slate-600 dark:text-slate-400 text-xs py-2.5 px-3 min-w-[150px] max-w-[200px]" title={r['Donor Email']}>
+                                <div className="truncate font-medium">{r['Donor Email'] || 'N/A'}</div>
+                              </td>
+                            </>
+                          )}
+
+                          {/* LaunchGood & GiveBright: Clickable Campaign URL Cell */}
+                          {platform !== 'paysuite' && (
+                            <td className="py-2 px-2 text-center w-28">
+                              {r['Campaign URL'] && r['Campaign URL'] !== '' && r['Campaign URL'] !== 'Unassigned' && r['Campaign URL'] !== 'None' ? (
+                                <a 
+                                  href={r['Campaign URL'].startsWith('http') ? r['Campaign URL'] : `https://${r['Campaign URL']}`} 
+                                  target="_blank" 
+                                  rel="noreferrer" 
+                                  className="inline-flex items-center gap-1 px-2.5 py-1 bg-cyan-100 text-cyan-800 dark:bg-cyan-500/10 dark:text-cyan-400 hover:bg-cyan-200 dark:hover:bg-cyan-500/20 border border-cyan-300 dark:border-cyan-500/30 rounded-lg text-[11px] font-bold transition-all max-w-[110px] truncate shadow-sm"
+                                  title={r['Campaign URL']}
+                                >
+                                  <ExternalLink className="w-3 h-3 shrink-0" />
+                                  <span className="truncate">Open Link</span>
+                                </a>
+                              ) : (
+                                <input
+                                  type="text"
+                                  disabled={!isSuperAdmin}
+                                  value={r['Campaign URL'] || ''}
+                                  onChange={e => handleCellChange(r._row_id, 'Campaign URL', e.target.value)}
+                                  placeholder="Paste URL..."
+                                  className="bg-white dark:bg-slate-900/90 border border-slate-300 dark:border-white/10 rounded-lg px-2 py-1 text-[11px] text-slate-800 dark:text-slate-300 w-24 focus:outline-none focus:border-cyan-500 disabled:opacity-60 font-mono"
+                                  title="Paste or edit campaign URL"
+                                />
+                              )}
+                            </td>
+                          )}
+
+                          {/* LaunchGood & Paysuite: Community Name Cell */}
+                          {platform !== 'givebright' && (
+                            <td className="text-slate-600 dark:text-slate-400 text-xs py-2.5 px-3 min-w-[160px] max-w-[220px]" title={r['Community Name']}>
+                              <div className="truncate font-medium">{r['Community Name']}</div>
+                            </td>
+                          )}
+
+                          {/* Editable Code with Datalist & Instant Auto-Fill */}
+                          <td className="py-2 px-2 w-36">
+                            <input 
+                              type="text" 
+                              list="known-codes-list"
+                              disabled={!isSuperAdmin}
+                              value={r['Code'] || ''} 
+                              onChange={e => handleCellChange(r._row_id, 'Code', e.target.value)}
+                              placeholder="Type Code..."
+                              className="bg-white dark:bg-slate-900/90 border border-cyan-400 dark:border-cyan-500/40 rounded-lg px-2.5 py-1.5 text-xs font-mono text-cyan-800 dark:text-cyan-300 font-extrabold w-full focus:outline-none focus:border-cyan-500 disabled:opacity-60 uppercase shadow-sm"
+                              title="Changing Code automatically auto-fills Department, Office, Portfolio, Country, and Zakat!"
+                            />
+                          </td>
+
+                          {/* Editable Department */}
+                          <td className="py-2 px-2 min-w-[170px]">
+                            <input 
+                              type="text" 
+                              disabled={!isSuperAdmin}
+                              value={r['Department'] || r['Heading'] || ''} 
+                              onChange={e => handleCellChange(r._row_id, 'Department', e.target.value)}
+                              className="bg-white dark:bg-slate-900/90 border border-slate-300 dark:border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-slate-800 dark:text-slate-200 font-semibold w-full focus:outline-none focus:border-teal-500 dark:focus:border-cyan-400 disabled:opacity-60 shadow-sm"
+                              title={r['Department'] || r['Heading']}
+                            />
+                          </td>
+
+                          {/* Editable Office */}
+                          <td className="py-2 px-2 min-w-[190px]">
+                            <input 
+                              type="text" 
+                              disabled={!isSuperAdmin}
+                              value={r['Office'] || r['Sub-Heading'] || ''} 
+                              onChange={e => handleCellChange(r._row_id, 'Office', e.target.value)}
+                              className="bg-white dark:bg-slate-900/90 border border-slate-300 dark:border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-purple-800 dark:text-purple-300 font-semibold w-full focus:outline-none focus:border-purple-500 dark:focus:border-purple-400 disabled:opacity-60 shadow-sm"
+                              title={r['Office'] || r['Sub-Heading']}
+                            />
+                          </td>
+
+                          {/* Editable Portfolio */}
+                          <td className="py-2 px-2 min-w-[150px]">
+                            <input 
+                              type="text" 
+                              disabled={!isSuperAdmin}
+                              value={r['Portfolio'] || ''} 
+                              onChange={e => handleCellChange(r._row_id, 'Portfolio', e.target.value)}
+                              placeholder="Portfolio..."
+                              className="bg-white dark:bg-slate-900/90 border border-slate-300 dark:border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-amber-800 dark:text-amber-300 font-semibold w-full focus:outline-none focus:border-amber-500 dark:focus:border-amber-400 disabled:opacity-60 shadow-sm placeholder:italic placeholder:font-normal placeholder:text-slate-400"
+                              title={r['Portfolio']}
+                            />
+                          </td>
+
+                          {/* Editable Country */}
+                          <td className="py-2 px-2 min-w-[150px]">
+                            <input 
+                              type="text" 
+                              disabled={!isSuperAdmin}
+                              value={r['Country'] || ''} 
+                              onChange={e => handleCellChange(r._row_id, 'Country', e.target.value)}
+                              className="bg-white dark:bg-slate-900/90 border border-slate-300 dark:border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-emerald-800 dark:text-emerald-300 font-semibold w-full focus:outline-none focus:border-emerald-500 dark:focus:border-emerald-400 disabled:opacity-60 shadow-sm"
+                              title={r['Country']}
+                            />
+                          </td>
+
+                          {/* Editable Zakat Eligibility */}
+                          <td className="py-2 px-2 w-40">
+                            <select 
+                              disabled={!isSuperAdmin}
+                              value={r['Zakat Eligibility'] || 'Unassigned'} 
+                              onChange={e => handleCellChange(r._row_id, 'Zakat Eligibility', e.target.value)}
+                              className="bg-white dark:bg-slate-900/90 border border-slate-300 dark:border-white/10 rounded-lg px-2 py-1.5 text-xs font-bold text-slate-800 dark:text-slate-200 w-full focus:outline-none focus:border-teal-500 dark:focus:border-cyan-400 disabled:opacity-60 cursor-pointer shadow-sm"
+                            >
+                              <option value="Unassigned">Unassigned</option>
+                              <option value="Zakat">Zakat</option>
+                              <option value="Non-Zakat">Non-Zakat</option>
+                            </select>
+                          </td>
+
+                          {/* Super Admin Actions: Primary Toggle, Add Code Variant & Delete */}
+                          {isSuperAdmin && (
+                            <td className="text-center py-2 px-2 w-24">
+                              <div className="flex items-center justify-center gap-1">
+                                {isMulti && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleTogglePrimary(r)}
+                                    className={`p-1.5 rounded-lg transition-all cursor-pointer ${
+                                      r.is_primary 
+                                        ? 'text-amber-500 bg-amber-500/20 border border-amber-400' 
+                                        : 'text-slate-400 hover:text-amber-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+                                    }`}
+                                    title={r.is_primary ? 'Current Primary Code for this Campaign' : 'Click to make this the Primary Code for this Campaign'}
+                                  >
+                                    <span className="text-xs font-bold">{r.is_primary ? '⭐' : '☆'}</span>
+                                  </button>
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={() => handleDuplicateRule(r)}
+                                  className="p-1.5 text-cyan-600 dark:text-cyan-400 hover:text-cyan-800 dark:hover:text-cyan-200 hover:bg-cyan-500/10 rounded-lg transition-colors cursor-pointer"
+                                  title="Add another Code variant rule for this campaign"
+                                >
+                                  <Plus className="w-4 h-4" />
+                                </button>
+                                <button 
+                                  type="button"
+                                  onClick={() => handleDeleteRule(r)}
+                                  className="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-500/10 rounded-lg transition-colors cursor-pointer"
+                                  title="Delete this classification rule"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
+                            </td>
+                          )}
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            )}
           </div>
 
           {/* 📑 Bottom Pagination Footer */}
@@ -1399,8 +1849,8 @@ export default function ClassificationView({ user }) {
                 Upload a CSV or Excel file containing classification rules. Required headers include:
                 <div className="mt-1.5 font-mono text-[11px] p-2 bg-slate-100 dark:bg-slate-800 rounded-lg text-slate-800 dark:text-slate-200">
                   {platform === 'paysuite' 
-                    ? 'Direct Debit Ref (Bank Ref), Platform Source, Code, Heading, Sub-Heading, Country, Zakat Eligibility'
-                    : 'Campaign Name, Community Name, Campaign URL, Code, Heading, Sub-Heading, Country, Zakat Eligibility'}
+                    ? 'Direct Debit Ref (Bank Ref), Platform Source, Code, Department, Office, Portfolio, Country, Zakat Eligibility'
+                    : 'Campaign Name, Community Name, Campaign URL, Code, Department, Office, Portfolio, Country, Zakat Eligibility'}
                 </div>
               </div>
 
@@ -1479,6 +1929,244 @@ export default function ClassificationView({ user }) {
                 >
                   {importing ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
                   <span>{importing ? 'Importing...' : 'Upload & Process'}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* 🏷️ Add / Edit Master Project Code Modal */}
+      {masterCodeModal && isSuperAdmin && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in">
+          <div className="glass-panel p-6 max-w-lg w-full rounded-2xl border border-white/20 shadow-2xl relative bg-white dark:bg-slate-900">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-200 dark:border-white/10">
+              <div className="flex items-center gap-2">
+                <Shield className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                <h3 className="text-base font-extrabold text-slate-900 dark:text-white">
+                  {masterCodeModal.isEdit ? `Edit Master Code: ${masterCodeModal.data.code}` : 'Add New Master Project Code'}
+                </h3>
+              </div>
+              <button 
+                onClick={() => setMasterCodeModal(null)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveMasterCodeSubmit} className="mt-4 flex flex-col gap-4">
+              {masterCodeModalMsg && (
+                <div className={`p-3 rounded-xl text-xs font-bold ${
+                  masterCodeModalMsg.includes('✅') 
+                    ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30'
+                    : 'bg-rose-500/10 text-rose-700 dark:text-rose-300 border border-rose-500/30'
+                }`}>
+                  {masterCodeModalMsg}
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 text-xs">
+                {/* Code */}
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-slate-700 dark:text-slate-300 font-bold uppercase tracking-wider text-[10px]">
+                    Project Code *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    disabled={masterCodeModal.isEdit}
+                    value={masterCodeModal.data.code}
+                    onChange={e => setMasterCodeModal(prev => ({ ...prev, data: { ...prev.data, code: e.target.value.toUpperCase() } }))}
+                    placeholder="e.g. EM-2024"
+                    className="bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-white/10 rounded-xl px-3 py-2 text-slate-900 dark:text-white text-xs font-mono font-bold uppercase focus:outline-none focus:border-emerald-500 disabled:opacity-60"
+                  />
+                </div>
+
+                {/* Department */}
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-slate-700 dark:text-slate-300 font-bold uppercase tracking-wider text-[10px]">
+                    Department *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={masterCodeModal.data.department}
+                    onChange={e => setMasterCodeModal(prev => ({ ...prev, data: { ...prev.data, department: e.target.value } }))}
+                    placeholder="e.g. Emergency"
+                    className="bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-white/10 rounded-xl px-3 py-2 text-slate-900 dark:text-white text-xs font-semibold focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+
+                {/* Office */}
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-slate-700 dark:text-slate-300 font-bold uppercase tracking-wider text-[10px]">
+                    Office *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={masterCodeModal.data.office}
+                    onChange={e => setMasterCodeModal(prev => ({ ...prev, data: { ...prev.data, office: e.target.value } }))}
+                    placeholder="e.g. Middle East"
+                    className="bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-white/10 rounded-xl px-3 py-2 text-slate-900 dark:text-white text-xs font-semibold focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+
+                {/* Portfolio */}
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-slate-700 dark:text-slate-300 font-bold uppercase tracking-wider text-[10px]">
+                    Portfolio (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={masterCodeModal.data.portfolio}
+                    onChange={e => setMasterCodeModal(prev => ({ ...prev, data: { ...prev.data, portfolio: e.target.value } }))}
+                    placeholder="e.g. Water & Sanitation"
+                    className="bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-white/10 rounded-xl px-3 py-2 text-slate-900 dark:text-white text-xs font-semibold focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+
+                {/* Country */}
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-slate-700 dark:text-slate-300 font-bold uppercase tracking-wider text-[10px]">
+                    Country *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={masterCodeModal.data.country}
+                    onChange={e => setMasterCodeModal(prev => ({ ...prev, data: { ...prev.data, country: e.target.value } }))}
+                    placeholder="e.g. Palestine"
+                    className="bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-white/10 rounded-xl px-3 py-2 text-slate-900 dark:text-white text-xs font-semibold focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+
+                {/* Zakat Eligibility */}
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-slate-700 dark:text-slate-300 font-bold uppercase tracking-wider text-[10px]">
+                    Zakat Eligibility
+                  </label>
+                  <select
+                    value={masterCodeModal.data.zakat_eligibility}
+                    onChange={e => setMasterCodeModal(prev => ({ ...prev, data: { ...prev.data, zakat_eligibility: e.target.value } }))}
+                    className="bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-white/10 rounded-xl px-3 py-2 text-slate-900 dark:text-white text-xs font-bold focus:outline-none focus:border-emerald-500 cursor-pointer"
+                  >
+                    <option value="Zakat">Zakat</option>
+                    <option value="Non-Zakat">Non-Zakat</option>
+                    <option value="Unassigned">Unassigned</option>
+                  </select>
+                </div>
+
+                {/* Programme Fund */}
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-slate-700 dark:text-slate-300 font-bold uppercase tracking-wider text-[10px]">
+                    Programme Fund
+                  </label>
+                  <input
+                    type="text"
+                    list="programme-fund-options"
+                    value={masterCodeModal.data.programme_fund || ''}
+                    onChange={e => setMasterCodeModal(prev => ({ ...prev, data: { ...prev.data, programme_fund: e.target.value.toUpperCase() } }))}
+                    placeholder="e.g. F1-EMR"
+                    className="bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-white/10 rounded-xl px-3 py-2 text-slate-900 dark:text-white text-xs font-mono font-bold focus:outline-none focus:border-emerald-500"
+                  />
+                  <datalist id="programme-fund-options">
+                    <option value="F1-EMR">F1-EMR (Emergency)</option>
+                    <option value="F2-OWH">F2-OWH (Orphan & Widow Care)</option>
+                    <option value="F3-FAM">F3-FAM (Family Support & Food)</option>
+                    <option value="F4-EDU">F4-EDU (Education)</option>
+                    <option value="F5-WAI">F5-WAI (Water & Sanitation)</option>
+                    <option value="F6-ZKT">F6-ZKT (General Zakat)</option>
+                  </datalist>
+                </div>
+
+                {/* Fund Code */}
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-slate-700 dark:text-slate-300 font-bold uppercase tracking-wider text-[10px]">
+                    Fund Code
+                  </label>
+                  <input
+                    type="text"
+                    value={masterCodeModal.data.fund_code || ''}
+                    onChange={e => setMasterCodeModal(prev => ({ ...prev, data: { ...prev.data, fund_code: e.target.value } }))}
+                    placeholder="e.g. 1001-01"
+                    className="bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-white/10 rounded-xl px-3 py-2 text-slate-900 dark:text-white text-xs font-mono focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+
+                {/* Legacy Non-Zakat GL Code */}
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-slate-700 dark:text-slate-300 font-bold uppercase tracking-wider text-[10px]">
+                    Legacy Non-Zakat GL Code
+                  </label>
+                  <input
+                    type="text"
+                    value={masterCodeModal.data.legacy_non_zakat_code || ''}
+                    onChange={e => setMasterCodeModal(prev => ({ ...prev, data: { ...prev.data, legacy_non_zakat_code: e.target.value } }))}
+                    placeholder="e.g. 5001-01"
+                    className="bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-white/10 rounded-xl px-3 py-2 text-slate-900 dark:text-white text-xs font-mono focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+
+                {/* Legacy Zakat GL Code */}
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-slate-700 dark:text-slate-300 font-bold uppercase tracking-wider text-[10px]">
+                    Legacy Zakat GL Code
+                  </label>
+                  <input
+                    type="text"
+                    value={masterCodeModal.data.legacy_zakat_code || ''}
+                    onChange={e => setMasterCodeModal(prev => ({ ...prev, data: { ...prev.data, legacy_zakat_code: e.target.value } }))}
+                    placeholder="e.g. 5001-02"
+                    className="bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-white/10 rounded-xl px-3 py-2 text-slate-900 dark:text-white text-xs font-mono focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+
+                {/* Old Code(s) */}
+                <div className="flex flex-col gap-1.5 sm:col-span-2">
+                  <label className="text-slate-700 dark:text-slate-300 font-bold uppercase tracking-wider text-[10px]">
+                    Old Code(s) (Comma separated aliases)
+                  </label>
+                  <input
+                    type="text"
+                    value={masterCodeModal.data.old_codes || ''}
+                    onChange={e => setMasterCodeModal(prev => ({ ...prev, data: { ...prev.data, old_codes: e.target.value } }))}
+                    placeholder="e.g. EM-PAL-23, EM-PAL-22"
+                    className="bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-white/10 rounded-xl px-3 py-2 text-slate-900 dark:text-white text-xs font-mono focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+              </div>
+
+              {/* Description */}
+              <div className="flex flex-col gap-1.5 text-xs">
+                <label className="text-slate-700 dark:text-slate-300 font-bold uppercase tracking-wider text-[10px]">
+                  Description (Optional)
+                </label>
+                <input
+                  type="text"
+                  value={masterCodeModal.data.description}
+                  onChange={e => setMasterCodeModal(prev => ({ ...prev, data: { ...prev.data, description: e.target.value } }))}
+                  placeholder="Brief notes or scope of this project code..."
+                  className="bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-white/10 rounded-xl px-3 py-2 text-slate-900 dark:text-white text-xs focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-200 dark:border-white/10">
+                <button
+                  type="button"
+                  onClick={() => setMasterCodeModal(null)}
+                  className="px-4 py-2 text-xs font-bold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingMasterCode}
+                  className="px-5 py-2 text-xs font-bold bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-xl shadow-lg shadow-emerald-500/20 hover:opacity-90 disabled:opacity-50 flex items-center gap-2 cursor-pointer"
+                >
+                  {savingMasterCode ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                  <span>{savingMasterCode ? 'Saving...' : 'Save & Cascade'}</span>
                 </button>
               </div>
             </form>

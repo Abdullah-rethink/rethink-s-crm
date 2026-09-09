@@ -5,6 +5,7 @@ import { API_BASE_URL } from '../config';
 export default function HorizontalFilters({ filters, onFilterChange, onResetFilters, accentColor = 'cyan' }) {
   const [filterOptions, setFilterOptions] = useState({
     sources: [],
+    programme_funds: [],
     headings: [],
     subheadings: [],
     countries: [],
@@ -14,7 +15,7 @@ export default function HorizontalFilters({ filters, onFilterChange, onResetFilt
     gift_aid_options: ['All Gift Aid Status', 'Yes', 'No']
   });
 
-  const [activeDropdown, setActiveDropdown] = useState(null); // 'payment', 'tier', 'source', 'heading', 'subheading', 'more'
+  const [activeDropdown, setActiveDropdown] = useState(null); // 'payment', 'tier', 'source', 'programme_fund', 'heading', 'subheading', 'more'
   const dropdownRef = useRef(null);
 
   // Fetch options dynamically based on current filters
@@ -24,6 +25,7 @@ export default function HorizontalFilters({ filters, onFilterChange, onResetFilt
       if (filters.payment_type) params.append('payment_type', filters.payment_type);
       if (filters.tier) params.append('tier', filters.tier);
       if (filters.source) params.append('source', filters.source);
+      if (filters.programme_fund) params.append('programme_fund', filters.programme_fund);
       if (filters.heading) params.append('heading', filters.heading);
       if (filters.subheading) params.append('subheading', filters.subheading);
       if (filters.country) params.append('country', filters.country);
@@ -219,7 +221,46 @@ export default function HorizontalFilters({ filters, onFilterChange, onResetFilt
           )}
         </div>
 
-        {/* Heading Pill */}
+        {/* Programme Fund Pill */}
+        <div className="relative">
+          <button
+            onClick={() => toggleDropdown('programme_fund')}
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-semibold transition-all hover:bg-slate-50 dark:hover:bg-slate-800/50 ${
+              filters.programme_fund && filters.programme_fund !== 'All Programme Funds'
+                ? `${actClass} font-bold`
+                : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-white/10'
+            }`}
+          >
+            <span>Fund: {!filters.programme_fund || filters.programme_fund === 'All Programme Funds' ? 'All' : filters.programme_fund}</span>
+            <ChevronDown className="w-3 h-3 opacity-60" />
+          </button>
+          
+          {activeDropdown === 'programme_fund' && (
+            <div className="absolute left-0 mt-2 w-64 bg-white dark:bg-slate-950 border border-slate-200 dark:border-white/10 rounded-xl shadow-xl z-50 py-1.5 animate-in fade-in slide-in-from-top-1 duration-150 max-h-60 overflow-y-auto custom-scrollbar">
+              <button
+                onClick={() => handleSelect('programme_fund', 'All Programme Funds')}
+                className={`w-full text-left px-4 py-2 text-xs hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors ${
+                  !filters.programme_fund || filters.programme_fund === 'All Programme Funds' ? 'text-cyan-500 font-bold' : 'text-slate-700 dark:text-slate-300'
+                }`}
+              >
+                All Programme Funds
+              </button>
+              {(filterOptions.programme_funds || []).map(opt => (
+                <button
+                  key={opt}
+                  onClick={() => handleSelect('programme_fund', opt)}
+                  className={`w-full text-left px-4 py-2 text-xs hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors ${
+                    filters.programme_fund === opt ? 'text-cyan-500 font-bold' : 'text-slate-700 dark:text-slate-300'
+                  }`}
+                >
+                  {opt}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Department Pill */}
         <div className="relative">
           <button
             onClick={() => toggleDropdown('heading')}
@@ -229,7 +270,7 @@ export default function HorizontalFilters({ filters, onFilterChange, onResetFilt
                 : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-white/10'
             }`}
           >
-            <span>Heading: {filters.heading === 'All Headings' ? 'All' : filters.heading}</span>
+            <span>Department: {filters.heading === 'All Headings' ? 'All' : filters.heading}</span>
             <ChevronDown className="w-3 h-3 opacity-60" />
           </button>
           
@@ -241,7 +282,7 @@ export default function HorizontalFilters({ filters, onFilterChange, onResetFilt
                   filters.heading === 'All Headings' ? 'text-cyan-500 font-bold' : 'text-slate-700 dark:text-slate-300'
                 }`}
               >
-                All Headings
+                All Departments
               </button>
               {filterOptions.headings.map(opt => (
                 <button
@@ -258,7 +299,7 @@ export default function HorizontalFilters({ filters, onFilterChange, onResetFilt
           )}
         </div>
 
-        {/* Sub-Heading Pill */}
+        {/* Office Pill */}
         <div className="relative">
           <button
             onClick={() => toggleDropdown('subheading')}
@@ -268,7 +309,7 @@ export default function HorizontalFilters({ filters, onFilterChange, onResetFilt
                 : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-white/10'
             }`}
           >
-            <span>Sub-Heading: {!filters.subheading || filters.subheading === 'All Sub-Headings' ? 'All' : filters.subheading}</span>
+            <span>Office: {!filters.subheading || filters.subheading === 'All Sub-Headings' ? 'All' : filters.subheading}</span>
             <ChevronDown className="w-3 h-3 opacity-60" />
           </button>
           
@@ -280,7 +321,7 @@ export default function HorizontalFilters({ filters, onFilterChange, onResetFilt
                   !filters.subheading || filters.subheading === 'All Sub-Headings' ? 'text-cyan-500 font-bold' : 'text-slate-700 dark:text-slate-300'
                 }`}
               >
-                All Sub-Headings
+                All Offices
               </button>
               {filterOptions.subheadings.map(opt => (
                 <button

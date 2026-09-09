@@ -21,6 +21,7 @@ class BulkEditDonorsRequest(BaseModel):
     filter_payment_type: Optional[str] = None
     filter_tier: Optional[str] = None
     filter_source: Optional[str] = None
+    filter_programme_fund: Optional[str] = None
     filter_heading: Optional[str] = None
     filter_subheading: Optional[str] = None
     filter_country: Optional[str] = None
@@ -108,10 +109,10 @@ def update_single_donor_record(payload: UpdateSingleDonorRequest):
         c_map = get_code_to_classification_map()
         if new_code_val in c_map:
             c_info = c_map[new_code_val]
-            for col in ["Heading", "Sub-Heading", "Country", "Zakat Eligibility"]:
+            for col in ["Department", "Office", "Portfolio", "Heading", "Sub-Heading", "Country", "Zakat Eligibility", "Programme Fund", "Fund Code"]:
                 if col in df_raw.columns:
-                    val = c_info.get(col, "Unassigned")
-                    if val != "Unassigned":
+                    val = c_info.get(col, "Unassigned" if col not in ["Portfolio", "Programme Fund", "Fund Code"] else "")
+                    if val != "Unassigned" and val != "":
                         if payload.updated_fields:
                             if payload.updated_fields.get(col) in [None, "", "Unassigned"]:
                                 df_raw.loc[target_idx, col] = val
@@ -180,7 +181,8 @@ def bulk_edit_donors(payload: BulkEditDonorsRequest):
         payload.filter_campaign_search,
         payload.filter_gift_aid,
         payload.filter_start_date,
-        payload.filter_end_date
+        payload.filter_end_date,
+        programme_fund=payload.filter_programme_fund
     )
 
     # 2. Apply search filter with multi-Donation ID support
@@ -194,6 +196,21 @@ def bulk_edit_donors(payload: BulkEditDonorsRequest):
     for col, val in zip(payload.target_columns, payload.new_values):
         if col and col in df_raw.columns:
             df_raw.loc[matching_indices, col] = val
+
+    # If 'Code' was among target columns, auto-fill Department, Office, Portfolio, Heading, Sub-Heading, Country, Zakat Eligibility, Programme Fund, Fund Code
+    if "Code" in payload.target_columns:
+        c_idx = payload.target_columns.index("Code")
+        new_c_val = str(payload.new_values[c_idx] or "").strip().lower()
+        if new_c_val and new_c_val not in ["unassigned", "nan", "none", "n/a", ""]:
+            from core.data_processor import get_code_to_classification_map
+            c_map = get_code_to_classification_map()
+            if new_c_val in c_map:
+                c_info = c_map[new_c_val]
+                for tc in ["Department", "Office", "Portfolio", "Heading", "Sub-Heading", "Country", "Zakat Eligibility", "Programme Fund", "Fund Code"]:
+                    if tc in df_raw.columns and tc not in payload.target_columns:
+                        t_val = c_info.get(tc, "Unassigned" if tc not in ["Portfolio", "Programme Fund", "Fund Code"] else "")
+                        if t_val != "Unassigned" and t_val != "":
+                            df_raw.loc[matching_indices, tc] = t_val
 
     from core.data_processor import sanitize_df_dtypes_for_parquet
     df_raw = sanitize_df_dtypes_for_parquet(df_raw)
@@ -275,11 +292,14 @@ def _apply_search_to_df(df: pd.DataFrame, search_str: str) -> pd.DataFrame:
     return df.loc[mask]
 
 
-def _apply_filters(df, payment_type=None, tier=None, source=None, heading=None, subheading=None, country=None, code=None, zakat=None, donor_country=None, campaign_search=None, gift_aid=None, start_date=None, end_date=None):
+def _apply_filters(df, payment_type=None, tier=None, source=None, heading=None, subheading=None, country=None, code=None, zakat=None, donor_country=None, campaign_search=None, gift_aid=None, start_date=None, end_date=None, programme_fund=None):
     if df is None or df.empty:
         return df
 
     mask = pd.Series(True, index=df.index)
+
+    if isinstance(programme_fund, str) and programme_fund.strip() and programme_fund != "All Programme Funds" and "Programme Fund" in df.columns:
+        mask &= (df["Programme Fund"].astype(str).str.strip().str.lower() == programme_fund.strip().lower())
 
     if isinstance(payment_type, str) and payment_type.strip() and payment_type != "All Payment Types" and "Payment Frequency" in df.columns:
         norm_type = payment_type.strip()
@@ -366,6 +386,7 @@ def get_donors_paginated(
     payment_type: Optional[str] = None,
     tier: Optional[str] = None,
     source: Optional[str] = None,
+    programme_fund: Optional[str] = None,
     heading: Optional[str] = None,
     subheading: Optional[str] = None,
     country: Optional[str] = None,
@@ -401,6 +422,10 @@ def get_donors_paginated(
             if "Platform" in avail_cols:
                 where_clauses.append('LOWER("Platform") != ?')
                 params.append("launchgood payout")
+
+            if programme_fund and programme_fund != "All Programme Funds" and "Programme Fund" in avail_cols:
+                where_clauses.append('LOWER("Programme Fund") = ?')
+                params.append(programme_fund.strip().lower())
 
             if payment_type and payment_type != "All Payment Types" and "Payment Frequency" in avail_cols:
                 norm_type = payment_type.strip()
@@ -561,7 +586,7 @@ def get_donors_paginated(
             "records": []
         }
 
-    filtered_df = _apply_filters(df_raw, payment_type, tier, source, heading, subheading, country, code, zakat, donor_country, campaign_search, gift_aid, start_date, end_date)
+    filtered_df = _apply_filters(df_raw, payment_type, tier, source, heading, subheading, country, code, zakat, donor_country, campaign_search, gift_aid, start_date, end_date, programme_fund=programme_fund)
     display_df = _apply_search_to_df(filtered_df, search)
 
     total_records = len(display_df)
@@ -597,6 +622,7 @@ def export_donors(
     payment_type: Optional[str] = None,
     tier: Optional[str] = None,
     source: Optional[str] = None,
+    programme_fund: Optional[str] = None,
     heading: Optional[str] = None,
     subheading: Optional[str] = None,
     country: Optional[str] = None,
@@ -630,7 +656,8 @@ def export_donors(
         campaign_search=campaign_search,
         gift_aid=gift_aid,
         start_date=start_date,
-        end_date=end_date
+        end_date=end_date,
+        programme_fund=programme_fund
     )
     display_df = _apply_search_to_df(filtered_df, search)
 
@@ -670,6 +697,7 @@ def get_donors_kanban(
     payment_type: Optional[str] = None,
     tier: Optional[str] = None,
     source: Optional[str] = None,
+    programme_fund: Optional[str] = None,
     heading: Optional[str] = None,
     subheading: Optional[str] = None,
     country: Optional[str] = None,
@@ -681,7 +709,7 @@ def get_donors_kanban(
 ):
     """Returns donor cards grouped by LTV Tier for the Kanban Pipeline Board with column total sums."""
     df_raw = load_data()
-    df = _apply_filters(df_raw, payment_type, tier, source, heading, subheading, country, code, zakat, donor_country, campaign_search, gift_aid)
+    df = _apply_filters(df_raw, payment_type, tier, source, heading, subheading, country, code, zakat, donor_country, campaign_search, gift_aid, programme_fund=programme_fund)
 
     if df.empty or "Lifetime Donor Classification" not in df.columns:
         return {}

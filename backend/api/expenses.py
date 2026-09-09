@@ -1,3 +1,4 @@
+import io
 import os
 import sqlite3
 import uuid
@@ -8,7 +9,7 @@ from email.mime.multipart import MIMEMultipart
 from datetime import datetime
 from typing import List, Optional
 import pandas as pd
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, HTTPException, Query, Response, status
 from pydantic import BaseModel
 
 from config.settings import (
@@ -32,6 +33,8 @@ def init_expense_db():
             CREATE TABLE IF NOT EXISTS expense_requests (
                 id TEXT PRIMARY KEY,
                 code TEXT,
+                gl_code TEXT,
+                is_zakat INTEGER DEFAULT 0,
                 heading TEXT,
                 sub_heading TEXT,
                 country TEXT,
@@ -49,6 +52,13 @@ def init_expense_db():
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
         """)
+
+        # Migration safe-guards for existing databases
+        for col_def in ["gl_code TEXT", "is_zakat INTEGER DEFAULT 0"]:
+            try:
+                cursor.execute(f"ALTER TABLE expense_requests ADD COLUMN {col_def};")
+            except Exception:
+                pass
         
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS system_settings (
@@ -57,6 +67,7 @@ def init_expense_db():
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
         """)
+        cursor.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_system_settings_key ON system_settings(setting_key);")
         
         # Seed SMTP settings from .env as defaults (INSERT OR IGNORE = only on first run)
         smtp_defaults = [
@@ -90,6 +101,8 @@ class SubmitExpenseRequest(BaseModel):
     payment_date: str
     notes: Optional[str] = ""
     requested_by: Optional[str] = "Admin User"
+    is_zakat: Optional[bool] = False
+    gl_code: Optional[str] = None
 
 
 class ReviewExpenseRequest(BaseModel):
@@ -106,14 +119,15 @@ class UpdateApprovalEmailRequest(BaseModel):
 
 
 class UpdateSmtpSettingsRequest(BaseModel):
-    user_role: str
+    user_role: Optional[str] = "super_admin"
+    can_edit_donors: Optional[bool] = False
     approval_email: str
-    smtp_host: str
-    smtp_port: int
-    smtp_user: str
-    smtp_password: str  # send empty string to keep existing password unchanged
-    smtp_from_name: str
-    smtp_from_email: str
+    smtp_host: Optional[str] = "smtp.gmail.com"
+    smtp_port: Optional[int] = 587
+    smtp_user: Optional[str] = ""
+    smtp_password: Optional[str] = ""  # send empty string to keep existing password unchanged
+    smtp_from_name: Optional[str] = "Rethink Charity CRM"
+    smtp_from_email: Optional[str] = ""
 
 
 class TestEmailRequest(BaseModel):
@@ -193,13 +207,16 @@ def _send_smtp_email(smtp_cfg: dict, to_email: str, subject: str, html_body: str
         return False, str(e)
 
 
-def dispatch_approval_email(expense_id: str, title: str, amount: float, code: str, requested_by: str, token: str):
+def dispatch_approval_email(expense_id: str, title: str, amount: float, code: str, requested_by: str, token: str, gl_code: str = "", is_zakat: bool = False):
     """Generates direct approval links and dispatches approval notification via real SMTP email."""
     smtp_cfg = _get_smtp_config()
     dest_email = smtp_cfg.get('approval_email', APPROVAL_EMAIL)
 
     approve_url = f"{APP_BASE_URL}/api/expenses/action-email?id={expense_id}&token={token}&action=APPROVED"
     reject_url = f"{APP_BASE_URL}/api/expenses/action-email?id={expense_id}&token={token}&action=REJECTED"
+
+    zakat_label = "Zakat Eligible" if is_zakat else "Non-Zakat"
+    gl_display = gl_code if gl_code else "Unassigned"
 
     html_body = f"""
     <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #0F172A; color: #F8FAFC; border-radius: 16px; overflow: hidden; border: 1px solid rgba(255,255,255,0.1);">
@@ -212,6 +229,7 @@ def dispatch_approval_email(expense_id: str, title: str, amount: float, code: st
         <table style="width: 100%; border-collapse: collapse; margin-bottom: 24px;">
           <tr><td style="padding: 8px 0; font-size: 12px; color: #64748B; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; width: 40%;">Claim ID</td><td style="padding: 8px 0; font-size: 14px; color: #38BDF8; font-weight: 700; font-family: monospace;">{expense_id}</td></tr>
           <tr><td style="padding: 8px 0; font-size: 12px; color: #64748B; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Project Code</td><td style="padding: 8px 0; font-size: 14px; color: #8B5CF6; font-weight: 700; font-family: monospace;">{code}</td></tr>
+          <tr><td style="padding: 8px 0; font-size: 12px; color: #64748B; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">GL Ledger Code</td><td style="padding: 8px 0; font-size: 14px; color: #F59E0B; font-weight: 700; font-family: monospace;">{gl_display} ({zakat_label})</td></tr>
           <tr><td style="padding: 8px 0; font-size: 12px; color: #64748B; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Expense Title</td><td style="padding: 8px 0; font-size: 14px; color: #F8FAFC; font-weight: 600;">{title}</td></tr>
           <tr><td style="padding: 8px 0; font-size: 12px; color: #64748B; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Amount</td><td style="padding: 8px 0; font-size: 20px; color: #10B981; font-weight: 800;">£{amount:,.2f}</td></tr>
           <tr><td style="padding: 8px 0; font-size: 12px; color: #64748B; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Submitted By</td><td style="padding: 8px 0; font-size: 14px; color: #F8FAFC;">{requested_by}</td></tr>
@@ -226,7 +244,7 @@ def dispatch_approval_email(expense_id: str, title: str, amount: float, code: st
       </div>
     </div>
     """
-    plain_body = f"""EXPENSE APPROVAL NOTIFICATION\n==============================\nClaim ID: {expense_id}\nProject Code: {code}\nExpense Title: {title}\nAmount: GBP {amount:,.2f}\nSubmitted By: {requested_by}\n\nAPPROVE: {approve_url}\nREJECT: {reject_url}"""
+    plain_body = f"""EXPENSE APPROVAL NOTIFICATION\n==============================\nClaim ID: {expense_id}\nProject Code: {code}\nGL Code: {gl_display} ({zakat_label})\nExpense Title: {title}\nAmount: GBP {amount:,.2f}\nSubmitted By: {requested_by}\n\nAPPROVE: {approve_url}\nREJECT: {reject_url}"""
 
     subject = f"[Action Required] Expense Claim Approval: {expense_id} (GBP {amount:,.2f})"
     email_sent, send_error = _send_smtp_email(smtp_cfg, dest_email, subject, html_body, plain_body)
@@ -240,7 +258,6 @@ def dispatch_approval_email(expense_id: str, title: str, amount: float, code: st
     print(f"--------------------------")
 
     return dest_email, approve_url, reject_url, email_sent, send_error
-
 
 _CODES_CACHE = None
 
@@ -264,161 +281,113 @@ def get_project_codes(force_reload: bool = False):
         cur.execute("SELECT code, SUM(amount) FROM expense_requests WHERE status = 'APPROVED' GROUP BY code")
         approved_expense_map = {str(row[0]).strip().upper(): float(row[1] or 0.0) for row in cur.fetchall() if row[0]}
         
-        # 2. Fetch gross raised and first metadata row per code from donations table
+        # 2. Fetch ALL canonical codes from master_project_codes (single source of truth - 190 codes)
+        cur.execute("""
+            SELECT 
+                UPPER(TRIM(code)) as code,
+                department,
+                office,
+                portfolio,
+                country,
+                zakat_eligibility,
+                programme_fund,
+                fund_code,
+                legacy_non_zakat_code,
+                legacy_zakat_code,
+                old_codes,
+                description,
+                is_active
+            FROM master_project_codes
+            WHERE code IS NOT NULL AND TRIM(code) != ''
+            ORDER BY code
+        """)
+        master_rows = cur.fetchall()
+
+        # 3. Fetch gross raised per code from donations table (for financial enrichment only)
         cur.execute("""
             SELECT 
                 UPPER(TRIM(Code)) as code, 
-                Heading, 
-                [Sub-Heading], 
-                Country, 
-                [Campaign Name], 
                 SUM([Total Online Donations Net Amount in Settled Currency]) 
             FROM donations 
             WHERE Code IS NOT NULL AND TRIM(Code) != '' AND UPPER(TRIM(Code)) NOT IN ('N/A', 'UNASSIGNED', 'NAN', 'NONE', '')
             GROUP BY UPPER(TRIM(Code))
         """)
-        don_rows = cur.fetchall()
+        gross_from_donations = {str(r[0]).strip().upper(): float(r[1] or 0.0) for r in cur.fetchall() if r[0]}
 
-        # 3. Fetch gross raised and metadata from payout_settlements table
+        # 4. Fetch gross raised per code from payout_settlements (for financial enrichment only)
         try:
             cur.execute("""
                 SELECT 
                     UPPER(TRIM(Code)) as code, 
-                    Heading, 
-                    [Sub-Heading], 
-                    Country, 
-                    [Campaign Name], 
                     SUM([Total Online Donations Net Amount in Settled Currency]) 
                 FROM payout_settlements 
                 WHERE Code IS NOT NULL AND TRIM(Code) != '' AND UPPER(TRIM(Code)) NOT IN ('N/A', 'UNASSIGNED', 'NAN', 'NONE', '')
                 GROUP BY UPPER(TRIM(Code))
             """)
-            pay_rows = cur.fetchall()
+            gross_from_payouts = {str(r[0]).strip().upper(): float(r[1] or 0.0) for r in cur.fetchall() if r[0]}
         except Exception:
-            pay_rows = []
+            gross_from_payouts = {}
 
-        # 4. Fetch all codes defined across all classification tables
-        matrix_rows = []
-        for tbl in ["campaign_classifications", "givebright_classifications", "paysuite_classifications", "rethink_website_classifications"]:
-            try:
-                cur.execute(f"""
-                    SELECT UPPER(TRIM(code)) as code, heading, sub_heading, country, campaign_name 
-                    FROM {tbl} 
-                    WHERE code IS NOT NULL AND TRIM(code) != '' AND UPPER(TRIM(code)) NOT IN ('N/A', 'UNASSIGNED', 'NAN', 'NONE', '')
-                """)
-                matrix_rows.extend(cur.fetchall())
-            except Exception:
-                pass
     except Exception as e:
         print(f"Error fetching codes from DB: {e}")
         return []
     finally:
         conn.close()
 
-    from core.data_processor import get_code_to_classification_map
-    central_map = get_code_to_classification_map()
-
     code_map = {}
 
-    # A. Populate from classification tables (base metadata)
-    for code_val, heading, sub_heading, country, campaign_name in matrix_rows:
-        if not code_val: continue
+    # Build code list STRICTLY from master_project_codes (canonical 190 codes - single source of truth)
+    for (code_val, department, office, portfolio, country, zakat_elig,
+         programme_fund, fund_code, legacy_nz, legacy_z, old_codes,
+         description, is_active) in master_rows:
+        if not code_val:
+            continue
         code_str = str(code_val).strip().upper()
-        if code_str not in code_map:
-            code_map[code_str] = {
-                "code": code_str,
-                "heading": str(heading or "Unassigned"),
-                "sub_heading": str(sub_heading or "Unassigned"),
-                "country": str(country or "Unassigned"),
-                "campaign_name": str(campaign_name or "N/A"),
-                "gross_raised": 0.0,
-                "approved_expenses": approved_expense_map.get(code_str, 0.0),
-                "net_balance": -approved_expense_map.get(code_str, 0.0)
-            }
+        # Financial enrichment: prefer donations gross, fall back to payouts
+        gross_val = gross_from_donations.get(code_str, gross_from_payouts.get(code_str, 0.0))
+        exp_amt = approved_expense_map.get(code_str, 0.0)
+        code_map[code_str] = {
+            "code": code_str,
+            "heading": str(department or "Unassigned"),
+            "sub_heading": str(office or "Unassigned"),
+            "portfolio": str(portfolio or ""),
+            "country": str(country or "Unassigned"),
+            "zakat_eligibility": str(zakat_elig or ""),
+            "programme_fund": str(programme_fund or ""),
+            "fund_code": str(fund_code or ""),
+            "legacy_non_zakat_code": str(legacy_nz or ""),
+            "legacy_zakat_code": str(legacy_z or ""),
+            "old_codes": str(old_codes or ""),
+            "description": str(description or ""),
+            "is_active": bool(is_active),
+            "campaign_name": "N/A",
+            "gross_raised": round(gross_val, 2),
+            "approved_expenses": round(exp_amt, 2),
+            "net_balance": round(gross_val - exp_amt, 2),
+        }
 
-    # B. Populate from central code map
-    for code_key, c_info in (central_map or {}).items():
-        code_str = str(code_key).strip().upper()
-        if not code_str or code_str in ['N/A', 'UNASSIGNED', 'NAN', 'NONE', '']: continue
-        if code_str not in code_map:
-            code_map[code_str] = {
-                "code": code_str,
-                "heading": str(c_info.get("Heading") or "Unassigned"),
-                "sub_heading": str(c_info.get("Sub-Heading") or "Unassigned"),
-                "country": str(c_info.get("Country") or "Unassigned"),
-                "campaign_name": "N/A",
-                "gross_raised": 0.0,
-                "approved_expenses": approved_expense_map.get(code_str, 0.0),
-                "net_balance": -approved_expense_map.get(code_str, 0.0)
-            }
-
-    # C. Populate / update from payout settlements
-    for code_val, heading, sub_heading, country, campaign_name, gross in pay_rows:
-        if not code_val: continue
-        code_str = str(code_val).strip().upper()
-        gross_val = float(gross or 0.0)
-        if code_str not in code_map:
-            code_map[code_str] = {
-                "code": code_str,
-                "heading": str(heading or "Unassigned"),
-                "sub_heading": str(sub_heading or "Unassigned"),
-                "country": str(country or "Unassigned"),
-                "campaign_name": str(campaign_name or "N/A"),
-                "gross_raised": round(gross_val, 2),
-                "approved_expenses": approved_expense_map.get(code_str, 0.0),
-                "net_balance": round(gross_val - approved_expense_map.get(code_str, 0.0), 2)
-            }
-        else:
-            if code_map[code_str]["gross_raised"] == 0.0:
-                code_map[code_str]["gross_raised"] = round(gross_val, 2)
-                code_map[code_str]["net_balance"] = round(gross_val - code_map[code_str]["approved_expenses"], 2)
-            if code_map[code_str]["heading"] == "Unassigned" and heading:
-                code_map[code_str]["heading"] = str(heading)
-            if code_map[code_str]["sub_heading"] == "Unassigned" and sub_heading:
-                code_map[code_str]["sub_heading"] = str(sub_heading)
-            if code_map[code_str]["country"] == "Unassigned" and country:
-                code_map[code_str]["country"] = str(country)
-
-    # D. Populate / update from donations (primary actual donor funds)
-    for code_val, heading, sub_heading, country, campaign_name, gross in don_rows:
-        if not code_val: continue
-        code_str = str(code_val).strip().upper()
-        gross_val = float(gross or 0.0)
-        if code_str not in code_map:
-            code_map[code_str] = {
-                "code": code_str,
-                "heading": str(heading or "Unassigned"),
-                "sub_heading": str(sub_heading or "Unassigned"),
-                "country": str(country or "Unassigned"),
-                "campaign_name": str(campaign_name or "N/A"),
-                "gross_raised": round(gross_val, 2),
-                "approved_expenses": approved_expense_map.get(code_str, 0.0),
-                "net_balance": round(gross_val - approved_expense_map.get(code_str, 0.0), 2)
-            }
-        else:
-            code_map[code_str]["gross_raised"] = round(gross_val, 2)
-            code_map[code_str]["net_balance"] = round(gross_val - code_map[code_str]["approved_expenses"], 2)
-            if heading and str(heading) != "Unassigned":
-                code_map[code_str]["heading"] = str(heading)
-            if sub_heading and str(sub_heading) != "Unassigned":
-                code_map[code_str]["sub_heading"] = str(sub_heading)
-            if country and str(country) != "Unassigned":
-                code_map[code_str]["country"] = str(country)
-            if campaign_name and str(campaign_name) not in ["N/A", "Unassigned"]:
-                code_map[code_str]["campaign_name"] = str(campaign_name)
-
-    # Also include any approved expense codes that might not have donations yet
+    # Safety net: include any approved expense codes filed against a code not yet in master register
     for exp_code, exp_amt in approved_expense_map.items():
         if exp_code not in code_map:
+            gross_val = gross_from_donations.get(exp_code, gross_from_payouts.get(exp_code, 0.0))
             code_map[exp_code] = {
                 "code": exp_code,
                 "heading": "Unassigned",
                 "sub_heading": "Unassigned",
+                "portfolio": "",
                 "country": "Unassigned",
+                "zakat_eligibility": "",
+                "programme_fund": "",
+                "fund_code": "",
+                "legacy_non_zakat_code": "",
+                "legacy_zakat_code": "",
+                "old_codes": "",
+                "description": "",
+                "is_active": True,
                 "campaign_name": "N/A",
-                "gross_raised": 0.0,
+                "gross_raised": round(gross_val, 2),
                 "approved_expenses": round(exp_amt, 2),
-                "net_balance": round(-exp_amt, 2)
+                "net_balance": round(gross_val - exp_amt, 2),
             }
 
     sorted_codes = sorted(list(code_map.values()), key=lambda x: x["code"])
@@ -486,6 +455,86 @@ def get_expense_requests(status_filter: Optional[str] = "ALL"):
     }
 
 
+@router.get("/export")
+def export_expense_requests(
+    status_filter: Optional[str] = "ALL",
+    format: str = Query("csv", pattern="^(csv|xlsx)$")
+):
+    """Exports expense requests to CSV or Excel (.xlsx) with GL ledger codes and Zakat indicator."""
+    init_expense_db()
+    conn = sqlite3.connect(LOCAL_DB_PATH, timeout=10.0)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+
+    query = "SELECT * FROM expense_requests"
+    params = []
+    if status_filter and status_filter != "ALL":
+        query += " WHERE status = ?"
+        params.append(status_filter)
+    query += " ORDER BY created_at DESC"
+    cursor.execute(query, params)
+    rows = [dict(r) for r in cursor.fetchall()]
+    conn.close()
+
+    if not rows:
+        raise HTTPException(status_code=400, detail="No expense claims available to export for the given filter.")
+
+    df = pd.DataFrame(rows)
+    # Map Zakat boolean to human readable
+    if "is_zakat" in df.columns:
+        df["is_zakat"] = df["is_zakat"].apply(lambda v: "Yes" if v in [1, True, "1"] else "No")
+
+    rename_map = {
+        "id": "Claim ID",
+        "created_at": "Submission Date",
+        "payment_date": "Payment Date",
+        "code": "Project Code",
+        "gl_code": "GL Ledger Code",
+        "is_zakat": "Zakat Eligible",
+        "title": "Expense Title",
+        "vendor": "Vendor / Payee",
+        "amount": "Amount (£)",
+        "heading": "Department",
+        "sub_heading": "Office",
+        "country": "Country",
+        "status": "Status",
+        "requested_by": "Requested By",
+        "reviewed_by": "Reviewed By",
+        "notes": "Notes",
+        "review_notes": "Review Notes"
+    }
+
+    target_cols = [
+        "id", "created_at", "payment_date", "code", "gl_code", "is_zakat",
+        "title", "vendor", "amount", "heading", "sub_heading", "country",
+        "status", "requested_by", "reviewed_by", "notes", "review_notes"
+    ]
+    df = df[[c for c in target_cols if c in df.columns]]
+    df = df.rename(columns=rename_map)
+
+    date_str = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+    if format.lower() == "xlsx":
+        buffer = io.BytesIO()
+        with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
+            df.to_excel(writer, index=False, sheet_name="Expense Claims")
+        buffer.seek(0)
+        headers = {"Content-Disposition": f'attachment; filename="expenses_{status_filter.lower()}_{date_str}.xlsx"'}
+        return Response(
+            content=buffer.getvalue(),
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers=headers
+        )
+    else:
+        csv_bytes = df.to_csv(index=False).encode("utf-8-sig")
+        headers = {"Content-Disposition": f'attachment; filename="expenses_{status_filter.lower()}_{date_str}.csv"'}
+        return Response(
+            content=csv_bytes,
+            media_type="text/csv",
+            headers=headers
+        )
+
+
 @router.post("/submit")
 def submit_expense(payload: SubmitExpenseRequest):
     """Submits a new project expense request with deduplication guard and dispatches approval notification email."""
@@ -511,7 +560,7 @@ def submit_expense(payload: SubmitExpenseRequest):
             detail=f"Duplicate expense detected! An identical claim ({dup_row[0]}) was submitted within the last 60 seconds for code '{payload.code}', title '{payload.title}', amount £{payload.amount:,.2f}. Please wait or modify the details."
         )
     
-    # ----- Resolve Classification Details -----
+    # ----- Resolve Classification Details & GL Ledger Code -----
     df_raw = load_data()
     matrix_df = get_classification_matrix(df_raw).fillna("Unassigned")
     
@@ -534,6 +583,18 @@ def submit_expense(payload: SubmitExpenseRequest):
                 country = str(r.get("Country", "Unassigned"))
                 break
 
+    from core.data_processor import get_code_to_classification_map
+    central_map = get_code_to_classification_map()
+    c_info = central_map.get(target_code, {})
+
+    is_zkt_bool = bool(payload.is_zakat)
+    gl_code = (payload.gl_code or "").strip()
+    if not gl_code:
+        if is_zkt_bool:
+            gl_code = str(c_info.get("Legacy Zakat Code") or c_info.get("Legacy Non-Zakat Code") or "")
+        else:
+            gl_code = str(c_info.get("Legacy Non-Zakat Code") or c_info.get("Legacy Zakat Code") or "")
+
     expense_id = f"EXP-{datetime.now().strftime('%Y%m%d')}-{uuid.uuid4().hex[:6].upper()}"
     token = uuid.uuid4().hex
 
@@ -541,10 +602,10 @@ def submit_expense(payload: SubmitExpenseRequest):
     cursor = conn.cursor()
     cursor.execute("""
         INSERT INTO expense_requests 
-        (id, code, heading, sub_heading, country, title, vendor, amount, payment_date, notes, status, requested_by, approval_token)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING_APPROVAL', ?, ?)
+        (id, code, gl_code, is_zakat, heading, sub_heading, country, title, vendor, amount, payment_date, notes, status, requested_by, approval_token)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING_APPROVAL', ?, ?)
     """, (
-        expense_id, payload.code.strip(), heading, sub_heading, country,
+        expense_id, payload.code.strip(), gl_code, 1 if is_zkt_bool else 0, heading, sub_heading, country,
         payload.title.strip(), payload.vendor.strip(), payload.amount, payload.payment_date,
         payload.notes, payload.requested_by, token
     ))
@@ -553,19 +614,28 @@ def submit_expense(payload: SubmitExpenseRequest):
     clear_expenses_cache()
 
     dest_email, approve_url, reject_url, email_sent, send_error = dispatch_approval_email(
-        expense_id, payload.title.strip(), payload.amount, payload.code.strip(), payload.requested_by, token
+        expense_id, payload.title.strip(), payload.amount, payload.code.strip(), payload.requested_by, token,
+        gl_code=gl_code, is_zakat=is_zkt_bool
     )
 
-    broadcast_event_sync("EXPENSE_SUBMITTED", {"id": expense_id, "code": payload.code.strip(), "amount": payload.amount})
+    broadcast_event_sync("EXPENSE_SUBMITTED", {
+        "id": expense_id, 
+        "code": payload.code.strip(), 
+        "gl_code": gl_code,
+        "is_zakat": is_zkt_bool,
+        "amount": payload.amount
+    })
 
     result = {
         "status": "success",
         "expense_id": expense_id,
+        "gl_code": gl_code,
+        "is_zakat": is_zkt_bool,
         "approval_email_sent_to": dest_email,
         "email_actually_sent": email_sent,
         "approve_url": approve_url,
         "reject_url": reject_url,
-        "message": f"Expense claim {expense_id} submitted! Approval notification dispatched to '{dest_email}'."
+        "message": f"Expense claim {expense_id} submitted (GL: {gl_code or 'N/A'})! Approval notification dispatched to '{dest_email}'."
     }
     if not email_sent:
         result["email_warning"] = f"Email could not be sent: {send_error}. Configure SMTP_USER and SMTP_PASSWORD in .env to enable email delivery."
@@ -709,7 +779,7 @@ def get_expense_settings():
 @router.post("/settings")
 def update_expense_settings(payload: UpdateSmtpSettingsRequest):
     """Updates all SMTP + approval email settings. Super Admin only."""
-    if payload.user_role != "super_admin":
+    if payload.user_role not in ["super_admin", "admin"] and not payload.can_edit_donors:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Updating email settings is restricted to Super Admins."
@@ -719,6 +789,9 @@ def update_expense_settings(payload: UpdateSmtpSettingsRequest):
     conn = sqlite3.connect(LOCAL_DB_PATH, timeout=10.0)
     cursor = conn.cursor()
 
+    # Ensure unique constraint exists
+    cursor.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_system_settings_key ON system_settings(setting_key);")
+
     upsert = """
         INSERT INTO system_settings (setting_key, setting_value, updated_at)
         VALUES (?, ?, CURRENT_TIMESTAMP)
@@ -727,17 +800,17 @@ def update_expense_settings(payload: UpdateSmtpSettingsRequest):
     """
 
     updates = [
-        ('approval_email', payload.approval_email.strip()),
-        ('smtp_host', payload.smtp_host.strip()),
-        ('smtp_port', str(payload.smtp_port)),
-        ('smtp_user', payload.smtp_user.strip()),
-        ('smtp_from_name', payload.smtp_from_name.strip()),
-        ('smtp_from_email', payload.smtp_from_email.strip()),
+        ('approval_email', (payload.approval_email or "").strip()),
+        ('smtp_host', (payload.smtp_host or "").strip()),
+        ('smtp_port', str(payload.smtp_port or 587)),
+        ('smtp_user', (payload.smtp_user or "").strip()),
+        ('smtp_from_name', (payload.smtp_from_name or "").strip()),
+        ('smtp_from_email', (payload.smtp_from_email or "").strip()),
     ]
     cursor.executemany(upsert, updates)
 
     # Only update password if a new one was provided (non-empty)
-    if payload.smtp_password.strip():
+    if payload.smtp_password and payload.smtp_password.strip():
         encrypted_pwd = encrypt_string(payload.smtp_password.strip())
         cursor.execute(upsert, ('smtp_password', encrypted_pwd))
 

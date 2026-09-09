@@ -105,14 +105,17 @@ def seed_database_if_empty():
         try:
             conn = sqlite3.connect(LOCAL_DB_PATH, timeout=5.0)
             cursor = conn.cursor()
-            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='campaign_classifications'")
-            has_classifications = cursor.fetchone()
-            count = 0
-            if has_classifications:
-                cursor.execute("SELECT COUNT(*) FROM campaign_classifications")
-                count = cursor.fetchone()[0]
+            cursor.execute("SELECT name FROM sqlite_master WHERE name IN ('master_project_codes', 'platform_campaign_mappings', 'campaign_classifications')")
+            found_tables = [r[0] for r in cursor.fetchall()]
+            total_rules = 0
+            for tbl in found_tables:
+                try:
+                    cursor.execute(f"SELECT COUNT(*) FROM {tbl}")
+                    total_rules += cursor.fetchone()[0]
+                except Exception:
+                    pass
 
-            if count == 0:
+            if total_rules == 0:
                 print("[DB Auto-Seed] Database missing classifications, restoring from seed_database.sqlite...")
                 conn.close()
                 shutil.copyfile(seed_path, LOCAL_DB_PATH)
