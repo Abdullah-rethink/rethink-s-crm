@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Table, Search, Download, ChevronLeft, ChevronRight, Edit3, UserCheck, Eye, Columns, CheckSquare, Square, Save, ArrowUpDown, ArrowUp, ArrowDown, X, Check, AlertCircle } from 'lucide-react';
+import { Table, Search, Download, ChevronLeft, ChevronRight, ChevronDown, Edit3, UserCheck, Eye, Columns, CheckSquare, Square, Save, ArrowUpDown, ArrowUp, ArrowDown, X, Check, AlertCircle } from 'lucide-react';
 import { API_BASE_URL } from '../config';
 
 const DEFAULT_EXPLORER_COLUMNS = [
@@ -97,6 +97,7 @@ export default function ExplorerView({ user, filters, onSelectDonor }) {
   const [pageSize, setPageSize] = useState(100);
   const [currentPage, setCurrentPage] = useState(1);
   const [showColumnChooser, setShowColumnChooser] = useState(false);
+  const [showExportMenu, setShowExportMenu] = useState(false);
   const [columnFilterText, setColumnFilterText] = useState('');
   const [selectedColumns, setSelectedColumns] = useState(() => {
     return getStoredColumns() || DEFAULT_EXPLORER_COLUMNS;
@@ -483,7 +484,7 @@ export default function ExplorerView({ user, filters, onSelectDonor }) {
     return str.split('T')[0].split(' ')[0];
   };
 
-  const handleExportDonors = (format) => {
+  const handleExportDonors = (format, exportAll = false) => {
     const params = new URLSearchParams({
       format: format,
       search: search
@@ -506,6 +507,10 @@ export default function ExplorerView({ user, filters, onSelectDonor }) {
       if (filters.end_date) params.append('end_date', filters.end_date);
     }
 
+    if (!exportAll && selectedColumns && selectedColumns.length > 0) {
+      params.append('columns', selectedColumns.join(','));
+    }
+
     window.open(`${API_BASE_URL}/api/donors/export?${params.toString()}`, '_blank');
   };
 
@@ -522,22 +527,85 @@ export default function ExplorerView({ user, filters, onSelectDonor }) {
 
         <div className="flex items-center gap-2 flex-wrap">
           {/* Export Dropdown Group */}
-          <div className="flex items-center gap-1 bg-slate-900/90 border border-emerald-500/30 p-1 rounded-xl">
-            <button 
-              onClick={() => handleExportDonors('csv')}
-              className="text-xs font-bold text-emerald-400 hover:bg-emerald-500/20 px-2.5 py-1.5 rounded-lg flex items-center gap-1 transition-all"
-              title="Export filtered records as CSV file"
-            >
-              <Download className="w-3.5 h-3.5" /> CSV
-            </button>
-            <span className="text-white/20 text-xs">|</span>
-            <button 
-              onClick={() => handleExportDonors('xlsx')}
-              className="text-xs font-bold text-emerald-400 hover:bg-emerald-500/20 px-2.5 py-1.5 rounded-lg flex items-center gap-1 transition-all"
-              title="Export filtered records as Excel (.xlsx) file"
-            >
-              <Download className="w-3.5 h-3.5" /> Excel (.xlsx)
-            </button>
+          <div className="relative inline-block text-left">
+            <div className="flex items-center bg-slate-900/90 border border-emerald-500/30 p-1 rounded-xl shadow-lg">
+              <button 
+                onClick={() => handleExportDonors('xlsx', false)}
+                className="text-xs font-bold text-emerald-400 hover:bg-emerald-500/20 px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 transition-all"
+                title={`Export visible columns (${selectedColumns.length}) as Excel (.xlsx) - Fast`}
+              >
+                <Download className="w-3.5 h-3.5" /> Excel (.xlsx)
+              </button>
+              <span className="text-white/20 text-xs">|</span>
+              <button 
+                onClick={() => handleExportDonors('csv', false)}
+                className="text-xs font-bold text-emerald-400 hover:bg-emerald-500/20 px-2 py-1.5 rounded-lg flex items-center gap-1 transition-all"
+                title={`Export visible columns (${selectedColumns.length}) as CSV`}
+              >
+                CSV
+              </button>
+              <span className="text-white/20 text-xs">|</span>
+              <button
+                type="button"
+                onClick={() => setShowExportMenu(!showExportMenu)}
+                className="text-xs text-emerald-400 hover:bg-emerald-500/20 px-1.5 py-1.5 rounded-lg transition-all flex items-center"
+                title="More export options (All Columns, Full Data)"
+              >
+                <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showExportMenu ? 'rotate-180' : ''}`} />
+              </button>
+            </div>
+
+            {showExportMenu && (
+              <div 
+                className="absolute right-0 mt-1.5 w-64 bg-slate-900/95 border border-emerald-500/30 rounded-xl shadow-2xl py-2 z-50 backdrop-blur-md"
+                onMouseLeave={() => setShowExportMenu(false)}
+              >
+                <div className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-white/5">
+                  Export Options
+                </div>
+                <button
+                  type="button"
+                  onClick={() => { setShowExportMenu(false); handleExportDonors('xlsx', false); }}
+                  className="w-full text-left px-3 py-2 text-xs text-white hover:bg-emerald-500/20 flex items-center justify-between transition-colors"
+                >
+                  <span className="flex items-center gap-2">
+                    <Download className="w-3.5 h-3.5 text-emerald-400" /> Excel (Visible {selectedColumns.length} Cols)
+                  </span>
+                  <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded">Fast (~5s)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setShowExportMenu(false); handleExportDonors('xlsx', true); }}
+                  className="w-full text-left px-3 py-2 text-xs text-white hover:bg-emerald-500/20 flex items-center justify-between transition-colors"
+                >
+                  <span className="flex items-center gap-2">
+                    <Download className="w-3.5 h-3.5 text-emerald-400" /> Excel (All 140+ Columns)
+                  </span>
+                  <span className="text-[10px] font-bold text-slate-400 bg-white/5 px-1.5 py-0.5 rounded">Full Data</span>
+                </button>
+                <div className="border-t border-white/5 my-1" />
+                <button
+                  type="button"
+                  onClick={() => { setShowExportMenu(false); handleExportDonors('csv', false); }}
+                  className="w-full text-left px-3 py-2 text-xs text-white hover:bg-emerald-500/20 flex items-center justify-between transition-colors"
+                >
+                  <span className="flex items-center gap-2">
+                    <Download className="w-3.5 h-3.5 text-emerald-400" /> CSV (Visible {selectedColumns.length} Cols)
+                  </span>
+                  <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded">Instant</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setShowExportMenu(false); handleExportDonors('csv', true); }}
+                  className="w-full text-left px-3 py-2 text-xs text-white hover:bg-emerald-500/20 flex items-center justify-between transition-colors"
+                >
+                  <span className="flex items-center gap-2">
+                    <Download className="w-3.5 h-3.5 text-emerald-400" /> CSV (All 140+ Columns)
+                  </span>
+                  <span className="text-[10px] font-bold text-slate-400 bg-white/5 px-1.5 py-0.5 rounded">Full Data</span>
+                </button>
+              </div>
+            )}
           </div>
 
           <select

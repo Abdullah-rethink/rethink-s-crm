@@ -1,14 +1,26 @@
 import io
 import math
+import os
 import sqlite3
+import tempfile
 from datetime import datetime
 from typing import List, Optional
 import pandas as pd
 from fastapi import APIRouter, HTTPException, Query, Response, status
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
+from starlette.background import BackgroundTask
 
 from config.settings import LOCAL_DB_PATH, PARQUET_PATH, PAYOUTS_PARQUET_PATH
 from core.data_processor import load_data, load_payouts_data, sync_donor_classifications_to_matrix
+from core.fast_export import dataframe_to_fast_xlsx, dataframe_to_fast_csv
+
+def _cleanup_temp_file(path: str):
+    try:
+        if os.path.exists(path):
+            os.remove(path)
+    except Exception:
+        pass
 
 router = APIRouter(prefix="/api/donors", tags=["Donors & Explorer"])
 
@@ -619,6 +631,7 @@ def get_donors_paginated(
 def export_donors(
     format: str = Query("csv", pattern="^(csv|xlsx)$"),
     search: Optional[str] = "",
+    columns: Optional[str] = None,
     payment_type: Optional[str] = None,
     tier: Optional[str] = None,
     source: Optional[str] = None,
@@ -661,34 +674,41 @@ def export_donors(
     )
     display_df = _apply_search_to_df(filtered_df, search)
 
+    # Column selection: filter to requested columns if provided, otherwise drop all-empty columns
+    if columns:
+        req_cols = [c.strip() for c in columns.split(",") if c.strip()]
+        valid_cols = [c for c in req_cols if c in display_df.columns]
+        export_df = display_df[valid_cols] if valid_cols else display_df
+    else:
+        export_df = display_df.dropna(axis=1, how="all") if not display_df.empty else display_df
+
     date_str = datetime.now().strftime("%Y%m%d_%H%M%S")
 
     if format.lower() == "xlsx":
-        # Drop columns that are completely empty to speed up serialization
-        export_df = display_df.dropna(axis=1, how="all") if not display_df.empty else display_df
-        buffer = io.BytesIO()
-        try:
-            with pd.ExcelWriter(buffer, engine="xlsxwriter", engine_kwargs={"options": {"constant_memory": True}}) as writer:
-                export_df.to_excel(writer, index=False, sheet_name="Filtered Donors")
-        except Exception:
-            # Fallback to openpyxl if xlsxwriter is unavailable
-            with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
-                export_df.to_excel(writer, index=False, sheet_name="Filtered Donors")
+        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
+        temp_file_path = temp_file.name
+        temp_file.close()
 
-        buffer.seek(0)
-        headers = {"Content-Disposition": f'attachment; filename="filtered_donors_{date_str}.xlsx"'}
-        return Response(
-            content=buffer.getvalue(),
+        dataframe_to_fast_xlsx(export_df, temp_file_path, sheet_name="Filtered Donors")
+
+        return FileResponse(
+            path=temp_file_path,
+            filename=f"filtered_donors_{date_str}.xlsx",
             media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            headers=headers
+            background=BackgroundTask(_cleanup_temp_file, temp_file_path)
         )
     else:
-        csv_bytes = display_df.to_csv(index=False).encode('utf-8-sig')
-        headers = {"Content-Disposition": f'attachment; filename="filtered_donors_{date_str}.csv"'}
-        return Response(
-            content=csv_bytes,
+        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".csv")
+        temp_file_path = temp_file.name
+        temp_file.close()
+
+        dataframe_to_fast_csv(export_df, temp_file_path)
+
+        return FileResponse(
+            path=temp_file_path,
+            filename=f"filtered_donors_{date_str}.csv",
             media_type="text/csv",
-            headers=headers
+            background=BackgroundTask(_cleanup_temp_file, temp_file_path)
         )
 
 
